@@ -1,0 +1,41 @@
+# Local settings and private development records
+.local/
+.runtime/
+.vscode/
+.idea/
+.superdesign/
+.agents/
+.codex/
+AGENTS.md
+skills/
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.private.env
+*.private.properties
+application-secret.yml
+test.env
+
+# Dependencies and build output
+node_modules/
+target/
+dist/
+build/
+coverage/
+__pycache__/
+*.pyc
+*.log
+
+# Local database files and backups
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+*.dump
+*.bak
+
+# Operating system files
+.DS_Store
+Thumbs.db
