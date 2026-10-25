@@ -1,6 +1,6 @@
 # Phạm vi hệ thống
 
-Tài liệu Mốc A xác định phạm vi thiết kế của KDrive. Các yêu cầu dưới đây không thay thế bằng chứng triển khai hoặc kiểm thử. Xem [giới thiệu đề tài](../../README.md) và [kiến trúc](../architecture/system-architecture.md).
+Tài liệu xác định phạm vi thiết kế của KDrive. Mốc B công bố backend và database; frontend được đồng bộ ở mốc tiếp theo. Các yêu cầu dưới đây không thay thế bằng chứng triển khai hoặc kiểm thử. Xem [giới thiệu đề tài](../../README.md) và [kiến trúc](../architecture/system-architecture.md).
 
 ## Bài toán
 
@@ -41,6 +41,6 @@ Backend kiểm tra role, chủ sở hữu và chi nhánh; việc ẩn nút trên
 
 ## Giới hạn
 
-Không triển khai thanh toán online, microservices hoặc tra cứu GPLX từ cơ sở dữ liệu quốc gia trong phạm vi hiện tại. Cọc, phụ phí, no-show, gia hạn/trả muộn, sửa/phát hành lại chứng từ và lưu trữ/xóa dữ liệu cần chính sách cụ thể; không tự coi đã được giải quyết chỉ vì có trường dữ liệu.
+Không thu tiền thật, không dùng microservices hoặc tra cứu GPLX từ cơ sở dữ liệu quốc gia. Source có cọc thử nghiệm và xử lý hủy/no-show theo [chính sách cọc](../modules/booking-deposit.md), mặc định tắt. [Chính sách trả xe](../modules/return-policy.md) mới lưu snapshot và xác nhận theo phạm vi mô tả, không tự hoàn thiện thu phí trả muộn. Gia hạn, phụ phí khác, phát hành lại chứng từ và lưu trữ/xóa dữ liệu không được coi là đã giải quyết chỉ vì có trường dữ liệu.
 
 Lựa chọn mô hình, phạm vi dữ liệu và khả năng kiểm chứng tuyến đường phải được mô tả trong tài liệu chức năng tương ứng. Việc gọi mô hình có sẵn không được trình bày như tự huấn luyện mô hình.

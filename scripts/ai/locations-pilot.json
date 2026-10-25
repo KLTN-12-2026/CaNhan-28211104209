@@ -1,0 +1,592 @@
+{
+  "schemaVersion": "kdrive-locations-pilot-v1",
+  "region": "Da Nang - Hoi An",
+  "generatedAt": "2026-10-20T00:00:00Z",
+  "locations": [
+    {
+      "categoryName": "Bảo tàng & Văn hóa",
+      "name": "Bảo tàng Điêu khắc Chăm Đà Nẵng",
+      "latitude": 16.0602,
+      "longitude": 108.22317,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Số 2 đường 2 Tháng 9, phường Bình Hiên, quận Hải Châu, Đà Nẵng",
+        "coordinatesSource": "https://mapcarta.com/W302872188 (OSM way302872188; ODbL)",
+        "durationBasis": "Admin estimate for a short visit; source describes exhibits, it does not prescribe visit duration."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "TUESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "WEDNESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "THURSDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "FRIDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SATURDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SUNDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": 90,
+        "hoursEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Danh thắng Ngũ Hành Sơn",
+      "latitude": 16.0043044,
+      "longitude": 108.263527,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "81 Huyền Trân Công Chúa, phường Hòa Hải, quận Ngũ Hành Sơn, Đà Nẵng",
+        "coordinatesSource": "https://fr.wikipedia.org/wiki/Montagnes_de_Marbre (reference point within site; road snapping is an estimate)",
+        "durationBasis": "Admin estimate for a short visit; source describes exhibits, it does not prescribe visit duration."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "TUESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "WEDNESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "THURSDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "FRIDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SATURDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SUNDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "07:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": 120,
+        "hoursEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Bảo tàng & Văn hóa",
+      "name": "Bảo tàng Đà Nẵng",
+      "latitude": 16.07483,
+      "longitude": 108.22398,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "31 Trần Phú / 42–44 Bạch Đằng, Đà Nẵng",
+        "coordinatesSource": "https://mapcarta.com/W1368599361 (OSM way1368599361; ODbL)",
+        "durationBasis": "Admin estimate for a short visit; source describes exhibits, it does not prescribe visit duration."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "TUESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "WEDNESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "THURSDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "FRIDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SATURDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SUNDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": 90,
+        "hoursEvidence": {
+          "url": "https://www.baotangdanang.vn/tk-tu",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://www.baotangdanang.vn/tk-tu",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Bảo tàng & Văn hóa",
+      "name": "Bảo tàng Mỹ thuật Đà Nẵng",
+      "latitude": 16.07137,
+      "longitude": 108.21768,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "78 Lê Duẩn, Đà Nẵng",
+        "coordinatesSource": "https://mapcarta.com/W759913076 (OSM way759913076; ODbL)",
+        "durationBasis": "Admin estimate for a short visit; source describes exhibits, it does not prescribe visit duration."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "TUESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "WEDNESDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "THURSDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "FRIDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SATURDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          },
+          "SUNDAY": {
+            "state": "INTERVALS",
+            "intervals": [
+              {
+                "start": "08:00",
+                "end": "17:00",
+                "nextDay": false
+              }
+            ]
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": 60,
+        "hoursEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Di tích lịch sử",
+      "name": "Hội quán Phúc Kiến Hội An",
+      "latitude": 15.8778,
+      "longitude": 108.3308,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "46 Trần Phú, phường Minh An, Hội An",
+        "coordinatesSource": "Legacy candidate reference coordinates; Admin must confirm before enabling visit planning.",
+        "verificationNote": "No verified hours/dwell; excluded from automatic itinerary."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "TUESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "WEDNESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "THURSDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "FRIDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SATURDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SUNDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Chùa Linh Ứng Bãi Bụt Sơn Trà",
+      "latitude": 16.10017,
+      "longitude": 108.27785,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Bán đảo Sơn Trà, phường Thọ Quang, quận Sơn Trà, Đà Nẵng",
+        "coordinatesSource": "Legacy candidate reference coordinates; Admin must confirm before enabling visit planning.",
+        "verificationNote": "No verified hours/dwell; excluded from automatic itinerary."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "TUESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "WEDNESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "THURSDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "FRIDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SATURDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SUNDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Bãi biển Mỹ Khê Đà Nẵng",
+      "latitude": 16.05973,
+      "longitude": 108.24647,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Đường Võ Nguyên Giáp, phường Phước Mỹ, quận Sơn Trà, Đà Nẵng",
+        "coordinatesSource": "Legacy candidate reference coordinates; Admin must confirm before enabling visit planning.",
+        "verificationNote": "No verified hours/dwell; excluded from automatic itinerary."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "TUESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "WEDNESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "THURSDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "FRIDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SATURDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SUNDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Cầu Rồng Đà Nẵng",
+      "latitude": 16.0611,
+      "longitude": 108.2232,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Cầu Rồng, đường Nguyễn Văn Linh nối Võ Văn Kiệt, Đà Nẵng",
+        "coordinatesSource": "Legacy candidate reference coordinates; Admin must confirm before enabling visit planning.",
+        "verificationNote": "No verified hours/dwell; excluded from automatic itinerary."
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "TUESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "WEDNESDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "THURSDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "FRIDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SATURDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          },
+          "SUNDAY": {
+            "state": "UNKNOWN",
+            "intervals": []
+          }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    }
+  ],
+  "catalogNote": "4 usable curated candidates + 4 UNKNOWN; no main DB apply without catalog approval; OSM coordinates/attribution in provenance."
+}

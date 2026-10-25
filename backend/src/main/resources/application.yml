@@ -1,0 +1,45 @@
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 11MB
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/kdrive?connectionTimeZone=UTC}
+    username: ${DB_USER:kdrive}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
+  jackson:
+    time-zone: UTC
+app:
+  return-policy-enabled: ${RETURN_POLICY_ENABLED:false}
+  deposit-method: ${DEPOSIT_METHOD:VNPAY_SANDBOX}
+  deposit-enabled: ${DEPOSIT_ENABLED:false}
+  vnpay-tmn-code: ${VNPAY_TMN_CODE:}
+  vnpay-hash-secret: ${VNPAY_HASH_SECRET:}
+  vnpay-return-url: ${VNPAY_RETURN_URL:http://localhost:5173/user/payment-return}
+  license-photo-directory: ${LICENSE_PHOTO_DIRECTORY:../.runtime/private-license-photos}
+  jwt-secret: ${JWT_SECRET:}
+  token-minutes: ${TOKEN_MINUTES:30}
+  cors-origin: ${FRONTEND_ORIGIN:http://127.0.0.1:5173}
+  seed-enabled: ${SEED_ENABLED:false}
+  seed-password: ${SEED_PASSWORD:}
+  ai-recommendation-enabled: ${AI_RECOMMENDATION_ENABLED:false}
+  gemini-parser-enabled: ${GEMINI_PARSER_ENABLED:false}
+  qwen-parser-enabled: ${QWEN_PARSER_ENABLED:false}
+  ai-routing-enabled: ${AI_ROUTING_ENABLED:false}
+  qwen-model: ${QWEN_MODEL:qwen3:8b}

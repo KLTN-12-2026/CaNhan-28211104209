@@ -14,11 +14,32 @@ Tôi phát triển KDrive để giải quyết bài toán quản lý thuê xe t�
 
 Tôi sử dụng AI hỗ trợ phân tích yêu cầu, đề xuất giải pháp, viết và rà soát mã nguồn, xây dựng kiểm thử và biên soạn tài liệu. Tôi chịu trách nhiệm lựa chọn giải pháp, kiểm tra và giải thích kết quả sử dụng trong đồ án. AI hỗ trợ phát triển được phân biệt với tính năng AI phục vụ khách hàng của hệ thống.
 
-## Mốc A — Phạm vi và kiến trúc
+## Mốc B — Backend và database
 
-Repository của khoa được tạo sau khi đề tài đã được phát triển tại môi trường cá nhân. Nội dung được đồng bộ theo từng mốc chức năng; Mốc A giới thiệu phạm vi và kiến trúc hệ thống, không phải thời điểm bắt đầu lập trình.
+Repository khoa được tạo sau khi đề tài đã được phát triển tại môi trường cá nhân. Mốc B đồng bộ backend, migration, kiểm thử và công cụ chạy; đây không phải thời điểm bắt đầu lập trình.
 
-Bản cập nhật này chỉ gồm tài liệu nền tảng và quy tắc loại trừ file. Mô tả chức năng là phạm vi thiết kế, không phải tuyên bố mọi chức năng đã hoàn tất hoặc đã được kiểm thử. Repository tại Mốc A chưa chứa mã nguồn ứng dụng, vì vậy chưa có lệnh cài đặt, chạy hay tài khoản demo. Hướng dẫn tương ứng sẽ được bổ sung cùng mã nguồn ở các mốc tiếp theo.
+Bản công bố này chưa chứa frontend. Có thể chạy backend và sử dụng API; giao diện tích hợp được bổ sung ở mốc tiếp theo. Mã nguồn có các chức năng tùy chọn, không đồng nghĩa tất cả dịch vụ ngoài đã được cấu hình hoặc nghiệm thu.
+
+## Chạy backend
+
+Yêu cầu JDK 21, Maven Wrapper và MySQL 8. Chuẩn bị database và biến môi trường theo [hướng dẫn database](database/README.md).
+
+Từ thư mục gốc, dùng Git Bash:
+
+```bash
+bash scripts/run-backend-gitbash.sh
+```
+
+Script kiểm tra Java/cổng, build rồi chạy backend. Nó không tự tạo hoặc khởi động MySQL. Endpoint kiểm tra dịch vụ: `http://127.0.0.1:8080/api/v1/health` khi dùng cổng mặc định.
+
+Chạy kiểm thử và đóng gói:
+
+```bash
+cd backend
+bash ./mvnw verify
+```
+
+Một số test cần fixture MySQL riêng hoặc dịch vụ định tuyến và có thể bị bỏ qua khi thiếu cấu hình. Test H2, build hoặc health thành công không thay thế kiểm chứng MySQL và toàn luồng.
 
 ## Nhóm người sử dụng
 
@@ -42,7 +63,7 @@ Guest là người chưa đăng nhập, không phải role lưu trong tài kho�
 | Persistence | Spring Data JPA/Hibernate, adapter truy cập dữ liệu theo module |
 | AI và tuyến đường | Gọi qua backend; dữ liệu đầu ra phải được kiểm tra theo nghiệp vụ |
 
-Backend quyết định giá, quyền truy cập, lịch xe và trạng thái giao dịch. Phạm vi đồ án không bao gồm thanh toán trực tuyến hoặc kiến trúc microservices.
+Backend quyết định giá, quyền truy cập, lịch xe và trạng thái giao dịch. Hệ thống không dùng kiến trúc microservices. Source có thử nghiệm cọc VNPAY Sandbox và QR DEMO thủ công, mặc định tắt; không dùng để thu tiền thật. Hóa đơn không chứng minh đã thanh toán.
 
 ## Tài liệu
 
@@ -51,6 +72,13 @@ Backend quyết định giá, quyền truy cập, lịch xe và trạng thái gi
 | [Phạm vi hệ thống](docs/requirements/system-scope.md) | Bài toán, actor, nhóm nghiệp vụ và giới hạn |
 | [Kiến trúc hệ thống](docs/architecture/system-architecture.md) | Các thành phần, phân tầng và nguyên tắc toàn vẹn dữ liệu |
 
-## Các mốc đồng bộ dự kiến
+## Các mốc đồng bộ tiếp theo
 
-Sau Mốc A, các mốc tiếp theo sẽ bổ sung database và xác thực; quản lý xe và chi nhánh; đặt xe và giao nhận; chứng từ và sự cố; tính năng tư vấn và kiểm thử. Mỗi mốc ghi rõ phạm vi đã đưa lên và phần còn thiếu. Lịch sử công bố trên repository khoa được phân biệt với lịch sử phát triển trước đó tại môi trường cá nhân.
+Mốc C bổ sung frontend, assets và hướng dẫn chạy tích hợp. Các lượt sau tập trung sửa lỗi, kiểm thử, đánh giá AI và hoàn thiện tài liệu theo góp ý. Những phần đã có được phân biệt với công việc mới.
+
+## Chức năng tùy chọn
+
+- [Cọc sandbox và QR DEMO](docs/modules/booking-deposit.md): chỉ thử nghiệm; không coi QR DEMO hoặc kiểm thử giao thức nội bộ là thanh toán ngân hàng thật.
+- [Chính sách trả xe](docs/modules/return-policy.md): snapshot và xác nhận chính sách, mặc định tắt; chưa đồng nghĩa quy trình thu phí trả muộn đã hoàn chỉnh.
+- AI và định tuyến cần cấu hình, dữ liệu và dịch vụ tương ứng. Gọi mô hình có sẵn không phải tự huấn luyện mô hình.
+- Script khởi động chỉ nạp các biến kết nối, JWT, cổng và seed được hỗ trợ từ `.env.local`. Các cờ tùy chọn phải export trong shell theo tài liệu chức năng; không mặc định mọi biến trong file env đều được nạp.
