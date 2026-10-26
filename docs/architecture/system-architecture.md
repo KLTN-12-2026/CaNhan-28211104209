@@ -1,6 +1,6 @@
 # Kiến trúc hệ thống
 
-Tài liệu mô tả kiến trúc lựa chọn cho KDrive trong [phạm vi đề tài](../requirements/system-scope.md). Mốc A chưa công bố mã nguồn hoặc kết quả nghiệm thu ứng dụng.
+Tài liệu mô tả kiến trúc lựa chọn cho KDrive trong [phạm vi đề tài](../requirements/system-scope.md). Mốc B công bố backend và database; frontend được bổ sung ở mốc sau. Tài liệu kiến trúc không thay thế bằng chứng nghiệm thu ứng dụng.
 
 ## Thành phần
 
@@ -28,9 +28,9 @@ Chuyển trạng thái đơn và ghi hồ sơ giao nhận/chứng từ liên qua
 
 ## Schema và cấu hình
 
-Flyway là nguồn migration duy nhất, theo đường dẫn dự kiến `backend/src/main/resources/db/migration/` khi mã nguồn được công bố. Hibernate dùng validate, không tự sinh schema song song. Không sửa migration đã áp dụng trong môi trường dùng chung; nâng cấp cần kiểm tra lịch sử và dữ liệu.
+Flyway là nguồn migration duy nhất: SQL tại `backend/src/main/resources/db/migration/` và Java migration V9 tại `backend/src/main/java/db/migration/`, cùng namespace và history Flyway. Hibernate dùng validate, không tự sinh schema song song. Không sửa migration đã áp dụng trong môi trường dùng chung; nâng cấp cần kiểm tra lịch sử và dữ liệu.
 
-Mật khẩu được băm; cấu hình nhạy cảm nằm ngoài Git. Frontend không giữ khóa dịch vụ AI/Map. Các biến môi trường và hướng dẫn khởi động sẽ đi cùng mốc mã nguồn tương ứng.
+Mật khẩu được băm; cấu hình nhạy cảm nằm ngoài Git. Frontend không giữ khóa dịch vụ AI/Map. Các biến môi trường và hướng dẫn khởi động nằm trong [README](../../README.md) và [hướng dẫn database](../../database/README.md).
 
 ## Ranh giới AI và dữ liệu ngoài
 
@@ -38,6 +38,6 @@ AI hỗ trợ hiểu nhu cầu hoặc đề xuất phương án trên dữ liệ
 
 Dữ liệu demo và dữ liệu API tách biệt. Thông báo lỗi dịch vụ không được thay bằng kết quả demo mà không thông báo cho người dùng.
 
-## Kiểm thử dự kiến
+## Nguyên tắc kiểm thử
 
-Kiểm thử gồm unit, integration, quyền truy cập, trạng thái, transaction/concurrency MySQL và tương tác trình duyệt cho các luồng chính/ca âm. Build thành công, health endpoint hoặc kiểm thử H2 không thay thế kiểm chứng toàn luồng trên MySQL. Kết quả được báo theo phạm vi đã thực thi khi bổ sung mã nguồn; Mốc A chỉ kiểm tra tài liệu và liên kết.
+Kiểm thử gồm unit, integration, quyền truy cập, trạng thái, transaction/concurrency MySQL và tương tác trình duyệt cho các luồng chính/ca âm. Build thành công, health endpoint hoặc kiểm thử H2 không thay thế kiểm chứng toàn luồng trên MySQL. Phạm vi kiểm thử và các điều kiện chạy được mô tả tại [hướng dẫn kiểm thử backend](../testing/backend.md). Các ca chuyên biệt chưa chạy hoặc chưa tương thích không được tính là đã đạt.
