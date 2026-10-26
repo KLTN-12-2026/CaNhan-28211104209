@@ -14,11 +14,11 @@ Tôi phát triển KDrive để giải quyết bài toán quản lý thuê xe t�
 
 Tôi sử dụng AI hỗ trợ phân tích yêu cầu, đề xuất giải pháp, viết và rà soát mã nguồn, xây dựng kiểm thử và biên soạn tài liệu. Tôi chịu trách nhiệm lựa chọn giải pháp, kiểm tra và giải thích kết quả sử dụng trong đồ án. AI hỗ trợ phát triển được phân biệt với tính năng AI phục vụ khách hàng của hệ thống.
 
-## Mốc B — Backend và database
+## Mốc C — Frontend và tích hợp hệ thống
 
-Repository khoa được tạo sau khi đề tài đã được phát triển tại môi trường cá nhân. Mốc B đồng bộ backend, migration, kiểm thử và công cụ chạy; đây không phải thời điểm bắt đầu lập trình.
+Repository khoa được tạo sau khi đề tài đã được phát triển tại môi trường cá nhân. Mốc C bổ sung frontend, assets và hướng dẫn tích hợp trên nền backend/database Mốc B; đây không phải thời điểm bắt đầu lập trình.
 
-Bản công bố này chưa chứa frontend. Có thể chạy backend và sử dụng API; giao diện tích hợp được bổ sung ở mốc tiếp theo. Mã nguồn có các chức năng tùy chọn, không đồng nghĩa tất cả dịch vụ ngoài đã được cấu hình hoặc nghiệm thu.
+Bản công bố gồm frontend React/Vite và backend Spring Boot. Chạy API mode để sử dụng dữ liệu từ MySQL; demo mode chỉ mô phỏng giao diện. Mã nguồn có các chức năng tùy chọn, không đồng nghĩa tất cả dịch vụ ngoài đã được cấu hình hoặc nghiệm thu.
 
 ## Chạy backend
 
@@ -40,6 +40,29 @@ bash ./mvnw verify
 ```
 
 Một số test cần fixture MySQL riêng hoặc dịch vụ định tuyến và có thể bị bỏ qua khi thiếu cấu hình. Test H2, build hoặc health thành công không thay thế kiểm chứng MySQL và toàn luồng.
+
+## Chạy frontend và tích hợp
+
+Cài Node.js và npm (môi trường kiểm tra: Node.js 24.11.0, npm 11.6.1), JDK 21 và MySQL 8. Clone repository không thay thế bước cài môi trường. Maven Wrapper tải Maven/dependency ở lần chạy đầu; `npm ci` cần truy cập registry.
+
+Sau khi backend sẵn sàng, mở terminal Git Bash thứ hai tại thư mục repository:
+
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local
+cd ..
+bash scripts/run-frontend-gitbash.sh
+```
+
+Mở `http://127.0.0.1:5173`. Script dùng API mode, proxy `/api/v1` sang backend mặc định `127.0.0.1:8080`. Không đặt mật khẩu hoặc API secret vào biến `VITE_*`. Cấu hình mẫu frontend không chứa tài khoản thật.
+
+- Chuẩn bị tài khoản/dữ liệu mẫu theo [hướng dẫn database](database/README.md); seed chỉ bật khi chủ động cấu hình và không dùng mật khẩu thật.
+- Cổng bận: dừng đúng tiến trình của mình hoặc chọn cổng khác và đồng bộ CORS/proxy; không tắt dịch vụ của dự án khác.
+- Backend chưa sẵn sàng: kiểm tra cấu hình MySQL và health trước; frontend API không tự dùng dữ liệu demo để che lỗi.
+- Chi tiết PowerShell, demo/API và kiểm thử: [frontend README](frontend/README.md).
+- Chạy `npm test`, `npm run lint`, `npm run build` trong `frontend`. Build không thay thế kiểm thử nghiệp vụ trên trình duyệt.
+- Ctrl+C ở từng terminal để dừng dịch vụ đã khởi động. Scripts không tự khởi động hoặc xóa MySQL.
 
 ## Nhóm người sử dụng
 
@@ -74,7 +97,7 @@ Backend quyết định giá, quyền truy cập, lịch xe và trạng thái gi
 
 ## Các mốc đồng bộ tiếp theo
 
-Mốc C bổ sung frontend, assets và hướng dẫn chạy tích hợp. Các lượt sau tập trung sửa lỗi, kiểm thử, đánh giá AI và hoàn thiện tài liệu theo góp ý. Những phần đã có được phân biệt với công việc mới.
+Các lượt sau tập trung sửa lỗi, kiểm thử, đánh giá AI và hoàn thiện tài liệu theo góp ý. Những phần đã có được phân biệt với công việc mới.
 
 ## Chức năng tùy chọn
 
