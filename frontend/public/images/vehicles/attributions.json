@@ -1,0 +1,94 @@
+[
+  {
+    "id": "v1",
+    "vehicleName": "Toyota Vios",
+    "category": "Sedan",
+    "images": {
+      "main": {
+        "fileName": "toyota-vios.jpg",
+        "title": "Toyota Vios (XP150) sedan front view",
+        "author": "EurovisionNim",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Toyota_Vios_(XP150)_sedan_front_view.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "interior": {
+        "fileName": "toyota-vios-interior.jpg",
+        "title": "2018 Toyota Vios (XP150) 1.5 E CVT Sedan interior",
+        "author": "7715Mateenz",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2018_Toyota_Vios_(XP150)_1.5_E_CVT_Sedan_(2018-04-13)_interior.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      }
+    }
+  },
+  {
+    "id": "v2",
+    "vehicleName": "Mitsubishi Xpander",
+    "category": "MPV",
+    "images": {
+      "main": {
+        "fileName": "mitsubishi-xpander.jpg",
+        "title": "2022 Mitsubishi Xpander GLS",
+        "author": "Ethan Llamas",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2022_Mitsubishi_Xpander_GLS_(20221009)_01.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "interior": {
+        "fileName": "mitsubishi-xpander-interior.jpg",
+        "title": "2019 Mitsubishi Xpander Sport 1.5 NC1W interior",
+        "author": "Overdrive83 (オーバードライブ83)",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2019_Mitsubishi_Xpander_Sport_1.5_NC1W_interior_(20190722).jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      }
+    }
+  },
+  {
+    "id": "v3",
+    "vehicleName": "Hyundai Accent",
+    "category": "Sedan",
+    "images": {
+      "main": {
+        "fileName": "hyundai-accent.jpg",
+        "title": "2012 Hyundai Accent (RB) Premium sedan",
+        "author": "EurovisionNim",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2012_Hyundai_Accent_(RB)_Premium_sedan_(2018-10-01)_02.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "interior": {
+        "fileName": "hyundai-accent-interior.jpg",
+        "title": "2012 Hyundai Accent Sedan Interior",
+        "author": "Michael Gil",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2012_Hyundai_Accent_Sedan_Interior_(5491180534).jpg",
+        "license": "CC BY 2.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+      }
+    }
+  },
+  {
+    "id": "v4",
+    "vehicleName": "Toyota Corolla Cross",
+    "category": "SUV",
+    "images": {
+      "main": {
+        "fileName": "toyota-corolla-cross.jpg",
+        "title": "Toyota Corolla Cross Hybrid",
+        "author": "Alexander Migl",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Toyota_Corolla_Cross_Hybrid_1X7A6349.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      },
+      "interior": {
+        "fileName": "toyota-corolla-cross-interior.jpg",
+        "title": "2020 Toyota Corolla Cross 1.8 ZSG10R interior",
+        "author": "Overdrive83 (オーバードライブ83)",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:2020_Toyota_Corolla_Cross_1.8_ZSG10R_interior_(20201113).jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+      }
+    }
+  }
+]

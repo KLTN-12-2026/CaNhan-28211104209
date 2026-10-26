@@ -1,0 +1,75 @@
+import js from "@eslint/js";
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
+
+export default [
+  js.configs.recommended,
+  {
+    files: ["**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        browser: true,
+        es2022: true,
+        React: "writable",
+        window: "readonly",
+        document: "readonly",
+        localStorage: "readonly",
+        sessionStorage: "readonly",
+        URLSearchParams: "readonly",
+        FormData: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        Date: "readonly",
+        console: "readonly",
+        navigator: "readonly",
+        fetch: "readonly",
+        Promise: "readonly",
+        JSON: "readonly",
+        Map: "readonly",
+        Set: "readonly",
+        Array: "readonly",
+        Object: "readonly",
+        Error: "readonly",
+        RegExp: "readonly",
+        Math: "readonly",
+        Number: "readonly",
+        String: "readonly",
+        Boolean: "readonly",
+        Symbol: "readonly",
+        parseInt: "readonly",
+        parseFloat: "readonly",
+        isNaN: "readonly",
+        isFinite: "readonly",
+        encodeURIComponent: "readonly",
+        decodeURIComponent: "readonly",
+        encodeURI: "readonly",
+        decodeURI: "readonly",
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    settings: {
+      react: {
+        version: "19.1",
+      },
+    },
+    plugins: {
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
+    rules: {
+      ...reactPlugin.configs.recommended.rules,
+      ...reactHooksPlugin.configs.recommended.rules,
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
+];
