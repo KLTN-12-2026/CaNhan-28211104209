@@ -82,3 +82,7 @@ Mốc C bổ sung frontend, assets và hướng dẫn chạy tích hợp. Các l
 - [Chính sách trả xe](docs/modules/return-policy.md): snapshot và xác nhận chính sách, mặc định tắt; chưa đồng nghĩa quy trình thu phí trả muộn đã hoàn chỉnh.
 - AI và định tuyến cần cấu hình, dữ liệu và dịch vụ tương ứng. Gọi mô hình có sẵn không phải tự huấn luyện mô hình.
 - Script khởi động chỉ nạp các biến kết nối, JWT, cổng và seed được hỗ trợ từ `.env.local`. Các cờ tùy chọn phải export trong shell theo tài liệu chức năng; không mặc định mọi biến trong file env đều được nạp.
+
+## Hướng dẫn kiểm thử
+
+Xem [kiểm thử backend](docs/testing/backend.md) để phân biệt H2, MySQL, fixture chuyên biệt và giới hạn tái chạy của bản công bố. Repo cung cấp runner và snapshot cho migration/history; các ca guard hoặc dịch vụ ngoài vẫn cần fixture riêng. Không suy toàn bộ native suite đạt từ build mặc định.

@@ -40,4 +40,4 @@ Dữ liệu demo và dữ liệu API tách biệt. Thông báo lỗi dịch vụ
 
 ## Nguyên tắc kiểm thử
 
-Kiểm thử gồm unit, integration, quyền truy cập, trạng thái, transaction/concurrency MySQL và tương tác trình duyệt cho các luồng chính/ca âm. Build thành công, health endpoint hoặc kiểm thử H2 không thay thế kiểm chứng toàn luồng trên MySQL. Kết quả được báo theo phạm vi đã thực thi khi bổ sung mã nguồn; Mốc A chỉ kiểm tra tài liệu và liên kết.
+Kiểm thử gồm unit, integration, quyền truy cập, trạng thái, transaction/concurrency MySQL và tương tác trình duyệt cho các luồng chính/ca âm. Build thành công, health endpoint hoặc kiểm thử H2 không thay thế kiểm chứng toàn luồng trên MySQL. Phạm vi kiểm thử và các điều kiện chạy được mô tả tại [hướng dẫn kiểm thử backend](../testing/backend.md). Các ca chuyên biệt chưa chạy hoặc chưa tương thích không được tính là đã đạt.
