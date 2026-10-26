@@ -20,6 +20,22 @@ Repository khoa được tạo sau khi đề tài đã được phát triển t�
 
 Bản công bố gồm frontend React/Vite và backend Spring Boot. Chạy API mode để sử dụng dữ liệu từ MySQL; demo mode chỉ mô phỏng giao diện. Mã nguồn có các chức năng tùy chọn, không đồng nghĩa tất cả dịch vụ ngoài đã được cấu hình hoặc nghiệm thu.
 
+## Lấy mã và chuẩn bị môi trường
+
+Các lệnh dưới đây dùng Git Bash trên Windows; cần cài Git for Windows, Node.js/npm, JDK 21 và MySQL 8 trước. Repository không cung cấp sẵn database hoặc dependency của máy phát triển.
+
+```bash
+git clone https://github.com/KLTN-12-2026/CaNhan-28211104209.git
+cd CaNhan-28211104209
+node --version
+npm --version
+java -version
+```
+
+`java -version` phải là 21. Nếu có nhiều JDK, đặt `JAVA_HOME` trỏ tới thư mục JDK 21 thực tế và thêm `$JAVA_HOME/bin` vào `PATH` trong terminal chạy backend. Dùng dấu nháy khi đường dẫn có khoảng trắng; không sao chép nguyên đường dẫn ví dụ của máy khác.
+
+Chuẩn bị database/tài khoản MySQL và `backend/.env.local` theo hướng dẫn bên dưới. Frontend chỉ chạy độc lập ở demo mode; API mode cần backend/MySQL sẵn sàng.
+
 ## Chạy backend
 
 Yêu cầu JDK 21, Maven Wrapper và MySQL 8. Chuẩn bị database và biến môi trường theo [hướng dẫn database](database/README.md).

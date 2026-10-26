@@ -6,6 +6,28 @@ Dùng MySQL 8 với database riêng cho KDrive và tài khoản có quyền áp 
 
 Tạo database rỗng bằng công cụ quản trị MySQL trước khi khởi động ứng dụng. Flyway tạo và nâng cấp các bảng; không nhập DDL thủ công song song.
 
+## Chuẩn bị database mới
+
+Chỉ chạy bước này trên MySQL do bạn quản lý và đã xác nhận là môi trường dành riêng cho KDrive. Nếu đã có database hoặc tài khoản cùng tên, kiểm tra lại quyền và dữ liệu; không drop/reset để chạy lại ví dụ.
+
+Trong MySQL Workbench hoặc MySQL CLI đăng nhập bằng tài khoản quản trị:
+
+```sql
+CREATE DATABASE kdrive CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'kdrive'@'localhost' IDENTIFIED BY '<mat_khau_rieng_cua_ban>';
+GRANT ALL PRIVILEGES ON kdrive.* TO 'kdrive'@'localhost';
+```
+
+Thay mật khẩu mẫu trước khi chạy. Đây là ví dụ kết nối local tới MySQL cài trực tiếp; nếu MySQL nằm trong Docker hoặc máy khác, quản trị viên phải chọn host của tài khoản theo nguồn kết nối thực tế. Không mở quyền từ mọi host chỉ để vượt lỗi đăng nhập. Quyền trên `kdrive.*` phục vụ Flyway trong môi trường đồ án, không cấp quyền quản trị toàn máy chủ.
+
+Kiểm tra bằng đúng host/cổng/tài khoản dùng cho ứng dụng (`-p` hỏi mật khẩu, không ghi mật khẩu vào dòng lệnh):
+
+```bash
+mysql --host=127.0.0.1 --port=33385 --user=kdrive -p kdrive
+```
+
+Thay cổng ví dụ bằng cổng MySQL của bạn. Nếu chưa có CLI, dùng chức năng Test Connection của Workbench. Chưa tạo bảng thủ công; Flyway sẽ tạo bảng khi backend khởi động.
+
 ## Cấu hình
 
 Tạo `backend/.env.local` trên máy, không commit file này:
@@ -52,3 +74,14 @@ Các tài khoản mẫu gồm `admin@example.test`, `user@example.test`, `staff.
 ## Chức năng tùy chọn
 
 Cọc và chính sách trả xe mặc định tắt. Xem [cọc thử nghiệm](../docs/modules/booking-deposit.md) và [chính sách trả xe](../docs/modules/return-policy.md). Không chuyển tiền thật trong môi trường demo.
+
+## Khi khởi động chưa thành công
+
+- `Missing required backend setting`: kiểm tra tên file `backend/.env.local`, các biến bắt buộc và terminal đang dùng. Script chỉ đọc các biến được hỗ trợ; không gửi nội dung file chứa mật khẩu vào báo lỗi công khai.
+- `Java 21 is required`: sửa `JAVA_HOME`/`PATH` trong cùng terminal rồi kiểm tra lại phiên bản.
+- `Unknown database`: tạo database rỗng trên đúng server/cổng trước, không nhập các file migration bằng tay.
+- `Access denied`: kiểm tra mật khẩu, host của tài khoản và quyền trên đúng database.
+- Lỗi kết nối: kiểm tra MySQL đã chạy và cổng trong `DB_URL`; không mặc định cổng ví dụ đã có trên máy mới.
+- Lỗi checksum/history Flyway: giữ dữ liệu và log, kiểm tra lịch sử migration; không tự `clean`, `repair` hoặc xóa schema để vượt lỗi.
+
+Khi báo lỗi, gửi tên lệnh, phiên bản môi trường và thông báo lỗi đã che thông tin nhạy cảm. Build thành công chưa chứng minh database kết nối hoặc các luồng ứng dụng hoạt động.
