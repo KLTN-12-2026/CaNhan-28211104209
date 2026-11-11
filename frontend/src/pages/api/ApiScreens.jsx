@@ -4,6 +4,7 @@ import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
+import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
@@ -1251,6 +1252,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const [queue, setQueue] = useState("all");
   const [depositPhase,setDepositPhase]=useState("");
   const [returnDebt,setReturnDebt]=useState(false);
+  const [scheduleWarning, setScheduleWarning] = useState('');
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
   const [sort, setSort] = useState("createdAt_desc");
   const [page, setPage] = useState(1);
@@ -1269,13 +1271,14 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     sort: isFilterActive ? sort : "createdAt_desc",
     depositPhase,
     returnDebt,
+    scheduleWarning: area === 'user' ? '' : scheduleWarning,
   });
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const activePage = Math.min(Math.max(1, page), totalPages);
 
-  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${returnDebt}`;
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${returnDebt}|${scheduleWarning}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -1343,6 +1346,11 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             ))}
           </select>
         </Field>
+        {area !== 'user' ? <Field label="Cảnh báo lịch xe">
+          <select value={scheduleWarning} onChange={event => setScheduleWarning(event.target.value)}>
+            <option value="">Tất cả</option><option value="early">Cần theo dõi</option><option value="overdue">Xe quá hạn / chưa về</option>
+          </select>
+        </Field> : null}
         <div className="space-y-3">
         <Field label="Hàng đợi">
           <select value={queue} onChange={event => setQueue(event.target.value)}>
@@ -1467,6 +1475,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       Tạo lúc {area === "admin" ? adminDateFormat(booking.createdAt, { withTime: true }) : dateTime(booking.createdAt)}
                     </p>
                   ) : null}
+                  <ScheduleWarnings booking={booking} area={area} />
                 </div>
                 <div className="flex items-center gap-4">
                   <strong>{money(booking.total)}</strong>
@@ -1795,6 +1804,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     Tổng tiền không xác nhận đã thanh toán.
                   </p>
                 </section>
+                <ScheduleWarnings booking={booking} area={area} />
                 <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} />
                 {detail.records?.length ? (
                   <section className="panel">

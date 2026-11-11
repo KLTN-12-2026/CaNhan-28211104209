@@ -46,17 +46,18 @@ afterEach(async()=>{for(const root of roots.splice(0))await act(async()=>root.un
 after(async()=>{Date.now=originalNow;await vite.close();dom.window.close();for(const[k,v]of originals){if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}if(oldMode===undefined)delete process.env.VITE_DATA_MODE;else process.env.VITE_DATA_MODE=oldMode;});
 async function mount(mode='all',entry='/',area='staff'){const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF',fullName:'Nhân viên kiểm thử'}}},h(Topbar,{areaLabel:'Nhân viên'}),h(List,{area,mode})))));return c;}
 async function select(el,value){await act(async()=>{el.value=value;el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
+const selectField=(c,label)=>[...c.querySelectorAll('label')].find(e=>e.textContent.startsWith(label)).querySelector('select');
 const names=c=>[...c.querySelectorAll('article h2')].map(el=>el.textContent);
 test('Calendar on queue/handover/return defaults Vietnam today, supports selection, empty, refresh and All',async()=>{
  for(const mode of ['all','handover','return']){
-  const c=await mount(mode),queue=c.querySelectorAll('select')[1];assert.equal(c.querySelector('input[type="date"]'),null);await select(queue,'date');let calendar=c.querySelector('input[type="date"]');assert.equal(calendar.value,'2026-10-16');assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới']:mode==='handover'?['Xe cũ']:['Xe trả']);
+  const c=await mount(mode),queue=selectField(c,'Hàng đợi');assert.equal(c.querySelector('input[type="date"]'),null);await select(queue,'date');let calendar=c.querySelector('input[type="date"]');assert.equal(calendar.value,'2026-10-16');assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới']:mode==='handover'?['Xe cũ']:['Xe trả']);
   async function date(value){await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(calendar,value);calendar.dispatchEvent(new dom.window.Event('input',{bubbles:true}));calendar.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
   await date('2026-10-17');assert.deepEqual(names(c),mode==='handover'?['Xe mới']:[]);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'date');assert.equal(calendar.value,'2026-10-17');
   await date('');assert.deepEqual(names(c),[]);assert.match(c.textContent,/Vui lòng chọn ngày/);await date('2026-10-17');await select(queue,'all');assert.equal(c.querySelector('input[type="date"]'),null);assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới','Xe cũ','Xe trả']:mode==='handover'?['Xe mới','Xe cũ']:['Xe trả']);await select(queue,'date');calendar=c.querySelector('input[type="date"]');assert.equal(calendar.value,'2026-10-17');await select(queue,'today');assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới']:mode==='handover'?['Xe cũ']:['Xe trả']);
  }
 });
 test('Handover status list replaces buttons, scopes All and retains date/search/refresh/deep link',async()=>{
- const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');
+ const c=await mount('handover'),[status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];
  assert.equal(c.querySelector('section[aria-label="Nhóm bàn giao xe"]'),null);assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn bàn giao','Chờ bàn giao','Đã bàn giao · Đang thuê']);assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới','Xe cũ']);
  await select(status,'IN_PROGRESS');assert.deepEqual(names(c),['Xe trả']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/bookings\/return$/);
  await select(queue,'today');assert.deepEqual(names(c),[]);assert.match(c.textContent,/Không có đơn phù hợp/);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe cũ']);assert.equal(queue.value,'today');
@@ -72,19 +73,19 @@ test('Operational All excludes unrelated statuses and return includes received a
  assert.deepEqual(ids(visibleBookings(fixtures,{mode:'return',status:'RETURNED',queue:'today',query:'Khách A',now})),['RETURNED']);assert.deepEqual(visibleBookings(fixtures,{mode:'return',queue:'today',now:now+86400000}),[]);assert.equal(visibleBookings(fixtures).length,8);
 });
 test('Return offers only work statuses and scoped All; date, routes and refresh stay usable',async()=>{
- const c=await mount('return'),[status,queue]=c.querySelectorAll('select');assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn nhận trả','Chờ nhận trả · Đang thuê','Đã nhận xe · Chờ hoàn tất','Đã hoàn tất']);assert.equal(status.value,'IN_PROGRESS');assert.deepEqual(names(c),['Xe trả']);
+ const c=await mount('return'),[status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn nhận trả','Chờ nhận trả · Đang thuê','Đã nhận xe · Chờ hoàn tất','Đã hoàn tất']);assert.equal(status.value,'IN_PROGRESS');assert.deepEqual(names(c),['Xe trả']);
  for(const value of ['RETURNED','COMPLETED']){await select(status,value);assert.deepEqual(names(c),[]);assert.match(c.textContent,/Không có đơn phù hợp/);}
  await select(status,'');assert.deepEqual(names(c),['Xe trả']);await select(queue,'today');assert.deepEqual(names(c),['Xe trả']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(status.value,'');assert.equal(queue.value,'today');
 });
 test('Actual staff page renders Vietnamese enum labels, newest first, Today and refresh without losing filters',async()=>{
  const c=await mount();assert.deepEqual(names(c),['Xe vừa tạo','Xe mới','Xe cũ','Xe trả']);assert.match(c.querySelector('header').textContent,/Nhân viên/);assert.doesNotMatch(c.querySelector('header').textContent,/STAFF/);
- const [status,queue]=c.querySelectorAll('select');assert.deepEqual([...status.options].slice(1).map(o=>o.textContent),Object.values(bookingStatusLabels));assert.equal(status.options[1].value,'PENDING');assert.equal(queue.value,'all');
+ const [status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];assert.deepEqual([...status.options].slice(1).map(o=>o.textContent),Object.values(bookingStatusLabels));assert.equal(status.options[1].value,'PENDING');assert.equal(queue.value,'all');
  await select(queue,'today');assert.deepEqual(names(c),['Xe vừa tạo','Xe mới']);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'today');assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await select(queue,'all');assert.deepEqual(names(c),['Xe mới','Xe cũ']);assert.doesNotMatch(c.textContent,/Lọc theo ngày tạo đơn/);
  assert.equal(roleLabels.ADMIN,'Quản trị viên');
 });
 test('Actual handover/return pages apply work dates and retain operation route IDs',async()=>{
- const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');assert.equal(status.value,'CONFIRMED');await select(queue,'today');assert.deepEqual(names(c),['Xe cũ']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/handover\/old$/);assert.doesNotMatch(c.textContent,/Lọc theo ngày nhận xe/);
- const d=await mount('return'),fields=d.querySelectorAll('select');assert.equal(fields[0].value,'IN_PROGRESS');await select(fields[1],'today');assert.deepEqual(names(d),['Xe trả']);assert.match(d.querySelector('article a').getAttribute('href'),/\/staff\/return\/return$/);assert.doesNotMatch(d.textContent,/Lọc theo ngày trả xe/);
+ const c=await mount('handover'),[status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];assert.equal(status.value,'CONFIRMED');await select(queue,'today');assert.deepEqual(names(c),['Xe cũ']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/handover\/old$/);assert.doesNotMatch(c.textContent,/Lọc theo ngày nhận xe/);
+ const d=await mount('return'),fields=[selectField(d,'Trạng thái'),selectField(d,'Hàng đợi')];assert.equal(fields[0].value,'IN_PROGRESS');await select(fields[1],'today');assert.deepEqual(names(d),['Xe trả']);assert.match(d.querySelector('article a').getAttribute('href'),/\/staff\/return\/return$/);assert.doesNotMatch(d.textContent,/Lọc theo ngày trả xe/);
 });
 
 test('Booking lists omit explanatory hints for every account and retain calendar controls',async()=>{
@@ -92,7 +93,7 @@ test('Booking lists omit explanatory hints for every account and retain calendar
   const c=await mount(mode,'/',area);
   assert.doesNotMatch(c.textContent,/Đơn mới tạo được hiển thị trước|Lọc theo|Tất cả không giới hạn ngày/);
   assert.ok([...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách'));
-  await select(c.querySelectorAll('select')[1],'date');
+  await select(selectField(c,'Hàng đợi'),'date');
   assert.ok(c.querySelector('input[type="date"]'));
   assert.doesNotMatch(c.textContent,/Đây là bộ lọc danh sách/);
  }
@@ -154,7 +155,7 @@ test('Admin booking list supports sort, pagination, copy UUID feedback, and rese
  assert.match(c.textContent, /Trang 1\//);
 
  // Changing sort
- const sortSelect = c.querySelectorAll('select')[2];
+ const sortSelect = selectField(c,'Sắp xếp');
  assert.ok(sortSelect);
  await select(sortSelect, 'createdAt_asc');
  assert.match(c.textContent, /Cũ tạo trước/);
