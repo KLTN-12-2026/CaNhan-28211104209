@@ -2,7 +2,7 @@
 
 ## Bộ phân loại rủi ro lịch xe nội bộ
 
-`ScheduleRiskPolicy` tính thuần từ danh sách lịch của **một xe** và thời điểm do bên gọi lấy từ Clock backend. Chỉ xét đơn nhận/trả cùng một chi nhánh; các đơn liên quan phải cùng chi nhánh đó. Không cần snapshot chính sách tính phí để nhận biết rủi ro, không tính tiền, không ghi DB hoặc đổi trạng thái. Bộ phân loại được dùng khi Staff/Admin đọc danh sách và chi tiết đơn; chưa có giao diện hiển thị cảnh báo.
+`ScheduleRiskPolicy` tính thuần từ danh sách lịch của **một xe** và thời điểm do bên gọi lấy từ Clock backend. Chỉ xét đơn nhận/trả cùng một chi nhánh; các đơn liên quan phải cùng chi nhánh đó. Không cần snapshot chính sách tính phí để nhận biết rủi ro, không tính tiền, không ghi DB hoặc đổi trạng thái. Bộ phân loại được dùng khi Staff/Admin đọc danh sách và chi tiết đơn; giao diện desktop hiển thị cảnh báo, bộ lọc và liên kết đơn liên quan theo quyền đọc, như mô tả bên dưới.
 
 - `RETURN_DUE_NEXT_DAY_BOOKING`: đơn A còn IN_PROGRESS, hôm nay là ngày trả và có đơn B nhận ngày kế tiếp. Gắn với A, tham chiếu B; chưa gọi A là quá hạn. Không cảnh báo sớm cho B nhận cách hai ngày hoặc xa hơn.
 - `OVERDUE`: A chưa trả và đã vượt hạn. Đơn theo ngày bắt đầu quá hạn từ 00:00 ngày kế tiếp theo Asia/Ho_Chi_Minh; thời điểm cuối ngày lưu ở độ chính xác microsecond vẫn chưa quá hạn. Đơn legacy dùng đúng thời điểm kết thúc cũ (từ thời điểm đó), không chuyển sang thuê theo ngày.
@@ -16,7 +16,7 @@ A được nhận trả thì rủi ro do A chưa về biến mất; điều này
 
 Tìm xe, báo giá, tạo đơn, xác nhận thường và xác nhận từ cọc dùng kiểm tra lịch chung. Bộ phân loại và kiểm tra lịch dùng cùng mốc quá hạn: đơn theo ngày từ đầu ngày kế tiếp tại Việt Nam; legacy từ thời điểm kết thúc. Cảnh báo sớm không tự chặn lịch hợp lệ. Xe quá hạn chưa trả không được bảo đảm cho đơn kế tiếp, kể cả ngày nhận còn xa; báo giá cũ không bỏ qua kiểm tra lại khi tạo đơn.
 
-Duyệt yêu cầu đóng cọc kiểm tra xe ACTIVE trước khi lưu duyệt, đồng thời kiểm tra lại lịch và GPLX. Nếu khoản cọc đã được ghi nhận nhưng không thể xác nhận do lịch xe, giữ quy trình hoàn khoản chưa áp dụng hiện có; không tự phát hành hợp đồng hay giành lại lịch. Bàn giao tiếp tục yêu cầu xe sẵn sàng tại đúng chi nhánh và không còn đơn khác IN_PROGRESS. Nhận trả không bỏ qua trạng thái bảo dưỡng. Các khóa xe/đơn, version và isolation của workflow không thay đổi; cảnh báo API chỉ được bổ sung ở luồng đọc mô tả bên dưới, chưa có UI.
+Duyệt yêu cầu đóng cọc kiểm tra xe ACTIVE trước khi lưu duyệt, đồng thời kiểm tra lại lịch và GPLX. Nếu khoản cọc đã được ghi nhận nhưng không thể xác nhận do lịch xe, giữ quy trình hoàn khoản chưa áp dụng hiện có; không tự phát hành hợp đồng hay giành lại lịch. Bàn giao tiếp tục yêu cầu xe sẵn sàng tại đúng chi nhánh và không còn đơn khác IN_PROGRESS. Nhận trả không bỏ qua trạng thái bảo dưỡng. Các khóa xe/đơn, version và isolation của workflow không thay đổi; cảnh báo API ở luồng đọc và giao diện desktop không thay thế kiểm tra backend khi thao tác.
 
 `RETURN_POLICY_ENABLED` mặc định `false` (`app.return-policy-enabled`). Chỉ bật trên fixture thử; giữ tắt ở môi trường sử dụng cho đến khi nhận trả, công nợ và bảo vệ lịch hoàn chỉnh. Cờ điều khiển áp chính sách khi tạo đơn mới; đơn đã chấp nhận chính sách vẫn sử dụng snapshot nếu tắt cờ. Ghi thu thủ công khoản vượt hạn có nhật ký riêng; chưa thay lịch.
 
