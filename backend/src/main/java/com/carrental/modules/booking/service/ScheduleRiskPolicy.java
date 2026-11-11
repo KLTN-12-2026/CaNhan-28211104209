@@ -25,10 +25,7 @@ public final class ScheduleRiskPolicy {
         for (var active : rows) {
             if (!"IN_PROGRESS".equals(active.status())) continue;
             LocalDate returnDate = active.end().atZone(RentalTerms.VIETNAM).toLocalDate();
-            // Calendar end is stored at 23:59:59.999999; the last microsecond still belongs to that day.
-            Instant deadline = active.calendar()
-                    ? returnDate.plusDays(1).atStartOfDay(RentalTerms.VIETNAM).toInstant() : active.end();
-            boolean overdue = !now.isBefore(deadline);
+            boolean overdue = SchedulePolicy.isOverdue(active, now);
             long lateDays = Math.max(0, ChronoUnit.DAYS.between(returnDate, today));
             if (overdue) risks.add(new Risk(Kind.OVERDUE, active.id(), null, returnDate, lateDays));
             for (var next : rows) {

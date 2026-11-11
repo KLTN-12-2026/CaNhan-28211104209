@@ -404,6 +404,7 @@ public class BookingService {
         if (!b.depositRequired || !"PENDING".equals(effective(b))) throw DomainException.conflict("Đơn không còn chờ duyệt đóng cọc.");
 
         var v = vehicles.lock(b.vehicleId);
+        if (!"ACTIVE".equals(v.status)) throw DomainException.conflict("Xe không còn sẵn sàng.");
         licenses.eligible(b.userId, v.transmission, v.seats, b.endAt);
         licenses.requirePhotos(b.userId, true);
         schedule(v, null, null);
