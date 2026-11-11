@@ -1,5 +1,17 @@
 # Chính sách trả xe — snapshot và xác nhận lúc đặt
 
+## Bộ phân loại rủi ro lịch xe nội bộ
+
+`ScheduleRiskPolicy` tính thuần từ danh sách lịch của **một xe** và thời điểm do bên gọi lấy từ Clock backend. Chỉ xét đơn nhận/trả cùng một chi nhánh; các đơn liên quan phải cùng chi nhánh đó. Không cần snapshot chính sách tính phí để nhận biết rủi ro, không tính tiền, không ghi DB hoặc đổi trạng thái. Đây là thành phần nội bộ chưa nối vào API, UI hay các điểm chặn lịch; không đồng nghĩa cảnh báo đã xuất hiện trên website.
+
+- `RETURN_DUE_NEXT_DAY_BOOKING`: đơn A còn IN_PROGRESS, hôm nay là ngày trả và có đơn B nhận ngày kế tiếp. Gắn với A, tham chiếu B; chưa gọi A là quá hạn. Không cảnh báo sớm cho B nhận cách hai ngày hoặc xa hơn.
+- `OVERDUE`: A chưa trả và đã vượt hạn. Đơn theo ngày bắt đầu quá hạn từ 00:00 ngày kế tiếp theo Asia/Ho_Chi_Minh; thời điểm cuối ngày lưu ở độ chính xác microsecond vẫn chưa quá hạn. Đơn legacy dùng đúng thời điểm kết thúc cũ (từ thời điểm đó), không chuyển sang thuê theo ngày.
+- `PREDECESSOR_NOT_RETURNED`: gắn với từng B kế tiếp còn CONFIRMED hoặc PENDING chưa hết hạn, tham chiếu A đang quá hạn. Kể cả ngày nhận B đã đến hoặc đã qua, B vẫn cần được kiểm tra nếu chưa xử lý; không khẳng định chắc chắn trùng lịch chỉ từ dự đoán ngày trả. Không xét B hủy, từ chối, hết hạn, đã trả hoặc hoàn tất.
+
+Kết quả gồm loại, mã đơn, mã đơn liên quan nếu có, ngày trả dự kiến của A và số ngày Việt Nam đã vượt. Legacy quá hạn trong cùng ngày có số ngày bằng 0; trạng thái quá hạn không được suy từ số ngày này hoặc dùng làm phí. Kết quả không trùng, thứ tự theo thời gian bắt đầu rồi mã đơn. Đầu vào phải là lịch đầy đủ của một xe, không trộn xe hoặc lọc chỉ còn trang hiện tại; bên tích hợp chịu trách nhiệm kiểm tra quyền trước khi trả mã đơn liên quan.
+
+A được nhận trả thì rủi ro do A chưa về biến mất; điều này không tự mở lịch, bỏ bảo dưỡng hoặc rút ngắn thời gian giữ xe của đơn trả sớm. Không có job, tự hủy, đổi xe, gia hạn, hoàn tiền hay ngày dự kiến do Staff nhập. Các quy tắc chặn lịch hiện có giữ nguyên.
+
 `RETURN_POLICY_ENABLED` mặc định `false` (`app.return-policy-enabled`). Chỉ bật trên fixture thử; giữ tắt ở môi trường sử dụng cho đến khi nhận trả, công nợ và bảo vệ lịch hoàn chỉnh. Cờ điều khiển áp chính sách khi tạo đơn mới; đơn đã chấp nhận chính sách vẫn sử dụng snapshot nếu tắt cờ. Ghi thu thủ công khoản vượt hạn có nhật ký riêng; chưa thay lịch.
 
 Khi bật, chỉ đơn theo ngày, nhận/trả cùng chi nhánh nhận chính sách `same-branch-return-v1`. Không thay `policyVersion` tính ngày thuê. Trả sớm không tự giảm giá/hoàn cọc và giữ lịch gốc; trả muộn theo số ngày Việt Nam vượt ngày trả, nhân giá/ngày đã lưu, không thêm tiền phạt. Cọc giữ chỗ thuộc tiền thuê, không phải cọc bảo đảm; khoản vượt hạn không tự được coi là đã thu.
