@@ -1,7 +1,10 @@
+import ReturnSettlement, { SettlementSummary } from '../../components/booking/ReturnSettlement';
 import ReturnPolicySummary from '../../components/booking/ReturnPolicySummary';
+import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking/ReturnReceipt';
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
+import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
@@ -1248,6 +1251,8 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   );
   const [queue, setQueue] = useState("all");
   const [depositPhase,setDepositPhase]=useState("");
+  const [returnDebt,setReturnDebt]=useState(false);
+  const [scheduleWarning, setScheduleWarning] = useState('');
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
   const [sort, setSort] = useState("createdAt_desc");
   const [page, setPage] = useState(1);
@@ -1265,13 +1270,15 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     now,
     sort: isFilterActive ? sort : "createdAt_desc",
     depositPhase,
+    returnDebt,
+    scheduleWarning: area === 'user' ? '' : scheduleWarning,
   });
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const activePage = Math.min(Math.max(1, page), totalPages);
 
-  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}`;
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${returnDebt}|${scheduleWarning}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -1325,6 +1332,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           />
         </Field>
 
+        {(area === 'admin' || mode === 'return') && <label className="flex items-center gap-2"><input type="checkbox" checked={returnDebt} onChange={e => { setReturnDebt(e.target.checked); if(e.target.checked){setStatus('');setQueue('all');setDepositPhase('');} }} />Đã trả — còn khoản vượt hạn</label>}
         <Field label="Trạng thái">
           <select
             value={status}
@@ -1338,6 +1346,11 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             ))}
           </select>
         </Field>
+        {area !== 'user' ? <Field label="Cảnh báo lịch xe">
+          <select value={scheduleWarning} onChange={event => setScheduleWarning(event.target.value)}>
+            <option value="">Tất cả</option><option value="early">Cần theo dõi</option><option value="overdue">Xe quá hạn / chưa về</option>
+          </select>
+        </Field> : null}
         <div className="space-y-3">
         <Field label="Hàng đợi">
           <select value={queue} onChange={event => setQueue(event.target.value)}>
@@ -1462,6 +1475,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       Tạo lúc {area === "admin" ? adminDateFormat(booking.createdAt, { withTime: true }) : dateTime(booking.createdAt)}
                     </p>
                   ) : null}
+                  <ScheduleWarnings booking={booking} area={area} />
                 </div>
                 <div className="flex items-center gap-4">
                   <strong>{money(booking.total)}</strong>
@@ -1659,6 +1673,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
       (!branchAssignmentsRequest.loading && !branchAssignmentsRequest.error),
     now,
   });
+  const regularActions = availableActions.filter(action => !(action === 'RETURNED' && booking?.returnPolicy));
 
   async function submitAction(event) {
     event.preventDefault();
@@ -1735,7 +1750,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
           <Missing title="Không tìm thấy đơn" back={`/${area}/bookings`} />
         ) : (
           <>
-            <BookingIdentity key={booking.id} id={booking.id} />
+            <BookingIdentity key={`identity-${booking.id}`} id={booking.id} />
             {notice ? <Notice>{notice}</Notice> : null}
             {isStaff && booking.status === "IN_PROGRESS" ? (
               <p className="mb-4"><Link className="btn-secondary" to="/staff/handover?group=delivered">Xem danh sách Đã bàn giao</Link></p>
@@ -1752,7 +1767,9 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
             <ReturnPolicySummary policy={booking.returnPolicy} />
-            {booking.deposit?.required ? <BookingDeposit key={booking.id} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
+            <ReturnAssessmentSummary assessment={booking.returnAssessment} settlement={booking.returnSettlement} />
+            <ReturnSettlement key={`settlement-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedReturn={assignedBranchIds.has(booking.returnBranchId)} onSaved={request.reload} />
+            {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
                 <section className="panel">
@@ -1787,6 +1804,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     Tổng tiền không xác nhận đã thanh toán.
                   </p>
                 </section>
+                <ScheduleWarnings booking={booking} area={area} />
                 <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} />
                 {detail.records?.length ? (
                   <section className="panel">
@@ -1909,7 +1927,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 {isStaff && license && assignedBranchIds.has(booking.pickupBranchId) && ["PENDING", "CONFIRMED"].includes(booking.status) ? (
                   <div className="panel"><LicensePhotos key={`${booking.id}-${license.version}`} license={license} bookingId={booking.id} onSaved={request.reload} /></div>
                 ) : null}
-                {availableActions.length ? (
+                {availableActions.includes('RETURNED') && booking.returnPolicy ? <ReturnReceipt key={`${booking.id}-${booking.version}`} booking={booking} onSaved={request.reload} /> : null}
+                {regularActions.length ? (
                   <form
                     className="panel h-fit space-y-4"
                     onSubmit={submitAction}
@@ -1925,7 +1944,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       onChange={(event) => setNext(event.target.value)}
                     >
                       <option value="">Chọn thao tác</option>
-                      {availableActions.map((action) => (
+                      {regularActions.map((action) => (
                         <option key={action} value={action}>
                           {bookingActionLabels[action] || bookingStatusLabels[action] || "Thao tác chưa xác định"}
                         </option>
@@ -2123,6 +2142,7 @@ export function ApiDocumentPage({ kind, area }) {
               })}
             </dl>
             <ReturnPolicySummary policy={doc.returnPolicy} />
+            {kind === "invoice" && <SettlementSummary settlement={doc.returnSettlement} history={false} />}
             {kind === "contract" && doc.terms ? (
               <div className="mt-6 border-t pt-4">
                 <h3 className="font-semibold mb-2">Điều khoản</h3>

@@ -37,6 +37,7 @@ class VehicleAdminHttpServerTest {
  @Autowired VehicleService vehicles;
  @Autowired TransactionTemplate tx;
  @Autowired Flyway flyway;
+ @org.springframework.test.context.bean.override.mockito.MockitoSpyBean java.time.Clock clock;
  String token(String id){return tokens.issue(accounts.require(id));}
  ResponseEntity<Map> call(HttpMethod method,String path,Object body,String token){
   HttpHeaders headers=new HttpHeaders();headers.setContentType(MediaType.APPLICATION_JSON);if(token!=null)headers.setBearerAuth(token);
@@ -54,7 +55,15 @@ class VehicleAdminHttpServerTest {
   jdbc.update("insert into bookings(id,user_id,vehicle_id,pickup_branch_id,return_branch_id,start_at,end_at,created_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,customer_name,vehicle_name,pickup_name,return_name,policy_version) values (?,'demo-user',?,'dn','dn','2026-10-01 08:00:00','2026-10-02 08:00:00','2026-09-30 08:00:00','2026-09-30 10:00:00',?,100,1,100,0,100,'Historical renter','Historical vehicle','Pickup','Return','vehicle-test')",UUID.randomUUID().toString(),vehicleId,state);
  }
  @Test void creationOrderIsServerOwnedStableAndEditDoesNotMoveVehicle(){
-  var first=create();var second=create();String firstId=(String)first.get("id"),secondId=(String)second.get("id");
+  // Two HTTP requests can share one Windows clock tick; make the non-tie case explicit.
+  var firstTime=java.time.Instant.now().plusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+  org.mockito.Mockito.doReturn(firstTime).when(clock).instant();
+  var first=create();
+  org.mockito.Mockito.doReturn(firstTime.plusSeconds(1)).when(clock).instant();
+  var second=create();String firstId=(String)first.get("id"),secondId=(String)second.get("id");
+  org.mockito.Mockito.reset(clock);
+  assertEquals(firstTime.toString(),first.get("createdAt"));
+  assertEquals(firstTime.plusSeconds(1).toString(),second.get("createdAt"));
   assertNotNull(first.get("createdAt"));assertFalse(first.get("createdAt").toString().startsWith("2099"));
   var list=vehicles.list();assertTrue(index(list,secondId)<index(list,firstId));assertTrue(index(list,firstId)<index(list,"v1"));
   var edit=new HashMap<>(first);edit.put("name","Updated vehicle");edit.put("createdAt","2100-01-01T00:00:00Z");
@@ -102,7 +111,7 @@ class VehicleAdminHttpServerTest {
    assertEquals(409,pending.get().get(10,TimeUnit.SECONDS));assertEquals("Committed update",rows(id).get("name"));
   }finally{executor.shutdownNow();assertTrue(executor.awaitTermination(10,TimeUnit.SECONDS));}
  }
- @Test void migrationHistoryMatchesFinalResources(){flyway.validate();assertEquals(List.of("1","2","3","4","5","6","7","8","9","10"),jdbc.queryForList("select version from flyway_schema_history where success=true and version is not null order by installed_rank",String.class));}
+ @Test void migrationHistoryMatchesFinalResources(){flyway.validate();assertEquals(List.of("1","2","3","4","5","6","7","8","9","10","11","12"),jdbc.queryForList("select version from flyway_schema_history where success=true and version is not null order by installed_rank",String.class));}
  @Test void bookingCommittedWhileVehicleLockedBlocksWaitingDelete()throws Exception{
   var v=create();String id=(String)v.get("id");links(id);var executor=Executors.newSingleThreadExecutor();CountDownLatch started=new CountDownLatch(1);java.util.concurrent.atomic.AtomicReference<Future<Integer>> pending=new java.util.concurrent.atomic.AtomicReference<>();
   try{

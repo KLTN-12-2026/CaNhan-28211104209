@@ -24,6 +24,7 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
     @org.springframework.beans.factory.annotation.Value("${app.return-policy-enabled:false}") private boolean returnPolicyEnabled;
     private final ReturnPolicy returnPolicies;
+    @org.springframework.beans.factory.annotation.Autowired private ReturnSettlementService settlements;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
     private final AccountService accounts;
@@ -47,7 +48,12 @@ public class BookingService {
                        String pickupBranchId, String returnBranchId, String pickupName, String returnName,
                        String actualReturnBranchId, Instant startAt, Instant endAt, Instant expiresAt,
                        String status, long dailyPrice, int rentalDays, long rentalTotal, long oneWayFee,
-                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy) {}
+                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy,
+                       ReturnPolicy.Assessment returnAssessment, ReturnSettlementService.Summary returnSettlement,
+                       @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                       ScheduleWarnings scheduleWarnings) {}
+
+    public record ScheduleWarnings(Instant checkedAt, List<ScheduleRiskPolicy.Risk> items) {}
 
     public record Deposit(boolean required, long amount, String policy, String method, String mode,
                           Instant approvedAt, Instant paymentDueAt, Instant reviewDueAt, Instant originalHoldUntil,
@@ -55,6 +61,10 @@ public class BookingService {
                           long appliedAmount, long receivedAmount, long missingAmount, long excessAmount) {}
 
     public View view(Booking b) {
+        return view(b, null);
+    }
+
+    private View view(Booking b, ScheduleWarnings warnings) {
         long received = jdbc.queryForObject(
             "select coalesce(sum(amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
             Long.class, b.id
@@ -77,7 +87,7 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt)
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings
         );
     }
 
@@ -112,19 +122,42 @@ public class BookingService {
         return b;
     }
 
+    @Transactional(readOnly = true)
     public List<View> list(Actor a) {
-        return (a.is("USER") ? repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()) : repo.findAllByOrderByCreatedAtDescIdAsc())
-            .stream().filter(b -> canRead(a, b)).map(this::view).toList();
+        var visible = (a.is("USER") ? repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()) : repo.findAllByOrderByCreatedAtDescIdAsc())
+            .stream().filter(b -> canRead(a, b)).toList();
+        var warnings = scheduleWarnings(a, visible);
+        return visible.stream().map(b -> view(b, warnings.get(b.id))).toList();
+    }
+
+    private Map<String, ScheduleWarnings> scheduleWarnings(Actor actor, List<Booking> visible) {
+        if ((!actor.is("STAFF") && !actor.is("ADMIN")) || visible.isEmpty()) return Map.of();
+        Instant now = clock.instant();
+        var schedule = repo.searchSchedule(visible.stream().map(b -> b.vehicleId).distinct().toList(), now);
+        var readableIds = schedule.stream().filter(b -> canRead(actor, b)).map(b -> b.id).collect(Collectors.toSet());
+        var byVehicle = schedule.stream().collect(Collectors.groupingBy(b -> b.vehicleId));
+        Map<String, List<ScheduleRiskPolicy.Risk>> byBooking = new HashMap<>();
+        for (var rows : byVehicle.values()) {
+            for (var risk : ScheduleRiskPolicy.classify(rows.stream().map(this::slot).toList(), now)) {
+                if (!readableIds.contains(risk.bookingId())
+                        || (risk.relatedBookingId() != null && !readableIds.contains(risk.relatedBookingId()))) continue;
+                byBooking.computeIfAbsent(risk.bookingId(), key -> new ArrayList<>()).add(risk);
+            }
+        }
+        Map<String, ScheduleWarnings> result = new HashMap<>();
+        for (var b : visible) result.put(b.id, new ScheduleWarnings(now, List.copyOf(byBooking.getOrDefault(b.id, List.of()))));
+        return result;
     }
 
     public List<String> bookingIdsForVehicle(String vehicleId) {
         return repo.findByVehicleIdOrderByStartAtAsc(vehicleId).stream().map(b -> b.id).toList();
     }
 
+    @Transactional(readOnly = true)
     public Object detail(Actor a, String id) {
         Booking b = require(a, id);
         var result = new LinkedHashMap<String, Object>();
-        result.put("booking", view(b));
+        result.put("booking", view(b, scheduleWarnings(a, List.of(b)).get(b.id)));
         result.put("history", jdbc.queryForList("select previous_status,next_status,occurred_at,reason from booking_status_history where booking_id=? order by occurred_at", id));
         result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance from vehicle_handover_records where booking_id=? order by occurred_at", id));
         if (a.is("STAFF")) result.put("license", licenses.forBooking(b.userId));
@@ -238,10 +271,29 @@ public class BookingService {
         return view(b);
     }
 
-    public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind) {
+    public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
+                         LocalDate returnPreviewDate, Long expectedLateAmount) {
+        public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind) {
+            this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, null, null);
+        }
         public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance) {
             this(next, version, reason, condition, licenseChecked, maintenance, null);
         }
+    }
+
+    public record ReturnPreview(long version, ReturnPolicy.Assessment assessment) {}
+    @Transactional(readOnly = true)
+    public ReturnPreview returnPreview(Actor a, String id) {
+        var b = require(a, id);
+        branches.requireStaff(a, b.returnBranchId);
+        if (!"IN_PROGRESS".equals(b.status)) throw DomainException.conflict("Chỉ xem trước nhận trả đơn đang thuê.");
+        return new ReturnPreview(b.version, assessReturn(b));
+    }
+    private ReturnPolicy.Assessment assessReturn(Booking b) {
+        if (b.returnPolicyVersion == null || !RentalTerms.CALENDAR_POLICY.equals(b.policyVersion)
+            || !b.pickupBranchId.equals(b.returnBranchId))
+            throw DomainException.conflict("Đơn không áp dụng chính sách nhận trả mới.");
+        return returnPolicies.assess(returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), b.endAt, clock.instant());
     }
 
     @Transactional
@@ -312,6 +364,13 @@ public class BookingService {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"IN_PROGRESS".equals(old)) throw DomainException.conflict("Đơn chưa ở trạng thái đang thuê.");
                 reason(action.condition());
+                if (b.returnPolicyVersion != null) {
+                    var assessment = assessReturn(b);
+                    if (!assessment.actualReturnDate().equals(action.returnPreviewDate()) || action.expectedLateAmount() == null
+                        || assessment.amountVnd() != action.expectedLateAmount())
+                        throw DomainException.conflict("Ngày hoặc khoản vượt hạn đã thay đổi. Vui lòng xem trước nhận trả lại.");
+                    b.returnAssessment = returnPolicies.snapshot(assessment);
+                }
                 vehicle.currentBranchId = b.returnBranchId;
                 b.actualReturnBranchId = b.returnBranchId;
                 if (action.maintenance()) vehicle.status = "MAINTENANCE";
@@ -319,6 +378,9 @@ public class BookingService {
             case "COMPLETED" -> {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"RETURNED".equals(old)) throw DomainException.conflict("Cần nhận xe trước khi hoàn tất.");
+                var assessment = returnPolicies.assessment(b.returnAssessment);
+                if (assessment != null && settlements.summary(b.id, assessment).outstandingAmount() > 0)
+                    throw DomainException.conflict("Khoản vượt hạn chưa thu. Chưa thể hoàn tất đơn; cần xử lý khoản còn phải thu.");
             }
             default -> throw DomainException.bad("Chuyển trạng thái không được hỗ trợ.");
         }
@@ -326,6 +388,26 @@ public class BookingService {
         repo.flush();
         history(b, old, a, action.reason() != null ? action.reason() : action.condition());
         return b;
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public View settleReturn(Actor actor, String id, ReturnSettlementService.Input input) {
+        var b=lockDepositBooking(id);
+        if("RECEIPT".equals(input.kind())) branches.requireStaff(actor,b.returnBranchId);
+        else if(Set.of("WAIVER","REVERSAL").contains(Objects.toString(input.kind(),""))) actor.require("ADMIN");
+        else throw DomainException.bad("Thao tác khoản vượt hạn không hợp lệ.");
+        var assessment=returnPolicies.assessment(b.returnAssessment);
+        if(assessment==null || assessment.amountVnd()<=0 || !b.pickupBranchId.equals(b.returnBranchId))
+            throw DomainException.conflict("Đơn không có khoản vượt hạn cần xử lý.");
+        var summary=settlements.summary(id,assessment);
+        if(settlements.duplicate(actor,summary,input)) return view(b);
+        if(!"RETURNED".equals(b.status)) throw DomainException.conflict("Chỉ xử lý trước khi hoàn tất đơn đã nhận trả.");
+        if(b.version!=input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Tải lại trước khi xử lý.");
+        settlements.append(actor,id,summary,input);
+        // Invalidate stale previews without rewriting original booking snapshots.
+        jdbc.update("update bookings set version=version+1 where id=?",id);
+        entityManager.refresh(b);
+        return view(b);
     }
 
     public Booking lockDepositBooking(String id) {
@@ -353,6 +435,7 @@ public class BookingService {
         if (!b.depositRequired || !"PENDING".equals(effective(b))) throw DomainException.conflict("Đơn không còn chờ duyệt đóng cọc.");
 
         var v = vehicles.lock(b.vehicleId);
+        if (!"ACTIVE".equals(v.status)) throw DomainException.conflict("Xe không còn sẵn sàng.");
         licenses.eligible(b.userId, v.transmission, v.seats, b.endAt);
         licenses.requirePhotos(b.userId, true);
         schedule(v, null, null);

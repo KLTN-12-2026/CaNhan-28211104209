@@ -30,6 +30,7 @@ export function getBookingActions(
       return ["RETURNED"];
     }
     if (status === "RETURNED" && assignedReturn) {
+      if (booking.returnSettlement ? booking.returnSettlement.outstandingAmount > 0 : booking.returnAssessment?.collectionStatus === 'UNPAID' && booking.returnAssessment.amountVnd > 0) return [];
       return ["COMPLETED"];
     }
     return [];

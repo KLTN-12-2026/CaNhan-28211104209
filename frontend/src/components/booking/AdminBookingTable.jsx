@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Copy } from "lucide-react";
 import { money, Status } from "../common/PageKit";
 import { adminBookingDate, adminDateFormat } from "../../utils/bookingQueue";
+import ScheduleWarnings from './ScheduleWarnings';
 
 export default function AdminBookingTable({ bookings, onCopy, copyFeedback, manualCopyId }) {
   return <div className="table-wrap admin-booking-table" tabIndex={0} role="region" aria-label="Danh sách đơn thuê, có thể cuộn ngang">
@@ -14,7 +15,7 @@ export default function AdminBookingTable({ bookings, onCopy, copyFeedback, manu
       <td><p className="font-semibold">{booking.customerName || "Chưa có tên"}</p><p className="mt-1 text-slate-600">{booking.vehicleName}</p>{booking.createdAt && <p className="mt-2 text-xs text-slate-500">Tạo lúc {adminDateFormat(booking.createdAt, { withTime: true })}</p>}</td>
       <td><p>{adminBookingDate(booking, booking.startAt)}</p><p className="mt-1 text-slate-600">→ {adminBookingDate(booking, booking.endAt)}</p></td>
       <td><p>{booking.pickupName}</p><p className="mt-1 text-slate-600">→ {booking.returnName}</p></td>
-      <td><Status status={booking.status} /></td><td className="font-semibold whitespace-nowrap">{money(booking.total)}</td>
+      <td><Status status={booking.status} /><ScheduleWarnings booking={booking} area="admin" /></td><td className="font-semibold whitespace-nowrap">{money(booking.total)}</td>
       <td><Link className="btn-secondary" to={`/admin/bookings/${booking.id}`}>Chi tiết</Link></td>
     </tr>)}</tbody></table>
   </div>;

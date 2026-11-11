@@ -1,4 +1,5 @@
 import { formatVietnamDate } from './calendarDate.js';
+import { matchesScheduleWarning } from './scheduleWarnings.js';
 
 export function vietnamDay(value) {
   const date = new Date(value);
@@ -25,12 +26,14 @@ export function adminBookingDate(booking, value) {
   return adminDateFormat(value, { withTime: true });
 }
 
-export function visibleBookings(bookings, { query = '', status = '', queue = 'all', date = '', mode = 'all', now = Date.now(), sort = 'createdAt_desc', depositPhase = '' } = {}) {
+export function visibleBookings(bookings, { query = '', status = '', queue = 'all', date = '', mode = 'all', now = Date.now(), sort = 'createdAt_desc', depositPhase = '', returnDebt = false, scheduleWarning = '' } = {}) {
   const today = vietnamDay(now), field = queueDateField(mode);
   const selectedDay = /^\d{4}-\d{2}-\d{2}$/.test(date) && vietnamDay(date + 'T00:00:00+07:00') === date ? date : '';
   return (Array.isArray(bookings) ? bookings : []).filter(booking =>
     (!workStatusLabels[mode] || Object.hasOwn(workStatusLabels[mode], booking.status)) &&
     (!status || booking.status === status) &&
+    matchesScheduleWarning(booking, scheduleWarning) &&
+    (!returnDebt || (booking.status === "RETURNED" && booking.returnSettlement?.outstandingAmount > 0)) &&
     (!depositPhase || (booking.status==='PENDING' && booking.deposit?.required &&
       (depositPhase==='review' ? Boolean(booking.deposit.reportedAt) : depositPhase==='payment' ? Boolean(booking.deposit.approvedAt) && !booking.deposit.reportedAt : !booking.deposit.approvedAt))) &&
     (queue !== 'today' || vietnamDay(booking[field]) === today) &&

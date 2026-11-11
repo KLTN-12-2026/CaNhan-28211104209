@@ -53,6 +53,11 @@ export async function applyBookingAction(id, action) {
   return data;
 }
 
+export async function previewBookingReturn(id) {
+  const { data } = await apiClient.get(`/bookings/${encodeURIComponent(id)}/return-preview`);
+  return data;
+}
+
 export async function getBookingDocument(id, kind) {
   const { data } = await apiClient.get(
     `/bookings/${encodeURIComponent(id)}/${kind}`,
@@ -99,5 +104,10 @@ export async function reviewLicensePhotos(bookingId, input) {
 export async function getLicensePhoto(bookingId, side, signal) {
   const base = bookingId ? `/bookings/${encodeURIComponent(bookingId)}/license-photos` : "/me/license/photos";
   const { data } = await apiClient.get(`${base}/${side}`, { responseType: "blob", signal });
+  return data;
+}
+
+export async function recordReturnSettlement(id, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/return-settlements`, input);
   return data;
 }

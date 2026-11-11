@@ -26,6 +26,7 @@ spring:
   jackson:
     time-zone: UTC
 app:
+  return-settlement-demo: ${RETURN_SETTLEMENT_DEMO:true}
   return-policy-enabled: ${RETURN_POLICY_ENABLED:false}
   deposit-method: ${DEPOSIT_METHOD:VNPAY_SANDBOX}
   deposit-enabled: ${DEPOSIT_ENABLED:false}

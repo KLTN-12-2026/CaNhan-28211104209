@@ -11,6 +11,8 @@ public class BookingController {
  @PostMapping("/quote") public Object quote(@AuthenticationPrincipal Actor a,@RequestBody BookingService.Input i){return service.quote(a,i);}
  @PostMapping @ResponseStatus(org.springframework.http.HttpStatus.CREATED) public Object create(@AuthenticationPrincipal Actor a,@RequestBody BookingService.Input i){return service.create(a,i);}
  @GetMapping("/{id}") public Object detail(@AuthenticationPrincipal Actor a,@PathVariable String id){return service.detail(a,id);}
+ @GetMapping("/{id}/return-preview") public Object returnPreview(@AuthenticationPrincipal Actor a,@PathVariable String id){return service.returnPreview(a,id);}
+ @PostMapping("/{id}/return-settlements") public Object settleReturn(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody com.carrental.modules.booking.service.ReturnSettlementService.Input input){return service.settleReturn(a,id,input);}
  public record PhotoReview(long version,boolean approve,String reason){}
  @PostMapping("/{id}/license-photo-review") public Object reviewPhotos(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody PhotoReview r){return service.reviewLicensePhotos(a,id,r.version(),r.approve(),r.reason());}
  @GetMapping("/{id}/license-photos/{side}") public org.springframework.http.ResponseEntity<byte[]> photo(@AuthenticationPrincipal Actor a,@PathVariable String id,@PathVariable String side){return com.carrental.modules.user.controller.LicensePhotoController.privateImage(service.licensePhoto(a,id,side));}
