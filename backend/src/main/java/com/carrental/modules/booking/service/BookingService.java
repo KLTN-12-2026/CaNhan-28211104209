@@ -49,7 +49,11 @@ public class BookingService {
                        String actualReturnBranchId, Instant startAt, Instant endAt, Instant expiresAt,
                        String status, long dailyPrice, int rentalDays, long rentalTotal, long oneWayFee,
                        long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy,
-                       ReturnPolicy.Assessment returnAssessment, ReturnSettlementService.Summary returnSettlement) {}
+                       ReturnPolicy.Assessment returnAssessment, ReturnSettlementService.Summary returnSettlement,
+                       @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                       ScheduleWarnings scheduleWarnings) {}
+
+    public record ScheduleWarnings(Instant checkedAt, List<ScheduleRiskPolicy.Risk> items) {}
 
     public record Deposit(boolean required, long amount, String policy, String method, String mode,
                           Instant approvedAt, Instant paymentDueAt, Instant reviewDueAt, Instant originalHoldUntil,
@@ -57,6 +61,10 @@ public class BookingService {
                           long appliedAmount, long receivedAmount, long missingAmount, long excessAmount) {}
 
     public View view(Booking b) {
+        return view(b, null);
+    }
+
+    private View view(Booking b, ScheduleWarnings warnings) {
         long received = jdbc.queryForObject(
             "select coalesce(sum(amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
             Long.class, b.id
@@ -79,7 +87,7 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment))
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings
         );
     }
 
@@ -114,19 +122,42 @@ public class BookingService {
         return b;
     }
 
+    @Transactional(readOnly = true)
     public List<View> list(Actor a) {
-        return (a.is("USER") ? repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()) : repo.findAllByOrderByCreatedAtDescIdAsc())
-            .stream().filter(b -> canRead(a, b)).map(this::view).toList();
+        var visible = (a.is("USER") ? repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()) : repo.findAllByOrderByCreatedAtDescIdAsc())
+            .stream().filter(b -> canRead(a, b)).toList();
+        var warnings = scheduleWarnings(a, visible);
+        return visible.stream().map(b -> view(b, warnings.get(b.id))).toList();
+    }
+
+    private Map<String, ScheduleWarnings> scheduleWarnings(Actor actor, List<Booking> visible) {
+        if ((!actor.is("STAFF") && !actor.is("ADMIN")) || visible.isEmpty()) return Map.of();
+        Instant now = clock.instant();
+        var schedule = repo.searchSchedule(visible.stream().map(b -> b.vehicleId).distinct().toList(), now);
+        var readableIds = schedule.stream().filter(b -> canRead(actor, b)).map(b -> b.id).collect(Collectors.toSet());
+        var byVehicle = schedule.stream().collect(Collectors.groupingBy(b -> b.vehicleId));
+        Map<String, List<ScheduleRiskPolicy.Risk>> byBooking = new HashMap<>();
+        for (var rows : byVehicle.values()) {
+            for (var risk : ScheduleRiskPolicy.classify(rows.stream().map(this::slot).toList(), now)) {
+                if (!readableIds.contains(risk.bookingId())
+                        || (risk.relatedBookingId() != null && !readableIds.contains(risk.relatedBookingId()))) continue;
+                byBooking.computeIfAbsent(risk.bookingId(), key -> new ArrayList<>()).add(risk);
+            }
+        }
+        Map<String, ScheduleWarnings> result = new HashMap<>();
+        for (var b : visible) result.put(b.id, new ScheduleWarnings(now, List.copyOf(byBooking.getOrDefault(b.id, List.of()))));
+        return result;
     }
 
     public List<String> bookingIdsForVehicle(String vehicleId) {
         return repo.findByVehicleIdOrderByStartAtAsc(vehicleId).stream().map(b -> b.id).toList();
     }
 
+    @Transactional(readOnly = true)
     public Object detail(Actor a, String id) {
         Booking b = require(a, id);
         var result = new LinkedHashMap<String, Object>();
-        result.put("booking", view(b));
+        result.put("booking", view(b, scheduleWarnings(a, List.of(b)).get(b.id)));
         result.put("history", jdbc.queryForList("select previous_status,next_status,occurred_at,reason from booking_status_history where booking_id=? order by occurred_at", id));
         result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance from vehicle_handover_records where booking_id=? order by occurred_at", id));
         if (a.is("STAFF")) result.put("license", licenses.forBooking(b.userId));

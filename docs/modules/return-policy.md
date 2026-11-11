@@ -2,7 +2,7 @@
 
 ## Bộ phân loại rủi ro lịch xe nội bộ
 
-`ScheduleRiskPolicy` tính thuần từ danh sách lịch của **một xe** và thời điểm do bên gọi lấy từ Clock backend. Chỉ xét đơn nhận/trả cùng một chi nhánh; các đơn liên quan phải cùng chi nhánh đó. Không cần snapshot chính sách tính phí để nhận biết rủi ro, không tính tiền, không ghi DB hoặc đổi trạng thái. Đây là thành phần nội bộ chưa nối vào API, UI hay các điểm chặn lịch; không đồng nghĩa cảnh báo đã xuất hiện trên website.
+`ScheduleRiskPolicy` tính thuần từ danh sách lịch của **một xe** và thời điểm do bên gọi lấy từ Clock backend. Chỉ xét đơn nhận/trả cùng một chi nhánh; các đơn liên quan phải cùng chi nhánh đó. Không cần snapshot chính sách tính phí để nhận biết rủi ro, không tính tiền, không ghi DB hoặc đổi trạng thái. Bộ phân loại được dùng khi Staff/Admin đọc danh sách và chi tiết đơn; chưa có giao diện hiển thị cảnh báo.
 
 - `RETURN_DUE_NEXT_DAY_BOOKING`: đơn A còn IN_PROGRESS, hôm nay là ngày trả và có đơn B nhận ngày kế tiếp. Gắn với A, tham chiếu B; chưa gọi A là quá hạn. Không cảnh báo sớm cho B nhận cách hai ngày hoặc xa hơn.
 - `OVERDUE`: A chưa trả và đã vượt hạn. Đơn theo ngày bắt đầu quá hạn từ 00:00 ngày kế tiếp theo Asia/Ho_Chi_Minh; thời điểm cuối ngày lưu ở độ chính xác microsecond vẫn chưa quá hạn. Đơn legacy dùng đúng thời điểm kết thúc cũ (từ thời điểm đó), không chuyển sang thuê theo ngày.
@@ -16,7 +16,7 @@ A được nhận trả thì rủi ro do A chưa về biến mất; điều này
 
 Tìm xe, báo giá, tạo đơn, xác nhận thường và xác nhận từ cọc dùng kiểm tra lịch chung. Bộ phân loại và kiểm tra lịch dùng cùng mốc quá hạn: đơn theo ngày từ đầu ngày kế tiếp tại Việt Nam; legacy từ thời điểm kết thúc. Cảnh báo sớm không tự chặn lịch hợp lệ. Xe quá hạn chưa trả không được bảo đảm cho đơn kế tiếp, kể cả ngày nhận còn xa; báo giá cũ không bỏ qua kiểm tra lại khi tạo đơn.
 
-Duyệt yêu cầu đóng cọc kiểm tra xe ACTIVE trước khi lưu duyệt, đồng thời kiểm tra lại lịch và GPLX. Nếu khoản cọc đã được ghi nhận nhưng không thể xác nhận do lịch xe, giữ quy trình hoàn khoản chưa áp dụng hiện có; không tự phát hành hợp đồng hay giành lại lịch. Bàn giao tiếp tục yêu cầu xe sẵn sàng tại đúng chi nhánh và không còn đơn khác IN_PROGRESS. Nhận trả không bỏ qua trạng thái bảo dưỡng. Các khóa xe/đơn, version và isolation của workflow không thay đổi; chưa bổ sung cảnh báo API/UI.
+Duyệt yêu cầu đóng cọc kiểm tra xe ACTIVE trước khi lưu duyệt, đồng thời kiểm tra lại lịch và GPLX. Nếu khoản cọc đã được ghi nhận nhưng không thể xác nhận do lịch xe, giữ quy trình hoàn khoản chưa áp dụng hiện có; không tự phát hành hợp đồng hay giành lại lịch. Bàn giao tiếp tục yêu cầu xe sẵn sàng tại đúng chi nhánh và không còn đơn khác IN_PROGRESS. Nhận trả không bỏ qua trạng thái bảo dưỡng. Các khóa xe/đơn, version và isolation của workflow không thay đổi; cảnh báo API chỉ được bổ sung ở luồng đọc mô tả bên dưới, chưa có UI.
 
 `RETURN_POLICY_ENABLED` mặc định `false` (`app.return-policy-enabled`). Chỉ bật trên fixture thử; giữ tắt ở môi trường sử dụng cho đến khi nhận trả, công nợ và bảo vệ lịch hoàn chỉnh. Cờ điều khiển áp chính sách khi tạo đơn mới; đơn đã chấp nhận chính sách vẫn sử dụng snapshot nếu tắt cờ. Ghi thu thủ công khoản vượt hạn có nhật ký riêng; chưa thay lịch.
 
@@ -60,7 +60,7 @@ V11 thêm `bookings.return_assessment` TEXT nullable, không thêm bảng/backfi
 
 Trả sớm/đúng ngày: `amountVnd=0`, `collectionStatus=NOT_DUE`; tiền thuê gốc và lịch giữ đến hết ngày trả không đổi. Trả muộn: `collectionStatus=UNPAID` (Chưa thu), không tự trừ cọc, không đánh dấu đã thanh toán. Ví dụ trả đăng ký28/10, ghi nhận31/10, giá650.000đ/ngày →3ngày,1.950.000đ. Đơn có khoản còn phải thu không được COMPLETED hoặc phát hành hóa đơn. Thu/miễn/đảo và số dư hiện tại theo nhật ký mô tả bên dưới; không sửa kết quả tính phí gốc. Đơn không phát sinh khoản vượt hạn vẫn có thể hoàn tất theo luồng hóa đơn cũ.
 
-Desktop tách xem trước và xác nhận nhận xe; đổi ghi chú/tình trạng bảo trì bỏ preview. Gửi lặp bị chặn tại UI và kiểm soát version/unique record backend; khi kết quả POST không rõ, chỉ đọc lại trước thao tác tiếp. User/Staff/Admin được đọc kết quả theo quyền đọc đơn hiện có; Admin không được nhận trả thay Staff. Chưa giải quyết cảnh báo/đổi xe hoặc hủy đơn kế tiếp khi xe trả muộn; không được suy đây là luồng trả muộn hoàn chỉnh để bật trên môi trường sử dụng.
+Desktop tách xem trước và xác nhận nhận xe; đổi ghi chú/tình trạng bảo trì bỏ preview. Gửi lặp bị chặn tại UI và kiểm soát version/unique record backend; khi kết quả POST không rõ, chỉ đọc lại trước thao tác tiếp. User/Staff/Admin được đọc kết quả theo quyền đọc đơn hiện có; Admin không được nhận trả thay Staff. Chưa có UI cảnh báo/đổi xe hoặc hủy đơn kế tiếp khi xe trả muộn; không được suy đây là luồng trả muộn hoàn chỉnh để bật trên môi trường sử dụng.
 
 
 ## Xử lý khoản vượt hạn
@@ -73,3 +73,11 @@ returnSettlement trên đơn gồm originalAmount, receivedAmount, waivedAmount,
 RETURN_SETTLEMENT_DEMO mặc định true: nhật ký và giao diện gắn nhãn mô phỏng; QA không chuyển tiền thật. Chế độ lưu trên từng bản ghi, không trộn chế độ trong một đơn. Không bật chính sách hoặc chế độ thu thật trên môi trường sử dụng khi chưa có nghiệm thu vận hành đầy đủ.
 
 Hóa đơn mới lưu snapshot assessment và settlement; tổng = tiền gốc + vượt hạn gốc - miễn/giảm. Invoice item vượt hạn lưu số ròng không âm để giữ ràng buộc schema cũ; khối giải thích riêng hiển thị khoản gốc, thu, miễn và còn thiếu. Hóa đơn không chứng minh toàn bộ tiền thuê đã thanh toán. Sau COMPLETED không ghi/đảo mới; retry cùng thao tác đã có chỉ đọc lại.
+
+## API cảnh báo lịch cho Staff/Admin
+
+GET `/api/v1/bookings` giữ mảng đơn hiện có; GET `/api/v1/bookings/{id}` giữ cấu trúc chi tiết hiện có. Mỗi booking trả cho STAFF/ADMIN bổ sung `scheduleWarnings: {checkedAt, items}`. `checkedAt` là Instant UTC lấy một lần từ Clock backend trong lượt đọc; mỗi item có `kind`, `bookingId`, `relatedBookingId` (nullable), `bookedReturnDate` (ngày Việt Nam, ISO yyyy-MM-dd), `lateDays`. Các loại theo bộ phân loại phía trên. Không có rủi ro trả `items: []`, không thay status đơn.
+
+USER không nhận trường `scheduleWarnings` kể cả trên đơn của chính mình. Staff chỉ đọc đơn thuộc chi nhánh đã phân công theo quyền hiện có; mã đơn liên quan chỉ xuất hiện khi cả hai đơn đều đọc được. Không trả tên khách hay GPLX của đơn liên quan trong item cảnh báo. API mutation/quote vẫn dùng View không kèm cảnh báo; tải lại GET để lấy kết quả đánh giá mới.
+
+Danh sách đọc lịch bằng một truy vấn theo nhóm vehicleId của các đơn được phép đọc; chi tiết cũng lấy lịch xe đầy đủ, không chỉ đơn đang mở. Phân loại tách từng xe; không thêm truy vấn lịch theo từng thẻ. Các truy vấn tài chính/quyền đọc hiện có không được refactor trong thay đổi này. Dữ liệu tính lại mỗi GET, không cache, không ghi DB/đổi version, không cần migration; nhận trả xe hoặc thay đổi thời gian sẽ phản ánh ở lần tải lại. Các trường cọc, chính sách và công nợ cũ giữ nguyên.
