@@ -37,8 +37,11 @@ class ScheduleProtectionHttpTest {
     }
     @TestConfiguration static class TimeConfig { @Bean @Primary TestClock scheduleClock() { var c = new TestClock(); c.now = Instant.parse("2026-10-25T03:00:00Z"); return c; } }
     @DynamicPropertySource static void database(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url", () -> "jdbc:h2:mem:schedule-protection;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1");
-        r.add("spring.datasource.username", () -> "sa"); r.add("spring.datasource.password", () -> "");
+        String url = System.getenv("KDRIVE_TEST_DB_URL");
+        if (url != null) CancelBoundaryTest.verifySafeIsolatedDatabase(url, System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"), System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"), System.getenv("KDRIVE_TEST_DB_USER"), System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+        r.add("spring.datasource.url", () -> url == null ? "jdbc:h2:mem:schedule-protection;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1" : url);
+        r.add("spring.datasource.username", () -> url == null ? "sa" : System.getenv("KDRIVE_TEST_DB_USER"));
+        r.add("spring.datasource.password", () -> url == null ? "" : System.getenv("KDRIVE_TEST_DB_PASSWORD"));
         r.add("app.license-photo-directory", () -> PHOTOS.toString());
     }
     @Autowired BookingService bookings;
@@ -55,6 +58,12 @@ class ScheduleProtectionHttpTest {
     String predecessor;
     @BeforeEach void setup() {
         CancelBoundaryTest.verifySafeIsolatedDatabase(jdbc);
+        if (System.getenv("KDRIVE_TEST_DB_URL") != null) {
+            try (var connection = jdbc.getDataSource().getConnection()) {
+                assertEquals("MySQL", connection.getMetaData().getDatabaseProductName());
+                assertEquals(System.getenv("KDRIVE_TEST_EXPECTED_SCHEMA"), connection.getCatalog());
+            } catch (java.sql.SQLException e) { throw new IllegalStateException(e); }
+        }
         ReflectionTestUtils.setField(bookings, "depositEnabled", false);
         for (String table : List.of("booking_return_settlements", "payment_events", "payment_refunds", "payment_transactions", "reviews", "incident_events", "incident_cases", "vehicle_handover_records", "invoice_items", "invoices", "contracts", "booking_status_history", "bookings")) jdbc.update("delete from " + table);
         jdbc.update("update vehicles set current_branch_id='dn',status='ACTIVE',daily_price=650000 where id='v1'");
@@ -141,5 +150,43 @@ class ScheduleProtectionHttpTest {
         action(predecessor, "RETURNED", false);
         conflict(() -> bookings.quote(user, input(27,28,null)), "trùng");
         assertTrue(available()); assertEquals(650000L, bookings.quote(user, input(28,29,null)).total());
+    }
+    int attempt(Runnable work) {
+        try { work.run(); return 200; } catch (DomainException e) { return e.status.value(); }
+    }
+    List<Integer> race(Runnable first, Runnable second) throws Exception {
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(() -> { start.await(); return attempt(first); });
+            var b = pool.submit(() -> { start.await(); return attempt(second); });
+            start.countDown();
+            return List.of(a.get(20, java.util.concurrent.TimeUnit.SECONDS), b.get(20, java.util.concurrent.TimeUnit.SECONDS));
+        } finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)); }
+    }
+    @Test void concurrentReturnAndCreateNeverLeaveAnUnsafeOrPartialBooking() throws Exception {
+        midnight();
+        var results = race(() -> action(predecessor, "RETURNED", false), () -> bookings.create(user, input(28,29,650000L)));
+        assertEquals(200, results.get(0)); assertTrue(Set.of(200,409).contains(results.get(1)), results.toString());
+        assertEquals("RETURNED", current(predecessor).status());
+        assertEquals(results.get(1) == 200 ? 2 : 1, jdbc.queryForObject("select count(*) from bookings", Integer.class));
+        assertEquals(2, count("vehicle_handover_records", predecessor)); // one HANDOVER plus one RETURN
+        assertEquals(1300000L, current(predecessor).total());
+        if (results.get(1) == 409) assertEquals("PENDING", bookings.create(user, input(28,29,650000L)).status());
+        assertEquals(1, jdbc.queryForObject("select count(*) from bookings where status='PENDING'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("select count(*) from contracts", Integer.class));
+    }
+    @Test void concurrentReturnAndNextHandoverNeverDoubleAssignVehicle() throws Exception {
+        String b = nextBooking(false); action(b, "CONFIRMED", false); midnight();
+        var results = race(() -> action(predecessor, "RETURNED", false), () -> action(b, "IN_PROGRESS", false));
+        assertEquals(200, results.get(0)); assertTrue(Set.of(200,409).contains(results.get(1)), results.toString());
+        assertEquals("RETURNED", current(predecessor).status());
+        assertEquals(results.get(1) == 200 ? "IN_PROGRESS" : "CONFIRMED", current(b).status());
+        assertEquals(results.get(1) == 200 ? 1 : 0, count("vehicle_handover_records", b));
+        if (results.get(1) == 409) action(b, "IN_PROGRESS", false);
+        assertEquals(1, jdbc.queryForObject("select count(*) from bookings where status='IN_PROGRESS'", Integer.class));
+        assertEquals(1, count("vehicle_handover_records", b));
+        assertEquals(2, jdbc.queryForObject("select count(*) from contracts", Integer.class));
+        assertEquals(650000L, current(b).total());
     }
 }

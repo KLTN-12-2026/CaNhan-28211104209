@@ -30,7 +30,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class ScheduleWarningHttpTest {
     static final Path PHOTOS;
     static { try { PHOTOS=Files.createTempDirectory("schedule-warning-synthetic-"); } catch(Exception e) {throw new IllegalStateException(e);} }
-    @DynamicPropertySource static void properties(DynamicPropertyRegistry r) {r.add("app.license-photo-directory",()->PHOTOS.toString());}
+    @DynamicPropertySource static void properties(DynamicPropertyRegistry r) {
+        r.add("app.license-photo-directory",()->PHOTOS.toString());
+        String url=System.getenv("KDRIVE_TEST_DB_URL");
+        if(url!=null) {
+            CancelBoundaryTest.verifySafeIsolatedDatabase(url,System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"),System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),System.getenv("KDRIVE_TEST_DB_USER"),System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+            r.add("spring.datasource.url",()->url);
+            r.add("spring.datasource.username",()->System.getenv("KDRIVE_TEST_DB_USER"));
+            r.add("spring.datasource.password",()->System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+        }
+    }
     static class TestClock extends Clock {
         Instant now=Instant.parse("2026-10-25T03:00:00Z");
         public Instant instant(){return now;} public ZoneId getZone(){return ZoneOffset.UTC;}
@@ -53,6 +62,12 @@ class ScheduleWarningHttpTest {
     Actor other;
     @BeforeEach void setup() {
         CancelBoundaryTest.verifySafeIsolatedDatabase(jdbc);
+        if(System.getenv("KDRIVE_TEST_DB_URL")!=null) {
+            try(var connection=jdbc.getDataSource().getConnection()) {
+                assertEquals("MySQL",connection.getMetaData().getDatabaseProductName());
+                assertEquals(System.getenv("KDRIVE_TEST_EXPECTED_SCHEMA"),connection.getCatalog());
+            } catch(java.sql.SQLException e) {throw new IllegalStateException(e);}
+        }
         for(String t:List.of("booking_return_settlements","payment_events","payment_refunds","payment_transactions","reviews","incident_events","incident_cases","vehicle_handover_records","invoice_items","invoices","contracts","booking_status_history","bookings"))jdbc.update("delete from "+t);
         jdbc.update("update vehicles set current_branch_id='dn',status='ACTIVE',daily_price=650000 where id='v1'");
         clock.now=Instant.parse("2026-10-25T03:00:00Z");
