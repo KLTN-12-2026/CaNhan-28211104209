@@ -317,3 +317,26 @@ test('documents render one escaped terms section and preserve calendar/legacy sn
   }
  } finally { client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} }); }
 });
+
+
+test('paid booking detail keeps unique child identities and return preview through parent updates',async()=>{
+ const {Routes,Route}=await vite.ssrLoadModule('react-router-dom');
+ const assessment={bookedReturnDate:'2026-10-14',actualReturnDate:'2026-10-16',actualReturnedAt:'2026-10-15T17:30:00Z',timing:'LATE',lateDays:2,dailyPriceVnd:650000,amountVnd:1300000,collectionStatus:'UNPAID'};
+ const booking={id:'return-paid',version:2,status:'IN_PROGRESS',pickupBranchId:'dn',returnBranchId:'dn',customerName:'Khách thử',vehicleName:'Xe thử',startAt:'2026-10-12T17:00:00Z',endAt:'2026-10-14T16:59:59.999999Z',total:1300000,dailyPrice:650000,rentalDays:2,policyVersion:'calendar-2026-10-17',returnPolicy:{version:'same-branch-return-v1',terms:{dailyPriceVnd:650000,text:'Chính sách đã lưu'},acceptedAt:'2026-10-10T03:00:00Z'},deposit:{required:true,amount:390000,method:'DEMO_QR_MANUAL'}};
+ const calls=[];client.defaults.adapter=async config=>{calls.push(config.url);return {config,data:config.url.endsWith('/return-preview')?{version:2,assessment}:config.url==='/me/branches'?['dn']:config.url==='/bookings/return-paid'?{booking,records:[],history:[]}:config.url.endsWith('/deposit')?{payments:[],refunds:[],events:[]}:[],status:200,statusText:'OK',headers:{}};};
+ const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);
+ const tree=()=>h(Router,{initialEntries:['/staff/return/return-paid']},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF'}}},h(Routes,null,h(Route,{path:'/:area/return/:bookingId',element:h(Detail,{area:'staff'})}))));
+ const originalError=console.error,duplicateKeys=[];console.error=(...args)=>{if(String(args[0]).includes('same key'))duplicateKeys.push(args);else originalError(...args);};
+ try{
+  await act(async()=>root.render(tree()));
+  const form=c.querySelector('form[aria-label="Ghi nhận trả xe"]');assert.ok(form);
+  await act(async()=>{const e=form.querySelector('textarea');Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(e,'Đã nhận xe fixture');e.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+  await act(async()=>form.querySelector('button').click());
+  assert.equal(calls.filter(x=>x.endsWith('/return-preview')).length,1);
+  assert.ok(c.querySelector('[aria-label="Dự kiến nhận trả"]'));
+  await act(async()=>root.render(tree()));
+  assert.equal(c.querySelector('form[aria-label="Ghi nhận trả xe"] textarea').value,'Đã nhận xe fixture');
+  assert.ok(c.querySelector('[aria-label="Dự kiến nhận trả"]'));
+  assert.equal(duplicateKeys.length,0,'Sibling keys must be distinct across identity and deposit');
+ }finally{console.error=originalError;}
+});

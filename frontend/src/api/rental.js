@@ -53,6 +53,11 @@ export async function applyBookingAction(id, action) {
   return data;
 }
 
+export async function previewBookingReturn(id) {
+  const { data } = await apiClient.get(`/bookings/${encodeURIComponent(id)}/return-preview`);
+  return data;
+}
+
 export async function getBookingDocument(id, kind) {
   const { data } = await apiClient.get(
     `/bookings/${encodeURIComponent(id)}/${kind}`,

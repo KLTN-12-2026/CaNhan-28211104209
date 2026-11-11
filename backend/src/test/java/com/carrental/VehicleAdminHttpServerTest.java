@@ -102,7 +102,7 @@ class VehicleAdminHttpServerTest {
    assertEquals(409,pending.get().get(10,TimeUnit.SECONDS));assertEquals("Committed update",rows(id).get("name"));
   }finally{executor.shutdownNow();assertTrue(executor.awaitTermination(10,TimeUnit.SECONDS));}
  }
- @Test void migrationHistoryMatchesFinalResources(){flyway.validate();assertEquals(List.of("1","2","3","4","5","6","7","8","9","10"),jdbc.queryForList("select version from flyway_schema_history where success=true and version is not null order by installed_rank",String.class));}
+ @Test void migrationHistoryMatchesFinalResources(){flyway.validate();assertEquals(List.of("1","2","3","4","5","6","7","8","9","10","11"),jdbc.queryForList("select version from flyway_schema_history where success=true and version is not null order by installed_rank",String.class));}
  @Test void bookingCommittedWhileVehicleLockedBlocksWaitingDelete()throws Exception{
   var v=create();String id=(String)v.get("id");links(id);var executor=Executors.newSingleThreadExecutor();CountDownLatch started=new CountDownLatch(1);java.util.concurrent.atomic.AtomicReference<Future<Integer>> pending=new java.util.concurrent.atomic.AtomicReference<>();
   try{

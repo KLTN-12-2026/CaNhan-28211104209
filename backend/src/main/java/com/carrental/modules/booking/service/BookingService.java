@@ -47,7 +47,8 @@ public class BookingService {
                        String pickupBranchId, String returnBranchId, String pickupName, String returnName,
                        String actualReturnBranchId, Instant startAt, Instant endAt, Instant expiresAt,
                        String status, long dailyPrice, int rentalDays, long rentalTotal, long oneWayFee,
-                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy) {}
+                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy,
+                       ReturnPolicy.Assessment returnAssessment) {}
 
     public record Deposit(boolean required, long amount, String policy, String method, String mode,
                           Instant approvedAt, Instant paymentDueAt, Instant reviewDueAt, Instant originalHoldUntil,
@@ -77,7 +78,7 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt)
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment)
         );
     }
 
@@ -238,10 +239,29 @@ public class BookingService {
         return view(b);
     }
 
-    public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind) {
+    public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
+                         LocalDate returnPreviewDate, Long expectedLateAmount) {
+        public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind) {
+            this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, null, null);
+        }
         public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance) {
             this(next, version, reason, condition, licenseChecked, maintenance, null);
         }
+    }
+
+    public record ReturnPreview(long version, ReturnPolicy.Assessment assessment) {}
+    @Transactional(readOnly = true)
+    public ReturnPreview returnPreview(Actor a, String id) {
+        var b = require(a, id);
+        branches.requireStaff(a, b.returnBranchId);
+        if (!"IN_PROGRESS".equals(b.status)) throw DomainException.conflict("Chỉ xem trước nhận trả đơn đang thuê.");
+        return new ReturnPreview(b.version, assessReturn(b));
+    }
+    private ReturnPolicy.Assessment assessReturn(Booking b) {
+        if (b.returnPolicyVersion == null || !RentalTerms.CALENDAR_POLICY.equals(b.policyVersion)
+            || !b.pickupBranchId.equals(b.returnBranchId))
+            throw DomainException.conflict("Đơn không áp dụng chính sách nhận trả mới.");
+        return returnPolicies.assess(returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), b.endAt, clock.instant());
     }
 
     @Transactional
@@ -312,6 +332,13 @@ public class BookingService {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"IN_PROGRESS".equals(old)) throw DomainException.conflict("Đơn chưa ở trạng thái đang thuê.");
                 reason(action.condition());
+                if (b.returnPolicyVersion != null) {
+                    var assessment = assessReturn(b);
+                    if (!assessment.actualReturnDate().equals(action.returnPreviewDate()) || action.expectedLateAmount() == null
+                        || assessment.amountVnd() != action.expectedLateAmount())
+                        throw DomainException.conflict("Ngày hoặc khoản vượt hạn đã thay đổi. Vui lòng xem trước nhận trả lại.");
+                    b.returnAssessment = returnPolicies.snapshot(assessment);
+                }
                 vehicle.currentBranchId = b.returnBranchId;
                 b.actualReturnBranchId = b.returnBranchId;
                 if (action.maintenance()) vehicle.status = "MAINTENANCE";
@@ -319,6 +346,9 @@ public class BookingService {
             case "COMPLETED" -> {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"RETURNED".equals(old)) throw DomainException.conflict("Cần nhận xe trước khi hoàn tất.");
+                var assessment = returnPolicies.assessment(b.returnAssessment);
+                if (assessment != null && assessment.amountVnd() > 0 && "UNPAID".equals(assessment.collectionStatus()))
+                    throw DomainException.conflict("Khoản vượt hạn chưa thu. Chưa thể hoàn tất đơn; cần xử lý công nợ ở bước tiếp theo.");
             }
             default -> throw DomainException.bad("Chuyển trạng thái không được hỗ trợ.");
         }

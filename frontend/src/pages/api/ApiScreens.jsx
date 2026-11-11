@@ -1,4 +1,5 @@
 import ReturnPolicySummary from '../../components/booking/ReturnPolicySummary';
+import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking/ReturnReceipt';
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
@@ -1659,6 +1660,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
       (!branchAssignmentsRequest.loading && !branchAssignmentsRequest.error),
     now,
   });
+  const regularActions = availableActions.filter(action => !(action === 'RETURNED' && booking?.returnPolicy));
 
   async function submitAction(event) {
     event.preventDefault();
@@ -1735,7 +1737,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
           <Missing title="Không tìm thấy đơn" back={`/${area}/bookings`} />
         ) : (
           <>
-            <BookingIdentity key={booking.id} id={booking.id} />
+            <BookingIdentity key={`identity-${booking.id}`} id={booking.id} />
             {notice ? <Notice>{notice}</Notice> : null}
             {isStaff && booking.status === "IN_PROGRESS" ? (
               <p className="mb-4"><Link className="btn-secondary" to="/staff/handover?group=delivered">Xem danh sách Đã bàn giao</Link></p>
@@ -1752,7 +1754,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
             <ReturnPolicySummary policy={booking.returnPolicy} />
-            {booking.deposit?.required ? <BookingDeposit key={booking.id} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
+            <ReturnAssessmentSummary assessment={booking.returnAssessment} />
+            {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
                 <section className="panel">
@@ -1909,7 +1912,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 {isStaff && license && assignedBranchIds.has(booking.pickupBranchId) && ["PENDING", "CONFIRMED"].includes(booking.status) ? (
                   <div className="panel"><LicensePhotos key={`${booking.id}-${license.version}`} license={license} bookingId={booking.id} onSaved={request.reload} /></div>
                 ) : null}
-                {availableActions.length ? (
+                {availableActions.includes('RETURNED') && booking.returnPolicy ? <ReturnReceipt key={`${booking.id}-${booking.version}`} booking={booking} onSaved={request.reload} /> : null}
+                {regularActions.length ? (
                   <form
                     className="panel h-fit space-y-4"
                     onSubmit={submitAction}
@@ -1925,7 +1929,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       onChange={(event) => setNext(event.target.value)}
                     >
                       <option value="">Chọn thao tác</option>
-                      {availableActions.map((action) => (
+                      {regularActions.map((action) => (
                         <option key={action} value={action}>
                           {bookingActionLabels[action] || bookingStatusLabels[action] || "Thao tác chưa xác định"}
                         </option>

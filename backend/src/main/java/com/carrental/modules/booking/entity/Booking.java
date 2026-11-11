@@ -32,6 +32,7 @@ public class Booking {
     public String returnPolicyVersion;
     @Column(columnDefinition = "TEXT") public String returnPolicySnapshot;
     public Instant returnPolicyAcceptedAt;
+    @Column(columnDefinition = "TEXT") public String returnAssessment;
     public boolean depositRequired;
     public long depositAmount;
     public String depositPolicy;
