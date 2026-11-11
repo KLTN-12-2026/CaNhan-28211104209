@@ -66,6 +66,67 @@ class QrDemoHttpTest {
     }
     void report(String id)throws Exception {assertEquals(200,post(user,"/bookings/"+id+"/deposit/report",Map.of("idempotencyKey","report-"+id)).getStatus());}
     long count(String table,String id){return jdbc.queryForObject("select count(*) from "+table+" where booking_id=?",Long.class,id);}
+    private JsonNode qrRead(Actor actor, String id, String endpoint) throws Exception {
+        var response=get(actor,endpoint); assertEquals(200,response.getStatus(),response.getContentAsString());
+        var data=json.readTree(response.getContentAsString());
+        if(endpoint.equals("/bookings")) {
+            for(var row:data) if(id.equals(row.path("id").asText())) return row.path("qrReconciliation");
+            fail("Booking absent from authorized list");
+        }
+        return endpoint.endsWith("/deposit") ? data.path("qrReconciliation") : data.path("booking").path("qrReconciliation");
+    }
+    private List<Object> qrSnapshot() {
+        return List.of(jdbc.queryForList("select * from bookings order by id"),jdbc.queryForList("select * from payment_transactions order by id"),
+                jdbc.queryForList("select * from payment_refunds order by id"),jdbc.queryForList("select * from payment_events order by id"),
+                jdbc.queryForList("select * from contracts order by id"),jdbc.queryForList("select * from booking_status_history order by id"));
+    }
+    @Test void reconciliationGetConsistentPrivateAndReadOnly() throws Exception {
+        var b=approve(); report(b.id()); verify(b.id(),"READ-PARTIAL",100000);
+        var before=qrSnapshot(); JsonNode expected=null;
+        for(var actor:List.of(user,staff,admin)) for(var endpoint:List.of("/bookings","/bookings/"+b.id(),"/bookings/"+b.id()+"/deposit")) {
+            var summary=qrRead(actor,b.id(),endpoint); assertFalse(summary.isMissingNode());
+            if(expected==null) expected=summary; else assertEquals(expected,summary);
+            assertEquals("RECEIVED_INCOMPLETE",summary.path("stage").asText());
+            assertEquals(100000,summary.path("receivedAmount").asLong());assertEquals(290000,summary.path("shortfallAmount").asLong());
+            assertFalse(summary.has("sourceAccount"));assertFalse(summary.has("transactionRef"));assertFalse(summary.has("actorId"));
+        }
+        assertEquals(before,qrSnapshot());
+        assertNull(current(b.id()).qrReconciliation()); // Mutation/internal View remains unchanged.
+    }
+    @Test void reconciliationGetPreservesPermissionsAndDoesNotQueryUnauthorizedProjection() throws Exception {
+        var b=approve();var wrong=new Actor("demo-staff-hn","STAFF","Other");
+        jdbc.update("insert into users(id,email,password_hash,full_name,role,status,token_version,version) select 'qr-other-user','qr-other@example.test',password_hash,'Other fixture','USER','ACTIVE',0,0 from users where id='demo-user' and not exists(select 1 from users where id='qr-other-user')");
+        var other=new Actor("qr-other-user","USER","Other");var before=qrSnapshot();
+        for(var actor:List.of(wrong,other)) {
+            for(var endpoint:List.of("/bookings/"+b.id(),"/bookings/"+b.id()+"/deposit")) assertEquals(404,get(actor,endpoint).getStatus());
+            assertEquals(0,json.readTree(get(actor,"/bookings").getContentAsString()).size());
+        }
+        assertEquals(401,mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/bookings/"+b.id())).andReturn().getResponse().getStatus());
+        assertEquals(before,qrSnapshot());
+    }
+    @Test void reconciliationProjectionMapsRefundPresenceAndRetryWithoutChangingOldTotals() throws Exception {
+        var b=approve();verify(b.id(),"READ-REFUND",100000);var payment=repo.forBooking(b.id()).getFirst();
+        var refund=json.valueToTree(payments.createManualRefund(admin,payment.id(),100000,"Fixture refund"));
+        payments.decide(admin,refund.path("id").asText(),refund.path("version").asLong(),0,"Decline fixture refund");
+        repo.event(b.id(),payment.id(),"DEPOSIT_RETRY","Private diagnostic",admin.id(),clock.instant(),null);
+        var response=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString());
+        assertEquals(100000,response.path("deposit").path("receivedAmount").asLong());
+        assertEquals(290000,response.path("deposit").path("missingAmount").asLong());
+        var summary=response.path("qrReconciliation");assertEquals(0,summary.path("eligibleAmount").asLong());assertEquals(390000,summary.path("shortfallAmount").asLong());
+        assertEquals("NONE",summary.path("processingIssue").asText());
+        assertFalse(summary.toString().contains("Private diagnostic"));
+    }
+    @Test void reconciliationOmittedForNonQrAndSharedClockAcrossList() throws Exception {
+        var b=approve();var other=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,11,2),LocalDate.of(2026,11,4)));
+        var rows=json.readTree(get(user,"/bookings").getContentAsString());assertEquals(2,rows.size());
+        assertEquals(rows.get(0).path("qrReconciliation").path("checkedAt"),rows.get(1).path("qrReconciliation").path("checkedAt"));
+        for(String update:List.of("deposit_required=false","deposit_required=true,deposit_method='VNPAY_SANDBOX'")) {
+            jdbc.update("update bookings set "+update+" where id=?",other.id());
+            for(String endpoint:List.of("/bookings","/bookings/"+other.id(),"/bookings/"+other.id()+"/deposit"))
+                assertTrue(qrRead(user,other.id(),endpoint).isMissingNode());
+        }
+        assertFalse(qrRead(user,b.id(),"/bookings").isMissingNode());
+    }
     @Test void authenticatedFullFlowAndOneContract()throws Exception {
         var b=approve();assertEquals("DEMO_QR_MANUAL",b.deposit().method());assertEquals(390000,b.deposit().amount());
         var payload=get(user,"/bookings/"+b.id()+"/deposit/qr-payload");assertEquals(200,payload.getStatus());

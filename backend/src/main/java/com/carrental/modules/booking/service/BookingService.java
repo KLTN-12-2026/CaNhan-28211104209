@@ -24,6 +24,7 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
     @org.springframework.beans.factory.annotation.Value("${app.return-policy-enabled:false}") private boolean returnPolicyEnabled;
     private final ReturnPolicy returnPolicies;
+    @org.springframework.beans.factory.annotation.Autowired private QrReconciliationReader qrReads;
     @org.springframework.beans.factory.annotation.Autowired private ReturnSettlementService settlements;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
@@ -51,7 +52,9 @@ public class BookingService {
                        long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy,
                        ReturnPolicy.Assessment returnAssessment, ReturnSettlementService.Summary returnSettlement,
                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-                       ScheduleWarnings scheduleWarnings) {}
+                       ScheduleWarnings scheduleWarnings,
+                       @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                       QrReconciliationPolicy.Summary qrReconciliation) {}
 
     public record ScheduleWarnings(Instant checkedAt, List<ScheduleRiskPolicy.Risk> items) {}
 
@@ -65,6 +68,10 @@ public class BookingService {
     }
 
     private View view(Booking b, ScheduleWarnings warnings) {
+        return view(b, warnings, null, clock.instant());
+    }
+
+    private View view(Booking b, ScheduleWarnings warnings, QrReconciliationPolicy.Summary qr, Instant now) {
         long received = jdbc.queryForObject(
             "select coalesce(sum(amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
             Long.class, b.id
@@ -80,14 +87,14 @@ public class BookingService {
             b.id, b.userId, b.vehicleId, b.customerName, b.vehicleName,
             b.pickupBranchId, b.returnBranchId, b.pickupName, b.returnName,
             b.actualReturnBranchId, b.startAt, b.endAt, b.expiresAt,
-            effective(b), b.dailyPrice, b.rentalDays, b.rentalTotal, b.oneWayFee,
+            ("PENDING".equals(b.status) && !b.expiresAt.isAfter(now) ? "EXPIRED" : b.status), b.dailyPrice, b.rentalDays, b.rentalTotal, b.oneWayFee,
             b.total, b.version, b.createdAt, b.policyVersion,
             new Deposit(
                 b.depositRequired, b.depositAmount, b.depositPolicy, b.depositMethod, mode,
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings, qr
         );
     }
 
@@ -122,17 +129,18 @@ public class BookingService {
         return b;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<View> list(Actor a) {
         var visible = (a.is("USER") ? repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()) : repo.findAllByOrderByCreatedAtDescIdAsc())
             .stream().filter(b -> canRead(a, b)).toList();
-        var warnings = scheduleWarnings(a, visible);
-        return visible.stream().map(b -> view(b, warnings.get(b.id))).toList();
+        var now = clock.instant();
+        var warnings = scheduleWarnings(a, visible, now);
+        var qr = qrSummaries(visible, now);
+        return visible.stream().map(b -> view(b, warnings.get(b.id), qr.get(b.id), now)).toList();
     }
 
-    private Map<String, ScheduleWarnings> scheduleWarnings(Actor actor, List<Booking> visible) {
+    private Map<String, ScheduleWarnings> scheduleWarnings(Actor actor, List<Booking> visible, Instant now) {
         if ((!actor.is("STAFF") && !actor.is("ADMIN")) || visible.isEmpty()) return Map.of();
-        Instant now = clock.instant();
         var schedule = repo.searchSchedule(visible.stream().map(b -> b.vehicleId).distinct().toList(), now);
         var readableIds = schedule.stream().filter(b -> canRead(actor, b)).map(b -> b.id).collect(Collectors.toSet());
         var byVehicle = schedule.stream().collect(Collectors.groupingBy(b -> b.vehicleId));
@@ -149,15 +157,37 @@ public class BookingService {
         return result;
     }
 
+    private Map<String, QrReconciliationPolicy.Summary> qrSummaries(List<Booking> visible, Instant now) {
+        var qr = visible.stream().filter(b -> b.depositRequired && DepositPolicy.isDemoQrMethod(b.depositMethod)).toList();
+        var facts = qrReads.read(qr.stream().map(b -> b.id).toList());
+        Map<String, QrReconciliationPolicy.Summary> result = new HashMap<>();
+        for (var b : qr) {
+            var f = facts.get(b.id);
+            var receipts = f.receipts().stream().map(p -> new QrReconciliationPolicy.Receipt(p.status(), p.amount(), p.appliedAmount(),
+                    p.transferTime(), p.verifiedAt(), f.refundedPaymentIds().contains(p.id()))).toList();
+            result.put(b.id, QrReconciliationPolicy.classify(new QrReconciliationPolicy.Booking(b.depositRequired, b.depositMethod,
+                    b.status, b.depositAmount, b.expiresAt, b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.reportedAt), receipts, f.hasRetryEvent(), now));
+        }
+        return result;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public View reconciliationView(Actor actor, String id) {
+        var b = require(actor, id);
+        var now = clock.instant();
+        return view(b, null, qrSummaries(List.of(b), now).get(b.id), now);
+    }
+
     public List<String> bookingIdsForVehicle(String vehicleId) {
         return repo.findByVehicleIdOrderByStartAtAsc(vehicleId).stream().map(b -> b.id).toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Object detail(Actor a, String id) {
         Booking b = require(a, id);
         var result = new LinkedHashMap<String, Object>();
-        result.put("booking", view(b, scheduleWarnings(a, List.of(b)).get(b.id)));
+        var now = clock.instant();
+        result.put("booking", view(b, scheduleWarnings(a, List.of(b), now).get(b.id), qrSummaries(List.of(b), now).get(b.id), now));
         result.put("history", jdbc.queryForList("select previous_status,next_status,occurred_at,reason from booking_status_history where booking_id=? order by occurred_at", id));
         result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance from vehicle_handover_records where booking_id=? order by occurred_at", id));
         if (a.is("STAFF")) result.put("license", licenses.forBooking(b.userId));

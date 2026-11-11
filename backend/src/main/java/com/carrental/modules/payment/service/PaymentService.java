@@ -60,16 +60,18 @@ public class PaymentService {
         throw DomainException.conflict("Phương thức cọc không hỗ trợ tạo phiên thanh toán trực tuyến.");
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Object summary(Actor actor, String bookingId) {
-        var b = bookings.view(bookings.require(actor, bookingId));
-        return Map.of(
-            "sandbox", true,
-            "acceptingNew", settings.acceptingNew(),
-            "deposit", b.deposit(),
-            "payments", repo.forBooking(bookingId),
-            "refunds", repo.refunds(bookingId),
-            "events", repo.events(bookingId)
-        );
+        var b = bookings.reconciliationView(actor, bookingId);
+        var result = new LinkedHashMap<String, Object>();
+        result.put("sandbox", true);
+        result.put("acceptingNew", settings.acceptingNew());
+        result.put("deposit", b.deposit());
+        result.put("payments", repo.forBooking(bookingId));
+        result.put("refunds", repo.refunds(bookingId));
+        result.put("events", repo.events(bookingId));
+        if (b.qrReconciliation() != null) result.put("qrReconciliation", b.qrReconciliation());
+        return result;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

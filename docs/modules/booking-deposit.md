@@ -56,9 +56,9 @@ Khi POST lỗi mạng hoặc tải lại sau POST thành công bị lỗi, giao 
 
 Migration V7/V8 bổ sung trường và guard trong ba bảng payment hiện có. V9 là migration Java Flyway nhỏ trong `backend/src/main/java/db/migration/`, chỉ xử lý tên UNIQUE(payment_id) do từng DB tự sinh, giữ FK và index tra cứu; tất cả dùng chung namespace `classpath:db/migration` và history Flyway, không có DDL chạy riêng. Tổng vẫn29 bảng gồm history; không đổi V1–V6. Không dùng V7 thử nghiệm cũ để nâng DB đã áp dụng checksum khác; cần kiểm kê history trước. Java migration có checksum tường minh và được kiểm thử MySQL/H2.
 
-## Contract tóm tắt đối soát QR — đã chốt, chưa triển khai API
+## Contract tóm tắt đối soát QR — API đọc
 
-Contract sau dành cho phần đọc; sự hiện diện trong tài liệu không có nghĩa API hiện tại đã trả trường này. Không thêm trạng thái đơn, migration, điều kiện thu tiền hay thay transaction. Ghi nhận khoản nhận vẫn bền vững trước bước áp dụng cọc/xác nhận đơn/phát hành hợp đồng; GET không gọi các thao tác này.
+Contract sau được dùng cho ba API GET bên dưới; giao diện hàng đợi/cảnh báo sử dụng trường mới chưa được bổ sung. Không thêm trạng thái đơn, migration, điều kiện thu tiền hay thay transaction ghi. Ghi nhận khoản nhận vẫn bền vững trước bước áp dụng cọc/xác nhận đơn/phát hành hợp đồng; GET không gọi các thao tác này.
 
 ### Vị trí và kiểu dữ liệu
 
