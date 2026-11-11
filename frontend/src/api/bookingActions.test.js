@@ -182,3 +182,10 @@ test('unpaid return assessment blocks completion only while an amount is outstan
   assert.deepEqual(getBookingActions({...b,returnAssessment:{amountVnd:0,collectionStatus:'NOT_DUE'}},staff),['COMPLETED']);
   assert.deepEqual(getBookingActions(b,staff),['COMPLETED']);
 });
+
+test('settled return ledger permits completion without changing original assessment',()=>{
+ const b={status:'RETURNED',pickupBranchId:'dn',returnBranchId:'dn',returnAssessment:{amountVnd:1950000,collectionStatus:'UNPAID'}};
+ const staff={role:'STAFF',assignedBranchIds:new Set(['dn']),now:Date.now()};
+ assert.deepEqual(getBookingActions({...b,returnSettlement:{outstandingAmount:0}},staff),['COMPLETED']);
+ assert.deepEqual(getBookingActions({...b,returnSettlement:{outstandingAmount:500000}},staff),[]);
+});

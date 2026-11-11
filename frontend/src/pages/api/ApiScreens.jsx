@@ -1,3 +1,4 @@
+import ReturnSettlement, { SettlementSummary } from '../../components/booking/ReturnSettlement';
 import ReturnPolicySummary from '../../components/booking/ReturnPolicySummary';
 import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking/ReturnReceipt';
 import LicensePhotos from "../../components/user/LicensePhotos";
@@ -1249,6 +1250,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   );
   const [queue, setQueue] = useState("all");
   const [depositPhase,setDepositPhase]=useState("");
+  const [returnDebt,setReturnDebt]=useState(false);
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
   const [sort, setSort] = useState("createdAt_desc");
   const [page, setPage] = useState(1);
@@ -1266,13 +1268,14 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     now,
     sort: isFilterActive ? sort : "createdAt_desc",
     depositPhase,
+    returnDebt,
   });
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const activePage = Math.min(Math.max(1, page), totalPages);
 
-  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}`;
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${returnDebt}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -1326,6 +1329,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           />
         </Field>
 
+        {(area === 'admin' || mode === 'return') && <label className="flex items-center gap-2"><input type="checkbox" checked={returnDebt} onChange={e => { setReturnDebt(e.target.checked); if(e.target.checked){setStatus('');setQueue('all');setDepositPhase('');} }} />Đã trả — còn khoản vượt hạn</label>}
         <Field label="Trạng thái">
           <select
             value={status}
@@ -1754,7 +1758,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
             <ReturnPolicySummary policy={booking.returnPolicy} />
-            <ReturnAssessmentSummary assessment={booking.returnAssessment} />
+            <ReturnAssessmentSummary assessment={booking.returnAssessment} settlement={booking.returnSettlement} />
+            <ReturnSettlement key={`settlement-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedReturn={assignedBranchIds.has(booking.returnBranchId)} onSaved={request.reload} />
             {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
@@ -2127,6 +2132,7 @@ export function ApiDocumentPage({ kind, area }) {
               })}
             </dl>
             <ReturnPolicySummary policy={doc.returnPolicy} />
+            {kind === "invoice" && <SettlementSummary settlement={doc.returnSettlement} history={false} />}
             {kind === "contract" && doc.terms ? (
               <div className="mt-6 border-t pt-4">
                 <h3 className="font-semibold mb-2">Điều khoản</h3>

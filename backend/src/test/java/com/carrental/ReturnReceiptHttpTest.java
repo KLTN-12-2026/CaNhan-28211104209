@@ -49,7 +49,7 @@ class ReturnReceiptHttpTest {
         org.springframework.test.util.ReflectionTestUtils.setField(bookings,"returnPolicyEnabled",true);
         org.springframework.test.util.ReflectionTestUtils.setField(bookings,"depositEnabled",false);
         CancelBoundaryTest.verifySafeIsolatedDatabase(jdbc);
-        for(String t:List.of("payment_events","payment_refunds","payment_transactions","reviews","incident_events","incident_cases","vehicle_handover_records","invoice_items","invoices","contracts","booking_status_history","bookings"))jdbc.update("delete from "+t);
+        for(String t:List.of("booking_return_settlements","payment_events","payment_refunds","payment_transactions","reviews","incident_events","incident_cases","vehicle_handover_records","invoice_items","invoices","contracts","booking_status_history","bookings"))jdbc.update("delete from "+t);
         jdbc.update("update vehicles set current_branch_id='dn',status='ACTIVE',daily_price=650000 where id='v1'");clock.value=Instant.parse("2026-10-23T03:00:00Z");
         var old=licenses.mine(user);licenses.save(user,new LicenseService.View(null,"SYNTHETIC-QR-DEMO-NOT-REAL","VN_2025","B",LocalDate.of(2035,12,31),false,"PENDING",old==null?0:old.version()));LicensePhotoFixture.approved(licenses,user);
     }

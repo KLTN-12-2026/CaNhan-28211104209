@@ -77,3 +77,12 @@ test('early and on-time summaries show zero without implying refund or payment',
     assert.match(container.textContent,/Không phát sinh khoản vượt hạn/);assert.match(container.textContent,/không tự giảm tiền thuê hoặc hoàn cọc/);assert.doesNotMatch(container.textContent,/Đã thanh toán/);
   }
 });
+
+test('saved assessment uses current settlement wording for partial and resolved balances',async()=>{
+  await mount();
+  for(const outstandingAmount of [500000,0]) {
+    await act(async()=>root.render(createElement(Summary,{assessment,settlement:{outstandingAmount}})));
+    assert.match(container.textContent,outstandingAmount ? /Chưa xử lý đủ khoản vượt hạn/ : /Khoản vượt hạn đã xử lý đủ/);
+    assert.doesNotMatch(container.textContent,/Chưa thu —/);
+  }
+});

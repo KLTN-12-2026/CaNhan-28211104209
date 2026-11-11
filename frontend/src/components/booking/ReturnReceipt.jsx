@@ -3,7 +3,7 @@ import { applyBookingAction, getBooking, previewBookingReturn } from '../../api/
 import { getErrorMessage } from '../../utils/roles';
 import { Field, Notice, dateOnly, dateTime, money } from '../common/PageKit';
 
-export function ReturnAssessmentSummary({ assessment, preview = false }) {
+export function ReturnAssessmentSummary({ assessment, preview = false, settlement }) {
   if (!assessment) return null;
   return <section className="panel space-y-2" aria-label={preview ? 'Dự kiến nhận trả' : 'Kết quả nhận trả'}>
     <h2 className="text-lg font-semibold">{preview ? 'Xem trước nhận trả' : 'Kết quả nhận trả'}</h2>
@@ -11,7 +11,7 @@ export function ReturnAssessmentSummary({ assessment, preview = false }) {
     <p>Ngày trả đăng ký: {dateOnly(assessment.bookedReturnDate)} · Ngày {preview ? 'ghi nhận dự kiến' : 'trả thực tế'}: {dateOnly(assessment.actualReturnDate)}</p>
     {!preview && <p>Ghi nhận lúc {dateTime(assessment.actualReturnedAt)}</p>}
     <p>Vượt hạn: {assessment.lateDays} ngày × {money(assessment.dailyPriceVnd)} = <strong>{money(assessment.amountVnd)}</strong></p>
-    <p>{assessment.collectionStatus === 'UNPAID' ? 'Chưa thu — chưa thể hoàn tất đơn. Khoản này không tự trừ cọc hoặc được coi là đã thanh toán.' : 'Không phát sinh khoản vượt hạn. Trả sớm không tự giảm tiền thuê hoặc hoàn cọc.'}</p>
+    <p>{settlement && assessment.amountVnd > 0 ? settlement.outstandingAmount === 0 ? 'Khoản vượt hạn đã xử lý đủ. Xem chi tiết thu và miễn/giảm bên dưới.' : 'Chưa xử lý đủ khoản vượt hạn — chưa thể hoàn tất đơn. Xem số đã thu, miễn/giảm và còn phải thu bên dưới.' : assessment.collectionStatus === 'UNPAID' ? 'Chưa thu — chưa thể hoàn tất đơn. Khoản này không tự trừ cọc hoặc được coi là đã thanh toán.' : 'Không phát sinh khoản vượt hạn. Trả sớm không tự giảm tiền thuê hoặc hoàn cọc.'}</p>
   </section>;
 }
 

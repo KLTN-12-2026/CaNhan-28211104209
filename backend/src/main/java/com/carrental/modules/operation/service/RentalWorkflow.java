@@ -5,15 +5,25 @@ import com.carrental.modules.invoice.service.InvoiceService;
 import com.carrental.modules.user.service.LicenseService;
 import com.carrental.security.Actor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 @Service public class RentalWorkflow {
  private final BookingService bookings;private final ContractService contracts;private final InvoiceService invoices;private final LicenseService licenses;private final JdbcTemplate jdbc;private final ObjectMapper json;private final java.time.Clock clock;
  @org.springframework.beans.factory.annotation.Autowired private com.carrental.modules.payment.service.PaymentService payments;
+ @org.springframework.beans.factory.annotation.Autowired private PlatformTransactionManager transactionManager;
  public RentalWorkflow(BookingService b,ContractService c,InvoiceService i,LicenseService l,JdbcTemplate j,ObjectMapper m,java.time.Clock clk){bookings=b;contracts=c;invoices=i;licenses=l;jdbc=j;json=m;clock=clk;}
- @Transactional public Object apply(Actor a,String id,BookingService.Action action){
+ public Object apply(Actor a,String id,BookingService.Action action){
+  var transaction=new TransactionTemplate(transactionManager);
+  // Only completion needs a fresh settlement read after waiting for the booking lock.
+  // Preserve the existing transaction isolation for deposit/cancellation workflows.
+  if("COMPLETED".equals(action.next()))transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+  return transaction.execute(status -> applyLocked(a,id,action));
+ }
+ private Object applyLocked(Actor a,String id,BookingService.Action action){
   var b=bookings.change(a,id,action);
   if(b.depositRequired&&java.util.Set.of("CANCELLED","REJECTED").contains(b.status))payments.cancellation(bookings.view(b));
   if("CONFIRMED".equals(b.status))contracts.issue(b);

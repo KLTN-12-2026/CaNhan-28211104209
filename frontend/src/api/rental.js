@@ -106,3 +106,8 @@ export async function getLicensePhoto(bookingId, side, signal) {
   const { data } = await apiClient.get(`${base}/${side}`, { responseType: "blob", signal });
   return data;
 }
+
+export async function recordReturnSettlement(id, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/return-settlements`, input);
+  return data;
+}

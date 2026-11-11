@@ -340,3 +340,9 @@ test('paid booking detail keeps unique child identities and return preview throu
   assert.equal(duplicateKeys.length,0,'Sibling keys must be distinct across identity and deposit');
  }finally{console.error=originalError;}
 });
+
+test('return debt filter includes only returned bookings with positive outstanding',()=>{
+ const rows=[{id:'owed',status:'RETURNED',returnSettlement:{outstandingAmount:500000}},{id:'paid',status:'RETURNED',returnSettlement:{outstandingAmount:0}},{id:'legacy',status:'RETURNED'},{id:'active',status:'IN_PROGRESS',returnSettlement:{outstandingAmount:500000}}];
+ assert.deepEqual(visibleBookings(rows,{mode:'return',returnDebt:true}).map(b=>b.id),['owed']);
+ assert.deepEqual(visibleBookings(rows,{returnDebt:true}).map(b=>b.id),['owed']);
+});

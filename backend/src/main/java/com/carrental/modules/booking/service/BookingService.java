@@ -24,6 +24,7 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
     @org.springframework.beans.factory.annotation.Value("${app.return-policy-enabled:false}") private boolean returnPolicyEnabled;
     private final ReturnPolicy returnPolicies;
+    @org.springframework.beans.factory.annotation.Autowired private ReturnSettlementService settlements;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
     private final AccountService accounts;
@@ -48,7 +49,7 @@ public class BookingService {
                        String actualReturnBranchId, Instant startAt, Instant endAt, Instant expiresAt,
                        String status, long dailyPrice, int rentalDays, long rentalTotal, long oneWayFee,
                        long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy,
-                       ReturnPolicy.Assessment returnAssessment) {}
+                       ReturnPolicy.Assessment returnAssessment, ReturnSettlementService.Summary returnSettlement) {}
 
     public record Deposit(boolean required, long amount, String policy, String method, String mode,
                           Instant approvedAt, Instant paymentDueAt, Instant reviewDueAt, Instant originalHoldUntil,
@@ -78,7 +79,7 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment)
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment))
         );
     }
 
@@ -347,8 +348,8 @@ public class BookingService {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"RETURNED".equals(old)) throw DomainException.conflict("Cần nhận xe trước khi hoàn tất.");
                 var assessment = returnPolicies.assessment(b.returnAssessment);
-                if (assessment != null && assessment.amountVnd() > 0 && "UNPAID".equals(assessment.collectionStatus()))
-                    throw DomainException.conflict("Khoản vượt hạn chưa thu. Chưa thể hoàn tất đơn; cần xử lý công nợ ở bước tiếp theo.");
+                if (assessment != null && settlements.summary(b.id, assessment).outstandingAmount() > 0)
+                    throw DomainException.conflict("Khoản vượt hạn chưa thu. Chưa thể hoàn tất đơn; cần xử lý khoản còn phải thu.");
             }
             default -> throw DomainException.bad("Chuyển trạng thái không được hỗ trợ.");
         }
@@ -356,6 +357,26 @@ public class BookingService {
         repo.flush();
         history(b, old, a, action.reason() != null ? action.reason() : action.condition());
         return b;
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public View settleReturn(Actor actor, String id, ReturnSettlementService.Input input) {
+        var b=lockDepositBooking(id);
+        if("RECEIPT".equals(input.kind())) branches.requireStaff(actor,b.returnBranchId);
+        else if(Set.of("WAIVER","REVERSAL").contains(Objects.toString(input.kind(),""))) actor.require("ADMIN");
+        else throw DomainException.bad("Thao tác khoản vượt hạn không hợp lệ.");
+        var assessment=returnPolicies.assessment(b.returnAssessment);
+        if(assessment==null || assessment.amountVnd()<=0 || !b.pickupBranchId.equals(b.returnBranchId))
+            throw DomainException.conflict("Đơn không có khoản vượt hạn cần xử lý.");
+        var summary=settlements.summary(id,assessment);
+        if(settlements.duplicate(actor,summary,input)) return view(b);
+        if(!"RETURNED".equals(b.status)) throw DomainException.conflict("Chỉ xử lý trước khi hoàn tất đơn đã nhận trả.");
+        if(b.version!=input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Tải lại trước khi xử lý.");
+        settlements.append(actor,id,summary,input);
+        // Invalidate stale previews without rewriting original booking snapshots.
+        jdbc.update("update bookings set version=version+1 where id=?",id);
+        entityManager.refresh(b);
+        return view(b);
     }
 
     public Booking lockDepositBooking(String id) {

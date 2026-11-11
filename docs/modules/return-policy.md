@@ -1,6 +1,6 @@
 # Chính sách trả xe — snapshot và xác nhận lúc đặt
 
-`RETURN_POLICY_ENABLED` mặc định `false` (`app.return-policy-enabled`). Chỉ bật trên fixture thử; giữ tắt ở môi trường sử dụng cho đến khi nhận trả, công nợ và bảo vệ lịch hoàn chỉnh. Cờ điều khiển áp chính sách khi tạo đơn mới; đơn đã chấp nhận chính sách vẫn sử dụng snapshot nếu tắt cờ. Chưa triển khai thu khoản vượt hạn hoặc thay lịch.
+`RETURN_POLICY_ENABLED` mặc định `false` (`app.return-policy-enabled`). Chỉ bật trên fixture thử; giữ tắt ở môi trường sử dụng cho đến khi nhận trả, công nợ và bảo vệ lịch hoàn chỉnh. Cờ điều khiển áp chính sách khi tạo đơn mới; đơn đã chấp nhận chính sách vẫn sử dụng snapshot nếu tắt cờ. Ghi thu thủ công khoản vượt hạn có nhật ký riêng; chưa thay lịch.
 
 Khi bật, chỉ đơn theo ngày, nhận/trả cùng chi nhánh nhận chính sách `same-branch-return-v1`. Không thay `policyVersion` tính ngày thuê. Trả sớm không tự giảm giá/hoàn cọc và giữ lịch gốc; trả muộn theo số ngày Việt Nam vượt ngày trả, nhân giá/ngày đã lưu, không thêm tiền phạt. Cọc giữ chỗ thuộc tiền thuê, không phải cọc bảo đảm; khoản vượt hạn không tự được coi là đã thu.
 
@@ -40,6 +40,18 @@ POST `/{id}/actions` với `next: RETURNED` tiếp tục nhận `version`, `cond
 
 V11 thêm `bookings.return_assessment` TEXT nullable, không thêm bảng/backfill. Chi tiết/list đơn trả `returnAssessment` đã lưu. RETURN record `occurred_at` trùng thời điểm trong assessment. Legacy/khác chi nhánh/đơn không có policy giữ quy trình cũ, không tự tính phí mới.
 
-Trả sớm/đúng ngày: `amountVnd=0`, `collectionStatus=NOT_DUE`; tiền thuê gốc và lịch giữ đến hết ngày trả không đổi. Trả muộn: `collectionStatus=UNPAID` (Chưa thu), không tự trừ cọc, không đánh dấu đã thanh toán. Ví dụ trả đăng ký28/10, ghi nhận31/10, giá650.000đ/ngày →3ngày,1.950.000đ. Đơn có khoản này chưa thu không được COMPLETED hoặc phát hành hóa đơn. Thu/miễn/điều chỉnh công nợ và dòng hóa đơn vượt hạn thuộc bước tiếp theo; hiện chưa có thao tác đóng khoản này. Đơn không phát sinh khoản vượt hạn vẫn có thể hoàn tất theo luồng hóa đơn cũ.
+Trả sớm/đúng ngày: `amountVnd=0`, `collectionStatus=NOT_DUE`; tiền thuê gốc và lịch giữ đến hết ngày trả không đổi. Trả muộn: `collectionStatus=UNPAID` (Chưa thu), không tự trừ cọc, không đánh dấu đã thanh toán. Ví dụ trả đăng ký28/10, ghi nhận31/10, giá650.000đ/ngày →3ngày,1.950.000đ. Đơn có khoản còn phải thu không được COMPLETED hoặc phát hành hóa đơn. Thu/miễn/đảo và số dư hiện tại theo nhật ký mô tả bên dưới; không sửa kết quả tính phí gốc. Đơn không phát sinh khoản vượt hạn vẫn có thể hoàn tất theo luồng hóa đơn cũ.
 
 Desktop tách xem trước và xác nhận nhận xe; đổi ghi chú/tình trạng bảo trì bỏ preview. Gửi lặp bị chặn tại UI và kiểm soát version/unique record backend; khi kết quả POST không rõ, chỉ đọc lại trước thao tác tiếp. User/Staff/Admin được đọc kết quả theo quyền đọc đơn hiện có; Admin không được nhận trả thay Staff. Chưa giải quyết cảnh báo/đổi xe hoặc hủy đơn kế tiếp khi xe trả muộn; không được suy đây là luồng trả muộn hoàn chỉnh để bật trên môi trường sử dụng.
+
+
+## Xử lý khoản vượt hạn
+V12 thêm booking_return_settlements (tổng 30 bảng kể cả Flyway). Booking sở hữu khoản vượt hạn và nhật ký xử lý; không đưa khoản này vào payment_transactions của cọc. Nhật ký bất biến gồm RECEIPT, WAIVER, REVERSAL; đảo toàn bộ một bản ghi thu/miễn trước đó một lần, không đảo bản ghi đảo. Đảo sai ghi nhận không xác nhận hoàn tiền thực tế. Không sửa ngày, giá, khoản vượt hạn gốc, hợp đồng hoặc hóa đơn cũ.
+
+POST /api/v1/bookings/{id}/return-settlements nhận kind, amountVnd (VND nguyên dương cho thu/miễn), method (CASH/BANK_TRANSFER cho thu), reference (tham chiếu thu), reason, reversesId (chỉ đảo), idempotencyKey, expectedVersion, confirmed=true. Staff đúng chi nhánh trả chỉ ghi thu đã đối chiếu; Admin chỉ miễn/giảm/đảo. USER chỉ đọc. Phải RETURNED có khoản vượt hạn dương cùng chi nhánh. Đảo không nhận số tiền client. Transaction ghi công nợ và action hoàn tất dùng READ_COMMITTED để đọc được nhật ký vừa commit sau khi chờ khóa. Khóa xe rồi đơn cùng thứ tự hoàn tất, ghi nhật ký và tăng version trong cùng transaction; lỗi rollback cả hai. Cùng khóa idempotency/nội dung/người gửi trả readback không ghi trùng; đổi nội dung cùng khóa trả409. Từ chối số tiền vượt số dư, tiền lẻ/âm/0, tham chiếu thu đang dùng trong cùng đơn, sai quyền/version; không tự retry mutation sau timeout.
+
+returnSettlement trên đơn gồm originalAmount, receivedAmount, waivedAmount, outstandingAmount, status, demo, entries. Số dư = gốc - thu hợp lệ - miễn hợp lệ; bản bị đảo không tính. Trạng thái UNPAID/PARTIAL/PAID/WAIVED/SETTLED/NOT_DUE phân biệt miễn và thu. returnAssessment.collectionStatus là kết quả ban đầu khi nhận xe; số dư/trạng thái hiện tại lấy returnSettlement. Khi số dư0 Staff được hoàn tất riêng; Admin không có quyền này. Chỉ khoản vượt hạn đã xử lý, không xác nhận phần tiền thuê còn lại.
+
+RETURN_SETTLEMENT_DEMO mặc định true: nhật ký và giao diện gắn nhãn mô phỏng; QA không chuyển tiền thật. Chế độ lưu trên từng bản ghi, không trộn chế độ trong một đơn. Không bật chính sách hoặc chế độ thu thật trên môi trường sử dụng khi chưa có nghiệm thu vận hành đầy đủ.
+
+Hóa đơn mới lưu snapshot assessment và settlement; tổng = tiền gốc + vượt hạn gốc - miễn/giảm. Invoice item vượt hạn lưu số ròng không âm để giữ ràng buộc schema cũ; khối giải thích riêng hiển thị khoản gốc, thu, miễn và còn thiếu. Hóa đơn không chứng minh toàn bộ tiền thuê đã thanh toán. Sau COMPLETED không ghi/đảo mới; retry cùng thao tác đã có chỉ đọc lại.
