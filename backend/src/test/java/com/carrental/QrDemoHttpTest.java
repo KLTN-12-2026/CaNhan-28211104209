@@ -172,10 +172,48 @@ class QrDemoHttpTest {
         var b=approve();var l=licenses.mine(user);licenses.save(user,new LicenseService.View(null,"SYNTHETIC-CHANGED","VN_2025","B",l.expiresOn(),false,"PENDING",l.version()));
         verify(b.id(),"A",390000);assertEquals(1,count("payment_transactions",b.id()));assertEquals("PENDING",current(b.id()).status());assertEquals(390000,repo.refunds(b.id()).getFirst().amount());assertEquals(0,count("contracts",b.id()));
     }
+    @Autowired PaymentSettings paymentSettings;
+    @Test void disabledNewDepositsKeepExistingQrReadsAndSettlement() throws Exception {
+        var b=approve();
+        Object previous=org.springframework.test.util.ReflectionTestUtils.getField(bookings,"depositEnabled");
+        boolean enabled=paymentSettings.enabled;
+        try {
+            // Simulate restart with the creation flag disabled; keep the persisted QR snapshot.
+            org.springframework.test.util.ReflectionTestUtils.setField(bookings,"depositEnabled",false);
+            org.springframework.test.util.ReflectionTestUtils.setField(paymentSettings,"enabled",false);
+            assertFalse(paymentSettings.acceptingNew());
+            var quote=bookings.quote(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,11,5),LocalDate.of(2026,11,7)));
+            assertFalse(quote.deposit().required());
+            var before=qrSnapshot();
+            for(var endpoint:List.of("/bookings","/bookings/"+b.id(),"/bookings/"+b.id()+"/deposit"))
+                assertEquals("AWAITING_TRANSFER",qrRead(user,b.id(),endpoint).path("stage").asText());
+            assertEquals(before,qrSnapshot());
+            var response=get(user,"/bookings/"+b.id()+"/deposit");assertEquals(200,response.getStatus());
+            assertFalse(json.readTree(response.getContentAsString()).path("acceptingNew").asBoolean(true));
+            report(b.id());verify(b.id(),"FLAG-OFF-OLD-QR",390000);
+            assertEquals("CONFIRMED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+            assertEquals("APPLIED",qrRead(user,b.id(),"/bookings/"+b.id()).path("stage").asText());
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(bookings,"depositEnabled",previous);
+            org.springframework.test.util.ReflectionTestUtils.setField(paymentSettings,"enabled",enabled);
+        }
+    }
     @Test void contractFailureRetainsMoneyAndRecoveryIssuesOnce()throws Exception {
         var b=approve();org.mockito.Mockito.doThrow(new IllegalStateException("Synthetic contract failure")).when(contracts).issueDeposit(org.mockito.ArgumentMatchers.any());
         verify(b.id(),"A",390000);assertEquals(1,count("payment_transactions",b.id()));assertEquals("PENDING",current(b.id()).status());assertEquals(0,current(b.id()).deposit().appliedAmount());assertEquals(0,count("contracts",b.id()));
+        var before=qrSnapshot();
+        for(var endpoint:List.of("/bookings","/bookings/"+b.id(),"/bookings/"+b.id()+"/deposit")) {
+            var summary=qrRead(staff,b.id(),endpoint);
+            assertEquals("AWAITING_APPLICATION",summary.path("stage").asText());
+            assertEquals("RETRY_REQUIRED",summary.path("processingIssue").asText());
+            assertEquals(390000,summary.path("receivedAmount").asLong());
+        }
+        assertEquals(before,qrSnapshot());
         org.mockito.Mockito.doCallRealMethod().when(contracts).issueDeposit(org.mockito.ArgumentMatchers.any());workflow.settleQr(b.id(),repo.forBooking(b.id()).getFirst().id());assertEquals("CONFIRMED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+        workflow.settleQr(b.id(),repo.forBooking(b.id()).getFirst().id());
+        var summary=qrRead(user,b.id(),"/bookings/"+b.id()+"/deposit");
+        assertEquals("APPLIED",summary.path("stage").asText());assertEquals("NONE",summary.path("processingIssue").asText());
+        assertEquals(1,count("contracts",b.id()));assertEquals(1,count("payment_transactions",b.id()));
     }
     @Test void wrongActorBranchMemoAndMalformedReceiptRejected()throws Exception {
         var b=approve();var req=input(b.id(),"A",390000,clock.instant());
