@@ -55,3 +55,61 @@ Admin xem lại khoản/đơn/số tiền/lý do trước khi gửi; hoàn DEMO 
 Khi POST lỗi mạng hoặc tải lại sau POST thành công bị lỗi, giao diện khóa thao tác và chỉ kiểm tra GET, không tự POST lại hay tạo yêu cầu thay thế. Đối chiếu theo ID yêu cầu, khoản nhận, version và dữ liệu thao tác; hoàn thành còn phải khớp tham chiếu/thời điểm/nguồn tiền. Dữ liệu chưa khớp cần đối soát, không báo hoàn thành. Không lưu thông tin nguồn tiền hoặc hàng đợi retry trong localStorage.
 
 Migration V7/V8 bổ sung trường và guard trong ba bảng payment hiện có. V9 là migration Java Flyway nhỏ trong `backend/src/main/java/db/migration/`, chỉ xử lý tên UNIQUE(payment_id) do từng DB tự sinh, giữ FK và index tra cứu; tất cả dùng chung namespace `classpath:db/migration` và history Flyway, không có DDL chạy riêng. Tổng vẫn29 bảng gồm history; không đổi V1–V6. Không dùng V7 thử nghiệm cũ để nâng DB đã áp dụng checksum khác; cần kiểm kê history trước. Java migration có checksum tường minh và được kiểm thử MySQL/H2.
+
+## Contract tóm tắt đối soát QR — API đọc
+
+Contract sau được dùng cho ba API GET bên dưới; giao diện hàng đợi/cảnh báo sử dụng trường mới chưa được bổ sung. Không thêm trạng thái đơn, migration, điều kiện thu tiền hay thay transaction ghi. Ghi nhận khoản nhận vẫn bền vững trước bước áp dụng cọc/xác nhận đơn/phát hành hợp đồng; GET không gọi các thao tác này.
+
+### Vị trí và kiểu dữ liệu
+
+Thêm `qrReconciliation` vào mỗi booking của GET `/api/v1/bookings`, vào `booking` của GET `/api/v1/bookings/{id}`, và ở cấp ngoài cùng của GET `/api/v1/bookings/{id}/deposit`. Ba vị trí dùng cùng bộ phân loại. Chỉ trả khi `deposit.required=true` và `deposit.method=DEMO_QR_MANUAL`; trường bị bỏ hoàn toàn với đơn khác. Quote và response mutation không thêm trường; đọc lại GET sau thao tác. Các trường `deposit` cũ giữ nguyên ý nghĩa.
+
+| Trường | Kiểu / giá trị | Ý nghĩa |
+|---|---|---|
+| `checkedAt` | Instant UTC, không null | Một thời điểm Clock backend cho toàn response |
+| `reviewDueAt` | Instant UTC hoặc null | Hạn đối soát đã lưu; null trước duyệt |
+| `stage` | Enum bên dưới | Giai đoạn đối soát, không phải trạng thái booking |
+| `urgency` | `NOT_APPLICABLE`, `NORMAL`, `DUE_SOON`, `EXPIRED` | Mức khẩn cấp theo backend |
+| `receivedAmount` | Long VND | Tổng `amount` của các khoản `SUCCEEDED` |
+| `appliedAmount` | Long VND | Tổng `appliedAmount` của các khoản `SUCCEEDED` |
+| `eligibleAmount` | Long VND | Tổng khoản đủ điều kiện thời gian và chưa có yêu cầu hoàn theo quy tắc dưới |
+| `shortfallAmount` | Long VND | `max(0, deposit.amount - eligibleAmount)` |
+| `processingIssue` | `NONE`, `RETRY_REQUIRED` | Tín hiệu cần đối soát xử lý, không chứa exception |
+| `timingIssues` | Mảng enum, không null | Tập không trùng, thứ tự `TRANSFER_LATE`, `VERIFICATION_LATE`; rỗng nếu không có |
+
+Các tổng dùng phép cộng kiểm tra tràn số, không wrap hoặc trả 0 để che lỗi. `receivedAmount` là tổng lịch sử khoản nhận thành công, không trừ tiền đã hoàn; không phải số tiền hiện còn giữ. `eligibleAmount` không phải lời hứa xác nhận được đơn: GPLX, lịch, xe và trạng thái vẫn do mutation kiểm tra. Không giới hạn tổng này ở mức cọc; có thể lớn hơn cọc.
+
+Một khoản đủ điều kiện khi đồng thời: `SUCCEEDED`, có `transferTime` và `verifiedAt`, chuyển **trước** `paymentDueAt`, xác minh **trước** `reviewDueAt`, và không tồn tại bất kỳ yêu cầu hoàn nào liên kết khoản đó. Điều kiện cuối giữ đúng cách `settleQr` hiện lựa chọn, kể cả yêu cầu hoàn `DECLINED`; không đổi thành chỉ loại khoản hoàn đang xử lý. Không trừ `appliedAmount` khi tính `eligibleAmount`. Thiếu mốc thời gian thì không chứng minh đủ điều kiện, không tự gán giờ hiện tại. Trước duyệt không có hạn thì `eligibleAmount=0`.
+
+`shortfallAmount` vì vậy có thể khác `deposit.missingAmount` hiện tính từ tổng đã nhận. Sau hủy/hoàn, shortfall cũng có thể lớn hơn 0; **không dùng nó để yêu cầu khách đóng thêm tiền** khi đơn đã đóng, hết hạn hoặc đã áp dụng cọc.
+
+### Thứ tự phân loại
+
+Dùng trạng thái hiệu lực hiện hành: PENDING có `expiresAt <= checkedAt` được xem là EXPIRED. Xét tuần tự, lấy dòng đầu khớp:
+
+| Ưu tiên | Điều kiện | `stage` |
+|---|---|---|
+| 1 | CANCELLED, REJECTED, RETURNED hoặc COMPLETED | `CLOSED` |
+| 2 | EXPIRED hiệu lực | `EXPIRED` |
+| 3 | `appliedAmount >= deposit.amount` | `APPLIED` |
+| 4 | Chưa có `approvedAt` | `AWAITING_APPROVAL` |
+| 5 | `eligibleAmount >= deposit.amount` | `AWAITING_APPLICATION` |
+| 6 | `receivedAmount > 0` | `RECEIVED_INCOMPLETE` |
+| 7 | Có `reportedAt` | `REPORTED_NO_RECEIPT` |
+| 8 | Còn lại | `AWAITING_TRANSFER` |
+
+CONFIRMED/IN_PROGRESS có đủ tiền áp dụng vẫn là APPLIED; RETURNED/COMPLETED là CLOSED nhưng số tiền tiếp tục được trả để tra cứu. Bộ phân loại không sửa dữ liệu bất thường: ví dụ CONFIRMED nhưng applied thiếu vẫn phản ánh các điều kiện tiền bên dưới, không tự giả đã đủ; mọi thao tác phải kiểm booking.status. `RECEIVED_INCOMPLETE` có thể là nhận thiếu hoặc tiền đã nhận không đủ điều kiện, không mặc định kết luận khách chưa chuyển đủ.
+
+`urgency` chỉ áp dụng cho booking còn PENDING hoặc vừa EXPIRED hiệu lực từ PENDING, đã duyệt và chưa áp dụng đủ cọc, có `reviewDueAt`. Tại/sau hạn là EXPIRED; còn trên 0 đến đúng 10 phút là DUE_SOON; còn hơn 10 phút là NORMAL. Các trường hợp khác là NOT_APPLICABLE. Xem trạng thái raw PENDING cùng thời hạn để nhận biết đơn hết hạn động; không cần job đổi DB. Cảnh báo không kéo dài hạn hoặc giữ lịch.
+
+`processingIssue=RETRY_REQUIRED` chỉ khi trạng thái hiệu lực PENDING, stage AWAITING_APPLICATION và có sự kiện DEPOSIT_RETRY của chính đơn. Khi đã áp dụng, hết hạn, đóng hoặc không còn đủ khoản đủ điều kiện thì NONE; lịch sử lỗi vẫn đọc qua events. Đây không phải kết luận nguyên nhân hạ tầng hiện vẫn tồn tại và không tự cho phép retry mutation.
+
+`timingIssues` xét các khoản SUCCEEDED của chính đơn, độc lập với stage và không bỏ dấu thời gian lịch sử sau hoàn: thêm TRANSFER_LATE nếu transferTime tại/sau paymentDueAt; thêm VERIFICATION_LATE nếu verifiedAt tại/sau reviewDueAt. Có thể có cả hai do cùng khoản hoặc các khoản khác nhau. Thiếu timestamp/hạn thì không gán lỗi muộn. Không dùng reportedAt làm thời điểm chuyển, không quy lỗi xác minh muộn cho khách. Không đổi giá trị nguyên nhân LATE đã lưu và không coi yêu cầu hoàn APPROVED là đã hoàn tiền.
+
+### Quyền, tính nhất quán và truy vấn
+
+Kiểm quyền đọc đơn trước khi lấy projection: USER chỉ đơn mình, Staff theo phạm vi đọc hiện có, Admin tra cứu hiện có. Không cấp thêm quyền duyệt/verify cho Staff chi nhánh trả. DTO tổng hợp không chứa tài khoản nguồn, mã giao dịch, danh tính người xác minh, nội dung ghi chú nội bộ hoặc exception. USER được nhận các mã trạng thái tổng quát nêu trên cho đơn mình; frontend sau này dịch sang thông báo dễ hiểu.
+
+Đọc các khoản nhận, liên kết hoàn và sự kiện cần thiết theo nhóm booking ID đã được phép đọc; không tải toàn DB và không thêm truy vấn cho từng thẻ. Projection có kiểu qua ranh giới module, không entity mutable/SQL trong controller và không gọi booking ngược vào operation. Không refactor các truy vấn tiền cũ ngoài phạm vi này. Danh sách rỗng không gọi projection; nếu phải chia nhóm do giới hạn tham số, tối đa ba truy vấn bổ sung mỗi nhóm 500 ID (payments, refund links, retry events). Chụp dữ liệu trong cùng read transaction/snapshot, một checkedAt; dữ liệu có thể thay đổi sau GET nên mutation vẫn kiểm tra lại. Không cache kết quả đối soát.
+
+Không thêm form khai báo giao dịch của khách: nút báo hiện tại chỉ lưu reportedAt và TRANSFER_REPORTED, không lưu transactionRef/transferTime khách khai. Báo lặp không kéo dài hạn. Không dùng sự khác nhau giữa khóa báo và ID khoản nhận để suy ra lỗi ghi trùng; chống trùng khoản nhận vẫn theo contract verify hiện có.
