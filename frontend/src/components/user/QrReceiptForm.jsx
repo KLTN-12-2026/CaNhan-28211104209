@@ -38,7 +38,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
     if (!alive.current) return;
     if (ledger.status !== 'fulfilled' || !Array.isArray(ledger.value.data?.payments)) {
       setPhase(operation.acknowledged ? 'recorded' : 'unknown'); setCanRetry(false);
-      setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận khoản DEMO nhưng chưa tải lại được giao dịch. Không nhập lại khoản này.' : 'Chưa xác định kết quả; chưa tải được giao dịch. Kiểm tra trước khi thử lại.');
+      setNotice(operation.acknowledged ? 'Yêu cầu đã được máy chủ chấp nhận nhưng chưa tải được trạng thái khoản nhận mới. Kiểm tra lại; không nhập lại khoản này.' : 'Chưa xác định kết quả; chưa tải được giao dịch. Kiểm tra trước khi thử lại.');
       return;
     }
     const payments = ledger.value.data.payments;
@@ -51,8 +51,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
         return;
       }
       const updated = order.value.data.booking || order.value.data;
-      const missing = updated.deposit?.missingAmount;
-      setNotice(`Đã ghi nhận khoản DEMO ${money(receipt.amount)} · Tham chiếu ${receipt.providerTransaction}. ${updated.status === 'CONFIRMED' ? 'Đơn đã xác nhận.' : `Đơn chưa xác nhận; còn thiếu ${money(missing)}.`}`);
+      setNotice(`Đã ghi nhận khoản DEMO ${money(receipt.amount)} · Tham chiếu ${receipt.providerTransaction}. ${updated.status === 'CONFIRMED' ? 'Đơn đã xác nhận.' : ['EXPIRED', 'CANCELLED', 'REJECTED', 'RETURNED', 'COMPLETED'].includes(updated.status) ? 'Đơn đã hết hạn hoặc kết thúc; không yêu cầu khách đóng thêm. Kiểm tra chi tiết đối soát.' : 'Khoản nhận đã được tìm thấy; kiểm tra tình trạng đối soát và điều kiện đơn. Không ghi nhận lại khoản này.'}`);
       pending.current = null; setForm(emptyForm()); setVerified(false); setCandidate(null); setPhase('idle');
       try { onRefresh(); } catch { setNotice('Khoản DEMO đã được ghi nhận. Cần tải lại đơn; không nhập lại khoản này.'); }
       return;
@@ -64,7 +63,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
     }
     setPhase(operation.blocked ? 'blocked' : operation.acknowledged ? 'recorded' : 'unknown');
     setCanRetry(!operation.blocked && !operation.acknowledged && order.status === 'fulfilled');
-    setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận nhưng giao dịch chưa xuất hiện trong lần tải này. Không ghi nhận lại; hãy kiểm tra kết quả.' : 'Chưa thấy giao dịch không chứng minh lần gửi trước thất bại. Chỉ kiểm tra lại hoặc thử lại đúng yêu cầu cũ; không đổi tham chiếu.');
+    setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận nhưng giao dịch chưa xuất hiện trong lần tải này. Không ghi nhận lại; hãy kiểm tra kết quả.' : 'Chưa thấy giao dịch trong lần tải này chưa chứng minh lần gửi trước thất bại. Ưu tiên tiếp tục kiểm tra kết quả; nếu đã đối soát để thử lại, chỉ dùng đúng yêu cầu cũ, không đổi tham chiếu.');
   }
 
   async function send(operation) {
