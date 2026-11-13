@@ -1,6 +1,7 @@
 package com.carrental.modules.ai.parser;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
 import java.text.Normalizer;
@@ -18,6 +19,7 @@ public class CriteriaExtractionService {
     public record Draft(String pickupDate,String returnDate,String pickupBranchId,String returnBranchId,Integer passengers,Long budgetVndTotal,String transmission) {}
     public record Result(String status,Draft draft,List<String> unresolvedFields) {}
     public Result extract(Actor actor,String text){
+        AiRequestDeadline deadline=AiRequestDeadline.start();
         actor.require("USER");
         if(text==null||text.isBlank()||text.length()>1000)throw DomainException.bad("Nhập nhu cầu từ1 đến1000 ký tự.");
         // Refuse common sensitive identifiers before inference; no transcript or user account is forwarded.
@@ -25,7 +27,7 @@ public class CriteriaExtractionService {
             throw DomainException.bad("Vui lòng bỏ email, số điện thoại hoặc số giấy tờ khỏi nhu cầu thuê xe.");
         var engine=parser.getIfAvailable();
         if(engine==null)throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
-        var extracted=engine.parse(text);
+        var extracted=engine.parse(text,deadline);
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
         var active=branches.active();

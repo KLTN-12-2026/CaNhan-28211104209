@@ -1,5 +1,6 @@
 package com.carrental.modules.ai.routing;
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.location.service.LocationService;
 import com.carrental.security.Actor;
 import java.math.BigDecimal;
@@ -17,7 +18,10 @@ class LocationRouteServiceTest {
             new LocationService.PublicView("a","c","Loại","A",new BigDecimal("16"),new BigDecimal("108")),
             new LocationService.PublicView("b","c","Loại","B",new BigDecimal("15"),new BigDecimal("109"))));
         var expected=new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE,null,null,"OSM");
-        when(routing.route(List.of(new OsrmRoutingClient.Point(16,108),new OsrmRoutingClient.Point(15,109)))).thenReturn(expected);
+        when(routing.route(
+            eq(List.of(new OsrmRoutingClient.Point(16,108),new OsrmRoutingClient.Point(15,109))),
+            any(AiRequestDeadline.class)
+        )).thenReturn(expected);
         assertEquals(expected,new LocationRouteService(locations,routing,true).preview(user,List.of("a","b")));
         verify(locations).activeCatalog(user);verifyNoMoreInteractions(locations);
     }
@@ -32,20 +36,17 @@ class LocationRouteServiceTest {
         for(String role:List.of("STAFF","ADMIN"))assertEquals(403,assertThrows(DomainException.class,()->new LocationRouteService(locations,routing,true).preview(new Actor("x",role,"Other"),List.of("a","b"))).status.value());
         verifyNoInteractions(locations,routing);
     }
-    @Test void localRouterHasBoundedConcurrencyAndReleasesCapacity() throws Exception {
+    @Test void directRouteUsesTheSharedRouterAndForwardsItsRequestDeadline() {
         when(locations.activeCatalog(user)).thenReturn(List.of(
             new LocationService.PublicView("a","c","Loại","A",BigDecimal.ZERO,BigDecimal.ZERO),
             new LocationService.PublicView("b","c","Loại","B",BigDecimal.ONE,BigDecimal.ONE)));
-        var entered=new java.util.concurrent.CountDownLatch(2);var release=new java.util.concurrent.CountDownLatch(1);
-        when(routing.route(anyList())).thenAnswer(call->{entered.countDown();assertTrue(release.await(3,java.util.concurrent.TimeUnit.SECONDS));return new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE,null,null,"OSM");});
+        var estimate=new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE,null,null,"OSM");
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(estimate);
         var service=new LocationRouteService(locations,routing,true);
-        try(var executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()){
-            var first=executor.submit(()->service.preview(user,List.of("a","b")));
-            var second=executor.submit(()->service.preview(user,List.of("a","b")));
-            try{assertTrue(entered.await(2,java.util.concurrent.TimeUnit.SECONDS));assertEquals(429,assertThrows(DomainException.class,()->service.preview(user,List.of("a","b"))).status.value());}
-            finally{release.countDown();}
-            assertNotNull(first.get());assertNotNull(second.get());
-            assertNotNull(service.preview(user,List.of("a","b")));
-        }
+        assertSame(estimate,service.preview(user,List.of("a","b")));
+        verify(routing).route(
+            eq(List.of(new OsrmRoutingClient.Point(0,0),new OsrmRoutingClient.Point(1,1))),
+            any(AiRequestDeadline.class)
+        );
     }
 }

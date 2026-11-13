@@ -1,5 +1,6 @@
 package com.carrental;
 
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.dto.CreateItineraryRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
@@ -172,14 +173,14 @@ public class ItineraryStorageIntegrationTest {
         locBId = json.readTree(locRes2.getResponse().getContentAsString()).path("id").asText();
 
         var leg = new OsrmRoutingClient.Leg(12000.0, 1080.0);
-        when(osrmRoutingClient.route(anyList())).thenReturn(
+        when(osrmRoutingClient.route(anyList(), any(AiRequestDeadline.class))).thenReturn(
             new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 12000.0, 1080.0, "OSM Test", List.of(leg))
         );
     }
 
     @Test
     void saveAndRetrieveItineraryFlow() throws Exception {
-        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt()))
+        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locAId, locBId), "QWEN_OPTIMIZED"));
 
         String tripDate = LocalDate.now().plusDays(3).toString();
@@ -350,8 +351,8 @@ public class ItineraryStorageIntegrationTest {
             .andExpect(status().isConflict());
         assertEquals(beforeItineraries + 1, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
 
-        when(osrmRoutingClient.route(anyList())).thenThrow(new IllegalStateException("Provider must not be used to read"));
-        when(sequencePlanner.planSequence(anyString(), anyList(), anyInt()))
+        when(osrmRoutingClient.route(anyList(), any(AiRequestDeadline.class))).thenThrow(new IllegalStateException("Provider must not be used to read"));
+        when(sequencePlanner.planSequence(anyString(), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new IllegalStateException("Qwen must not be used to read"));
         var offlineRead = mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
             .header("Authorization", "Bearer " + userToken)).andExpect(status().isOk()).andReturn();
@@ -362,7 +363,7 @@ public class ItineraryStorageIntegrationTest {
     @Test
     @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "KDRIVE_TEST_DB_URL", matches = "jdbc:mysql:.*")
     void nativeMySqlRollbackAfterFirstItemInsert() throws Exception {
-        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt()))
+        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locAId, locBId), "QWEN_OPTIMIZED"));
         LocalDate date = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(3);
         var preview = mvc.perform(post(PREVIEW_URL).header("Authorization", "Bearer " + userToken)

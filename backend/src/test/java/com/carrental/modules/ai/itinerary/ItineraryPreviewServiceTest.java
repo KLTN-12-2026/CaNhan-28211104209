@@ -1,6 +1,7 @@
 package com.carrental.modules.ai.itinerary;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse;
 import com.carrental.modules.ai.itinerary.service.ItineraryPreviewService;
@@ -67,7 +68,7 @@ class ItineraryPreviewServiceTest {
     @Test
     void successfulPreviewWithCalculatedTimelineAndFingerprint() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB, locC));
-        when(planner.planSequence(eq("loc-a"), anyList(), anyInt()))
+        when(planner.planSequence(eq("loc-a"), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
 
         // 2026-10-20 là Thứ Ba
@@ -77,7 +78,7 @@ class ItineraryPreviewServiceTest {
         var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0); // 10km, 15 phút
         var estimate = new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1));
 
-        when(routing.route(anyList())).thenReturn(estimate);
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(estimate);
 
         ItineraryPreviewResponse res = service.preview(user, req);
 
@@ -136,7 +137,7 @@ class ItineraryPreviewServiceTest {
     @Test
     void returnsUnavailableWhenQwenFailsOrIsDisabled() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
-        when(planner.planSequence(any(), any(), anyInt()))
+        when(planner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(503, "Dịch vụ AI hiện không khả dụng (bị tắt)."));
 
         LocalDate validDate = LocalDate.parse("2026-10-20");
@@ -151,7 +152,7 @@ class ItineraryPreviewServiceTest {
     @Test
     void throwsTooManyRequestsWhenQwenIsBusy() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
-        when(planner.planSequence(any(), any(), anyInt()))
+        when(planner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(429, "Dịch vụ AI đang bận"));
 
         LocalDate validDate = LocalDate.parse("2026-10-20");
@@ -177,13 +178,13 @@ class ItineraryPreviewServiceTest {
     @Test
     void returnsNoFeasiblePlanWhenOsrmHasNoRoute() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
-        when(planner.planSequence(any(), any(), anyInt()))
+        when(planner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
 
         LocalDate validDate = LocalDate.parse("2026-10-20");
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "12:00", "loc-a", null);
 
-        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE, null, null, "OSM"));
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE, null, null, "OSM"));
 
         var res = service.preview(user, req);
         assertEquals(ItineraryPreviewResponse.Status.NO_FEASIBLE_PLAN, res.status());
@@ -193,7 +194,7 @@ class ItineraryPreviewServiceTest {
     @Test
     void returnsNoFeasiblePlanWhenTimeExceedsEndTime() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
-        when(planner.planSequence(any(), any(), anyInt()))
+        when(planner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
 
         LocalDate validDate = LocalDate.parse("2026-10-20");
@@ -201,7 +202,7 @@ class ItineraryPreviewServiceTest {
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "11:00", "loc-a", null);
 
         var leg1 = new OsrmRoutingClient.Leg(30000.0, 5400.0); // 90 phút
-        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 30000.0, 5400.0, "OSM", List.of(leg1)));
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 30000.0, 5400.0, "OSM", List.of(leg1)));
 
         var res = service.preview(user, req);
         assertEquals(ItineraryPreviewResponse.Status.NO_FEASIBLE_PLAN, res.status());
@@ -239,10 +240,10 @@ class ItineraryPreviewServiceTest {
     @Test
     void changedWeeklyScheduleOrEvidenceProducesDifferentFingerprint() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
-        when(planner.planSequence(any(), any(), anyInt()))
+        when(planner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
         var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0);
-        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
 
         LocalDate tripDate = LocalDate.parse("2026-10-20");
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(tripDate, "08:00", "14:00", "loc-a", null);
@@ -307,7 +308,7 @@ class ItineraryPreviewServiceTest {
     void revalidateRejectsFingerprintMismatchWithConflict() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
         var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0);
-        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
 
         LocalDate tripDate = LocalDate.parse("2026-10-20");
         DomainException ex = assertThrows(DomainException.class, () ->

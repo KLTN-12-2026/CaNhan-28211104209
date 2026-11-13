@@ -2,6 +2,7 @@ package com.carrental.modules.ai.routing;
 import com.carrental.exception.DomainException;
 import com.carrental.modules.location.service.LocationService;
 import com.carrental.security.Actor;
+import com.carrental.modules.ai.AiRequestDeadline;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -15,7 +16,6 @@ public class LocationRouteService {
     private final LocationService locations;
     private final OsrmRoutingClient routing;
     private final boolean enabled;
-    private final java.util.concurrent.Semaphore previewCapacity=new java.util.concurrent.Semaphore(2);
     @org.springframework.beans.factory.annotation.Autowired
     public LocationRouteService(
             LocationService locations,
@@ -26,6 +26,7 @@ public class LocationRouteService {
         this.enabled=enabled;
     }
     public OsrmRoutingClient.Estimate preview(Actor actor,List<String> ids){
+        AiRequestDeadline deadline=AiRequestDeadline.start();
         actor.require("USER");
         if(!enabled)throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Tính năng xem tuyến chưa được bật.");
         if(ids==null||ids.size()<2||ids.size()>8||ids.stream().anyMatch(id->id==null||id.isBlank())||ids.stream().distinct().count()!=ids.size())
@@ -35,11 +36,10 @@ public class LocationRouteService {
             var item=catalog.get(id);if(item==null)throw DomainException.bad("Địa điểm không còn hoạt động hoặc không tồn tại.");
             return new OsrmRoutingClient.Point(item.latitude().doubleValue(),item.longitude().doubleValue());
         }).toList();
-        if(!previewCapacity.tryAcquire())throw new DomainException(HttpStatus.TOO_MANY_REQUESTS,"Đang xử lý nhiều tuyến; vui lòng thử lại.");
         try {
-            return routing.route(points);
+            return routing.route(points,deadline);
         } catch (com.carrental.modules.ai.AiProviderCapacity.CapacityExceededException error) {
             throw new DomainException(HttpStatus.TOO_MANY_REQUESTS,"Đang xử lý nhiều tuyến; vui lòng thử lại.");
-        } finally {previewCapacity.release();}
+        }
     }
 }

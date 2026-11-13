@@ -1,6 +1,7 @@
 package com.carrental.modules.ai.itinerary.service;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse.*;
@@ -52,6 +53,7 @@ public class ItineraryPreviewService {
     }
 
     public ItineraryPreviewResponse preview(Actor actor, ItineraryPreviewRequest request) {
+        AiRequestDeadline deadline = AiRequestDeadline.start();
         actor.require("USER");
         validateRequest(request);
 
@@ -146,7 +148,7 @@ public class ItineraryPreviewService {
 
         QwenItinerarySequencePlanner.SequenceResult planResult;
         try {
-            planResult = sequencePlanner.planSequence(startLocation.id(), plannerCandidates, targetCount);
+            planResult = sequencePlanner.planSequence(startLocation.id(), plannerCandidates, targetCount, deadline);
         } catch (QwenItinerarySequencePlanner.QwenPlanningException qpe) {
             if (qpe.getStatusCode() == 429) {
                 throw new DomainException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, qpe.getMessage());
@@ -161,7 +163,8 @@ public class ItineraryPreviewService {
         }
         List<PublicView> orderedLocations = orderedIds.stream().map(viewMap::get).toList();
 
-        ScheduleComputationResult scheduleResult = computeSchedule(criteria, orderedLocations, request.tripDate(), startTime, endTime);
+        ScheduleComputationResult scheduleResult = computeSchedule(
+            criteria, orderedLocations, request.tripDate(), startTime, endTime, deadline);
         if (scheduleResult.errorResponse != null) {
             return scheduleResult.errorResponse;
         }
@@ -186,6 +189,20 @@ public class ItineraryPreviewService {
             String preferredCategoryId,
             List<String> orderedLocationIds,
             String expectedFingerprint) {
+        return revalidateOrderedLocations(actor, tripDate, startTimeStr, endTimeStr, startLocationId,
+            preferredCategoryId, orderedLocationIds, expectedFingerprint, AiRequestDeadline.start());
+    }
+
+    public VerifiedSchedule revalidateOrderedLocations(
+            Actor actor,
+            LocalDate tripDate,
+            String startTimeStr,
+            String endTimeStr,
+            String startLocationId,
+            String preferredCategoryId,
+            List<String> orderedLocationIds,
+            String expectedFingerprint,
+            AiRequestDeadline deadline) {
         actor.require("USER");
         if (orderedLocationIds == null || orderedLocationIds.size() < 2 || orderedLocationIds.size() > 4) {
             throw DomainException.bad("Danh sách địa điểm lưu phải có từ 2 đến 4 điểm.");
@@ -259,7 +276,8 @@ public class ItineraryPreviewService {
             preferredCategoryId
         );
 
-        ScheduleComputationResult scheduleResult = computeSchedule(criteria, orderedLocations, tripDate, startTime, endTime);
+        ScheduleComputationResult scheduleResult = computeSchedule(
+            criteria, orderedLocations, tripDate, startTime, endTime, deadline);
         if (scheduleResult.errorResponse != null) {
             throw DomainException.conflict("Lịch trình không còn khả thi dựa trên thông tin hiện hành: "
                 + String.join("; ", scheduleResult.errorResponse.notices()));
@@ -305,7 +323,8 @@ public class ItineraryPreviewService {
             List<PublicView> orderedLocations,
             LocalDate tripDate,
             LocalTime startTime,
-            LocalTime endTime) {
+            LocalTime endTime,
+            AiRequestDeadline deadline) {
 
         List<String> orderedIds = orderedLocations.stream().map(PublicView::id).toList();
 
@@ -314,7 +333,7 @@ public class ItineraryPreviewService {
             .map(l -> new OsrmRoutingClient.Point(l.latitude().doubleValue(), l.longitude().doubleValue()))
             .toList();
 
-        var routeEstimate = osrmRoutingClient.route(points);
+        var routeEstimate = osrmRoutingClient.route(points, deadline);
         if (routeEstimate.status() == OsrmRoutingClient.Status.NO_ROUTE) {
             return new ScheduleComputationResult(noFeasiblePlan(criteria, orderedIds,
                 List.of("Không tìm được tuyến đường lái xe khả thi giữa các điểm tham quan đã chọn.")));
@@ -332,7 +351,7 @@ public class ItineraryPreviewService {
                 List<OsrmRoutingClient.Leg> fetchedLegs = new ArrayList<>();
                 boolean allLegsOk = true;
                 for (int i = 0; i < points.size() - 1; i++) {
-                    var pairRoute = osrmRoutingClient.route(List.of(points.get(i), points.get(i + 1)));
+                    var pairRoute = osrmRoutingClient.route(List.of(points.get(i), points.get(i + 1)), deadline);
                     if (pairRoute.status() != OsrmRoutingClient.Status.VERIFIED) {
                         allLegsOk = false;
                         break;

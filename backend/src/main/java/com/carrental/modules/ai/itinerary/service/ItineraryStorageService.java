@@ -1,6 +1,7 @@
 package com.carrental.modules.ai.itinerary.service;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.dto.CreateItineraryRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryDetailDto;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse;
@@ -47,6 +48,7 @@ public class ItineraryStorageService {
 
     @Transactional
     public ItineraryDetailDto create(Actor actor, CreateItineraryRequest request) {
+        AiRequestDeadline deadline = AiRequestDeadline.start();
         actor.require("USER");
         if (request == null || request.title() == null || request.title().isBlank()) {
             throw DomainException.bad("Tiêu đề hành trình không được để trống.");
@@ -71,7 +73,8 @@ public class ItineraryStorageService {
             request.startLocationId(),
             request.preferredCategoryId(),
             request.orderedLocationIds(),
-            request.fingerprint()
+            request.fingerprint(),
+            deadline
         );
 
         Instant now = Instant.now(clock);

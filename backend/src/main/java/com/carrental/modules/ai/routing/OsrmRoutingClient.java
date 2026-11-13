@@ -3,6 +3,7 @@ package com.carrental.modules.ai.routing;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.carrental.modules.ai.AiProviderCapacity;
 import com.carrental.modules.ai.AiProviderCapacity.Provider;
+import com.carrental.modules.ai.AiRequestDeadline;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
@@ -44,15 +45,29 @@ public final class OsrmRoutingClient {
         this.json=json;this.base=base;this.capacity=capacity;
     }
     public Estimate route(List<Point> points){
+        return route(points, AiRequestDeadline.start());
+    }
+    public Estimate route(List<Point> points, AiRequestDeadline deadline){
         if(points==null||points.size()<2||points.size()>8||points.stream().anyMatch(p->p==null))
             throw new IllegalArgumentException("Tuyến cần từ 2 đến 8 tọa độ.");
-        AiProviderCapacity.Permit permit = capacity.acquire(Provider.OSRM);
-        String coordinates=String.join(";",points.stream().map(Point::coordinates).toList());
-        var request=HttpRequest.newBuilder(base.resolve("/route/v1/driving/"+coordinates+"?overview=false&steps=false&alternatives=false&radiuses="
-            +String.join(";",points.stream().map(p->"1000").toList())))
-            .timeout(Duration.ofSeconds(5)).GET().build();
+        AiProviderCapacity.Permit permit;
+        try {
+            deadline.requireRemaining();
+            permit = capacity.acquire(Provider.OSRM);
+        } catch (AiProviderCapacity.CapacityExceededException error) {
+            throw error;
+        } catch (AiRequestDeadline.DeadlineExceededException error) {
+            return failed(Status.UNAVAILABLE);
+        }
         try (permit) {
-            var response=com.carrental.modules.ai.LocalHttp.send(client,request,Duration.ofSeconds(5),32768);
+            String coordinates=String.join(";",points.stream().map(Point::coordinates).toList());
+            Duration callTimeout=deadline.timeoutFor(Duration.ofSeconds(5));
+            var request=HttpRequest.newBuilder(base.resolve("/route/v1/driving/"+coordinates+"?overview=false&steps=false&alternatives=false&radiuses="
+                +String.join(";",points.stream().map(p->"1000").toList())))
+                .timeout(callTimeout).GET().build();
+            deadline.requireRemaining();
+            var response=com.carrental.modules.ai.LocalHttp.send(client,request,Duration.ofSeconds(5),32768,deadline);
+            deadline.requireRemaining();
             if(response.body().length()>32768)return failed(Status.UNAVAILABLE);
             var body=json.readTree(response.body());
             if((response.status()==200||response.status()==400) && ("NoRoute".equals(body.path("code").asText())||"NoSegment".equals(body.path("code").asText())))return failed(Status.NO_ROUTE);
@@ -79,6 +94,7 @@ public final class OsrmRoutingClient {
             }
             return new Estimate(Status.VERIFIED,meters,seconds,"© OpenStreetMap contributors; OSRM driving estimate",List.copyOf(legs));
         } catch(AiProviderCapacity.CapacityExceededException error){throw error;}
+        catch(AiRequestDeadline.DeadlineExceededException error){return failed(Status.UNAVAILABLE);}
         catch(InterruptedException error){Thread.currentThread().interrupt();return failed(Status.UNAVAILABLE);}
         catch(Exception error){return failed(Status.UNAVAILABLE);}
     }

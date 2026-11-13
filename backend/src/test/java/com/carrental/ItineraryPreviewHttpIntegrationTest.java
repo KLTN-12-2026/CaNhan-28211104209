@@ -1,5 +1,6 @@
 package com.carrental;
 
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -191,12 +192,12 @@ public class ItineraryPreviewHttpIntegrationTest {
 
     @Test
     void postPreview_ReturnsValidatedWithFullSnapshotAndAttribution() throws Exception {
-        when(sequencePlanner.planSequence(eq(locId1), anyList(), anyInt()))
+        when(sequencePlanner.planSequence(eq(locId1), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locId1, locId2), "QWEN_OPTIMIZED"));
 
         // Mock OSRM leg routing
         var leg = new OsrmRoutingClient.Leg(12000.0, 1080.0); // 12km, 18 phút
-        when(osrmRoutingClient.route(anyList())).thenReturn(
+        when(osrmRoutingClient.route(anyList(), any(AiRequestDeadline.class))).thenReturn(
             new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 12000.0, 1080.0, "OSM Test", List.of(leg))
         );
 
@@ -230,7 +231,7 @@ public class ItineraryPreviewHttpIntegrationTest {
 
     @Test
     void postPreview_ReturnsUnavailableWhenQwenFails() throws Exception {
-        when(sequencePlanner.planSequence(any(), any(), anyInt()))
+        when(sequencePlanner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(503, "Dịch vụ AI hiện không khả dụng (bị tắt)."));
 
         String tripDate = LocalDate.now().plusDays(2).toString();
@@ -252,7 +253,7 @@ public class ItineraryPreviewHttpIntegrationTest {
 
     @Test
     void postPreview_ReturnsTooManyRequestsWhenQwenBusy() throws Exception {
-        when(sequencePlanner.planSequence(any(), any(), anyInt()))
+        when(sequencePlanner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(429, "Dịch vụ AI đang bận"));
 
         String tripDate = LocalDate.now().plusDays(2).toString();

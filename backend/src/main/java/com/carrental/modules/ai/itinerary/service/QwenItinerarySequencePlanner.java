@@ -4,6 +4,7 @@ import com.carrental.exception.DomainException;
 import com.carrental.modules.ai.LocalHttp;
 import com.carrental.modules.ai.AiProviderCapacity;
 import com.carrental.modules.ai.AiProviderCapacity.Provider;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -85,6 +86,14 @@ public class QwenItinerarySequencePlanner {
     }
 
     public SequenceResult planSequence(String startId, List<Candidate> candidates, int targetCount) {
+        return planSequence(startId, candidates, targetCount, AiRequestDeadline.start());
+    }
+
+    public SequenceResult planSequence(
+            String startId,
+            List<Candidate> candidates,
+            int targetCount,
+            AiRequestDeadline deadline) {
         if (candidates == null || candidates.isEmpty()) {
             throw DomainException.bad("Danh sách địa điểm ứng viên không được để trống.");
         }
@@ -95,6 +104,11 @@ public class QwenItinerarySequencePlanner {
         // Qwen không được bật: ném lỗi rõ ràng, không fake AI plan (F01)
         if (!enabled) {
             throw new QwenPlanningException(503, "Dịch vụ AI gợi ý lộ trình hiện không khả dụng (bị tắt).");
+        }
+        try {
+            deadline.requireRemaining();
+        } catch (AiRequestDeadline.DeadlineExceededException error) {
+            throw new QwenPlanningException(503, "Thời hạn xử lý hành trình đã hết.");
         }
 
         AiProviderCapacity.Permit permit;
@@ -149,13 +163,15 @@ public class QwenItinerarySequencePlanner {
                 )
             );
 
+            Duration callTimeout = deadline.timeoutFor(timeout);
             var request = HttpRequest.newBuilder(endpoint)
-                .timeout(timeout)
+                .timeout(callTimeout)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
                 .build();
 
-            var response = LocalHttp.send(client, request, timeout, 16384);
+            deadline.requireRemaining();
+            var response = LocalHttp.send(client, request, timeout, 16384, deadline);
             if (response.status() != 200) {
                 throw new QwenPlanningException(503, "Dịch vụ AI trả về mã lỗi HTTP " + response.status());
             }
@@ -217,6 +233,7 @@ public class QwenItinerarySequencePlanner {
                 throw new QwenPlanningException(503, "Mã lý do không hợp lệ: " + rawReason);
             }
 
+            deadline.requireRemaining();
             return new SequenceResult(ids, reasonCode.name());
         } catch (QwenPlanningException qpe) {
             throw qpe;

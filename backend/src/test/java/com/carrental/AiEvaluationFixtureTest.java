@@ -1,5 +1,6 @@
 package com.carrental;
 
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.carrental.modules.location.service.VisitMetadata;
@@ -184,8 +185,9 @@ class AiEvaluationFixtureTest {
             qwen=qc.newInstance(json,useLive?URI.create("http://127.0.0.1:11434/api/chat"):base.resolve("/api/chat"),useLive?Duration.ofSeconds(60):Duration.ofMillis(cause.equals("QWEN_TIMEOUT")?150:5000),"qwen3:8b",!cause.equals("QWEN_DISABLED"));
             var oc=OsrmRoutingClient.class.getDeclaredConstructor(ObjectMapper.class,URI.class);oc.setAccessible(true);osrm=oc.newInstance(json,base);
             if(cause.equals("QWEN_CAPACITY")){held=(Semaphore)ReflectionTestUtils.getField(qwen,"capacity");assertTrue(held.tryAcquire());}
-            when(planner.planSequence(anyString(),anyList(),anyInt())).thenAnswer(a->qwen.planSequence(a.getArgument(0),a.getArgument(1),a.getArgument(2)));
-            when(routing.route(anyList())).thenAnswer(a->osrm.route(a.getArgument(0)));
+            when(planner.planSequence(anyString(),anyList(),anyInt(),any(AiRequestDeadline.class)))
+                .thenAnswer(a->qwen.planSequence(a.getArgument(0),a.getArgument(1),a.getArgument(2),a.getArgument(3)));
+            when(routing.route(anyList(),any(AiRequestDeadline.class))).thenAnswer(a->osrm.route(a.getArgument(0),a.getArgument(1)));
         }
         boolean proof(){
             if(cause.isEmpty())return false;

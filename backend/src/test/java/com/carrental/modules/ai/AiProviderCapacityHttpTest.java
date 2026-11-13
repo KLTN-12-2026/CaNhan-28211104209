@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,6 +124,28 @@ class AiProviderCapacityHttpTest {
         assertEquals(OsrmRoutingClient.Status.VERIFIED, itinerary.get(3, TimeUnit.SECONDS).status());
         assertEquals(2, maximumActive.get());
         assertEquals(OsrmRoutingClient.Status.VERIFIED, fallbackRouteClient.route(points()).status());
+    }
+
+    @Test
+    void itineraryBudgetSpentByQwenPreventsTheFollowingOsrmDispatch() throws Exception {
+        AtomicLong ticker = new AtomicLong(100);
+        var deadline = AiRequestDeadline.withTicker(Duration.ofSeconds(60), ticker::get);
+        var planner = planner();
+        var osrm = new OsrmRoutingClient(
+            json,
+            URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"),
+            capacity
+        );
+
+        assertEquals(
+            List.of("start", "second"),
+            planner.planSequence("start", candidates(), 2, deadline).orderedLocationIds()
+        );
+        assertEquals(1, requestCount.get());
+        ticker.addAndGet(Duration.ofSeconds(60).toNanos());
+
+        assertEquals(OsrmRoutingClient.Status.UNAVAILABLE, osrm.route(points(), deadline).status());
+        assertEquals(1, requestCount.get(), "An expired itinerary budget must not dispatch its OSRM stage.");
     }
 
     private void assertBusyAcrossAdapters(QwenCriteriaParser parser, QwenItinerarySequencePlanner planner)
