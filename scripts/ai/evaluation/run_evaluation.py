@@ -26,6 +26,42 @@ OBS_FIELDS={'caseId','httpStatus','body','durationMs','error','causeCode','evide
 def digest(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def ollama_json(path):
+    conn=http.client.HTTPConnection('127.0.0.1',11434,timeout=5)
+    try:
+        conn.request('GET',path); response=conn.getresponse()
+        require(response.status==200,'Ollama metadata unavailable')
+        data=response.read(1048577);require(len(data)<=1048576,'Ollama metadata limit')
+        return decode(data.decode('utf-8'))
+    finally:conn.close()
+
+
+def model_identity():
+    models=ollama_json('/api/tags')['models']
+    chosen=[m for m in models if m.get('name')=='qwen3:8b']
+    require(len(chosen)==1,'qwen3:8b must already exist; no model pull')
+    value=dict(name='qwen3:8b',digest=chosen[0]['digest'],runtimeVersion=ollama_json('/api/version')['version'],mode='live')
+    validate_model(value)
+    return value
+
+
+def validate_model(value):
+    if isinstance(value,str):require(value in ('synthetic','unknown'),'model metadata');return
+    keys(value,{'name','digest','runtimeVersion','mode'},'model metadata')
+    require(value['name'] in ('qwen3:4b','qwen3:8b') and isinstance(value['digest'],str)
+            and re.fullmatch('[a-f0-9]{64}',value['digest']) and isinstance(value['runtimeVersion'],str)
+            and re.fullmatch('[0-9A-Za-z.+_-]{1,50}',value['runtimeVersion']) and value['mode']=='live','pinned model metadata')
+
+
+def model_load_state(identity):
+    try:
+        loaded=ollama_json('/api/ps')['models']
+        matches=[m for m in loaded if m.get('name',m.get('model'))==identity['name']]
+        if not matches:return 'COLD'
+        return 'WARM' if len(matches)==1 and matches[0].get('digest')==identity['digest'] else 'UNKNOWN'
+    except (OSError,ValueError,KeyError,TypeError,http.client.HTTPException):return 'UNKNOWN'
+
+
 def load_cases(root,suites):
     root=Path(root).resolve()
     require(set(suites)<=set(ENDPOINTS) and suites,'suites')
@@ -78,7 +114,7 @@ def read_capture(path,cases,hashes):
     require(isinstance(m['sourceHashes'],dict) and m['sourceHashes'],'source hashes required')
     for relative,h in m['sourceHashes'].items(): checked_json(REPO,relative,h)
     require(isinstance(m['sourceRevision'],str) and re.fullmatch('[a-f0-9]{40}',m['sourceRevision']),'source revision')
-    for key in ('model','graph'): require(m[key] in ('synthetic','unknown'),'unpinned external provider')
+    validate_model(m['model']);require(m['graph'] in ('synthetic','unknown'),'unpinned graph')
     rows=[]; ids=set(); planned={c['caseId'] for c in cases}
     file=checked_json(path.parent,m['observationsPath'],m['observationsSha256'])
     for line in file.read_text(encoding='utf-8').splitlines():
@@ -152,6 +188,9 @@ def run(args):
     require(args.allow_draft or manifest['reviewState']=='REVIEWED','DRAFT requires --allow-draft exploratory')
     require(out!=root and not out.is_relative_to(root) and not root.is_relative_to(out),'output overlaps dataset')
     series='replay-synthetic'; capture=None; observations={}
+    observe=getattr(args,'ollama_observe',False)
+    require(not observe or not args.capture,'load-state observation requires live HTTP')
+    identity=model_identity() if observe else None
     if args.capture:
         require(args.series=='quality','capture supports one-attempt quality only')
         observations,capture=read_capture(args.capture,cases,hashes)
@@ -181,21 +220,28 @@ def run(args):
         captureManifestSha256=digest(args.capture) if capture else None,observationsSha256=capture['observationsSha256'] if capture else None,
         profileBindings={name:profile['bindings'] for name,profile in manifest['profiles'].items()},
         attempts=1 if args.series=='quality' else 3,seriesType=args.series,
-        selectedCaseIds=list(dict.fromkeys(c['caseId'] for c,_ in plan)),split='dev',model=capture['model'] if capture else 'unknown',graph=capture['graph'] if capture else 'unknown',
+        selectedCaseIds=list(dict.fromkeys(c['caseId'] for c,_ in plan)),split='dev',model=capture['model'] if capture else identity or 'unknown',graph=capture['graph'] if capture else 'unknown',
         settings={'timeoutSeconds':args.timeout,'retries':0},hardware='unknown',clockInstant='2027-02-01T00:00:00Z',
         command={'mode':'capture' if capture else 'http','suites':suites,'allowDraft':args.allow_draft})
     (out/'manifest.json').write_text(json.dumps(run_manifest,indent=2),encoding='utf-8')
-    results=[]; signatures={}
+    results=[]; signatures={}; load_states=[]
     with (out/'results.jsonl').open('x',encoding='utf-8') as stream:
         for c,attempt in plan:
+            state=model_load_state(identity) if observe else 'UNKNOWN'
             obs=observations.get(c['caseId'],uncalled(c['caseId'])) if capture else http_observation(args.base_url,c,token,args.timeout,True)
             r=scoring.score(c,obs,facts); r['attempt']=attempt; results.append(r)
+            load_states.append(dict(caseId=c['caseId'],attempt=attempt,state=state))
             signatures.setdefault(c['caseId'],[]).append(hashlib.sha256(json.dumps([obs['httpStatus'],obs['body'],obs['error']],sort_keys=True).encode()).hexdigest())
             stream.write(json.dumps(r,ensure_ascii=False)+'\n'); stream.flush()
     require(len(results)==len(plan) and len({(r['caseId'],r['attempt']) for r in results})==len(plan),'result coverage')
     report=scoring.summary(results,manifest['reviewState'],series)
     report['certified']=False  # This dev-only runner never certifies heldout/reviewer acceptance.
     report['seriesType']=args.series
+    if observe:
+        report['modelIdentityStable']=model_identity()==identity
+        report['latencyLoadState']='OBSERVED_BEFORE_REQUEST'
+        report['latencyByLoadState']={state:scoring.summary([r for r,l in zip(results,load_states) if l['state']==state],manifest['reviewState'],series)['latencyByOutcome'] for state in ('COLD','WARM','UNKNOWN')}
+        (out/'load-state.jsonl').write_text(''.join(json.dumps(s)+'\n' for s in load_states),encoding='utf-8')
     if args.series=='performance':
         report['numericGatesPassed']=None
         report['consistency']={cid:dict(attempts=len(h),distinctResponses=len(set(h)),consistent=len(set(h))==1) for cid,h in signatures.items()}
@@ -204,9 +250,10 @@ def run(args):
            '','| Suite/category | N | C | F | Coverage | Accuracy | F/N |','|---|---:|---:|---:|---:|---:|---:|']
     fmt=lambda x:'N/A' if x is None else f'{100*x:.2f}%'
     for name,m in report['groups'].items(): lines.append(f"| {name} | {m['planned']} | {m['completed']} | {m['correct']} | {fmt(m['coverage'])} | {fmt(m['semanticAccuracy'])} | {fmt(m['conservativeSuccess'])} |")
-    lines+=['','Latency p50/p95 by outcome in summary.json; load state UNKNOWN. Timeouts remain separate.',
+    lines+=['','Latency p50/p95 by outcome in summary.json; load state '+report['latencyLoadState']+'. Timeouts remain separate.',
             'No raw prompts, response bodies, credentials or error text are copied into these reports.']
     (out/'REPORT.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+    if observe and not report['modelIdentityStable']:return 2
     if any(r['outcome'] in ('ENV_BLOCKED','DATASET_INVALID','SKIPPED') for r in results): return 2
     if args.series=='performance': return 0 if all(r['outcome']=='PASS' for r in results) else 1
     return 0 if report['numericGatesPassed'] else 1
@@ -221,6 +268,7 @@ def main():
     p.add_argument('--preflight',type=Path); p.add_argument('--output',type=Path,required=True)
     p.add_argument('--allow-draft',action='store_true'); p.add_argument('--timeout',type=float,default=65)
     p.add_argument('--series',choices=('quality','performance'),default='quality')
+    p.add_argument('--ollama-observe',action='store_true',help='pin existing qwen3:8b and observe loaded state before each HTTP request')
     args=p.parse_args()
     try:
         require(math.isfinite(args.timeout) and 0<args.timeout<=65,'timeout 0..65s')

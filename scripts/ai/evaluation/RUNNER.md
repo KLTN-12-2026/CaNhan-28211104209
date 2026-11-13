@@ -46,7 +46,7 @@ Mỗi case chỉ POST một lần đến endpoint parse. Không dùng proxy môi
 
 ## Định dạng capture và evidence
 
-capture.json đủ keys: schemaVersion=`kdrive-ai-capture-v1`, captureKind (`spring-h2-synthetic`, `test-double`, `live`), datasetHashes, sourceRevision, sourceHashes, observationsPath, observationsSha256, model, graph, clockInstant. `model`/`graph` trong phiên bản này là synthetic hoặc unknown; không tuyên bố đã pin model thật chỉ từ tên tag. Một capture live chỉ là khai báo nguồn; không tự cấp chứng nhận. Capture path tương đối cùng thư mục, không traversal/URL. Unknown fields/duplicate keys/hash drift bị từ chối.
+capture.json đủ keys: schemaVersion=`kdrive-ai-capture-v1`, captureKind (`spring-h2-synthetic`, `test-double`, `live`), datasetHashes, sourceRevision, sourceHashes, observationsPath, observationsSha256, model, graph, clockInstant. `graph` là synthetic hoặc unknown; `model` là synthetic/unknown hoặc object gồm name (`qwen3:4b`/`qwen3:8b`), digest SHA256, runtimeVersion và mode=`live`. Không tuyên bố đã pin model thật chỉ từ tên tag. Một capture live chỉ là khai báo nguồn; không tự cấp chứng nhận. Capture path tương đối cùng thư mục, không traversal/URL. Unknown fields/duplicate keys/hash drift bị từ chối.
 
 Mỗi observation có đúng caseId, httpStatus, body, durationMs, error, causeCode, evidence. error là null/TIMEOUT/API_ERROR/ENV_BLOCKED/SKIPPED. evidence có ba boolean fixtureVerified/noMutation/causeConfirmed. Ca uncalled không có status/body/duration. Cause allowlist QWEN_DISABLED/QWEN_TIMEOUT/QWEN_INVALID_IDS/OSRM_UNAVAILABLE/QWEN_CAPACITY/MODEL_OUTPUT_INVALID/PROVIDER_ERROR/TIMEOUT. Không lấy HTTP503 đơn lẻ làm bằng chứng cause. Với adverse, thiếu causeConfirmed→ENV_BLOCKED; sai cause→CONTRACT_FAIL; mapping đúng và payload đúng mới PASS. Capture producer chịu trách nhiệm chứng minh evidence, không sửa boolean để tăng điểm.
 
@@ -71,6 +71,24 @@ Output mới gồm manifest.json, results.jsonl (flush sau từng ca), summary.j
 python -X utf8 scripts/ai/evaluation/test_evaluation.py -v
 python -X utf8 scripts/ai/evaluation/test_validate_scenarios.py -v
 python -X utf8 scripts/ai/evaluation/test_validate_parser_dataset.py -v
+python -X utf8 scripts/ai/evaluation/test_live_baseline.py -v
 ```
 
 Test runner gồm vectors đúng/sai, công thức tính tay, response ngoài top3, witness khác, mutation, adverse sai cause, zero denominators, exits0/1/2, duplicate/missing cases, refuse-existing, redaction, và HTTP loopback no redirect/retry/timeout. Các server test dùng cổng0 và dừng đúng instance do test tạo. Trong sandbox chặn loopback, cần quyền chạy test ngoài sandbox; không đổi assertions để PASS. Khi đổi backend test, chạy JDK21 `./mvnw.cmd verify` theo AGENTS.md; H2 và test-double không thay gate MySQL/model/OSRM thực của giai đoạn sau.
+
+## Baseline local có provider thật
+
+`run_live_baseline.py` dành cho Windows, JDK21, Python và Ollama đã cài. Qwen3:8b phải có sẵn trong model store; pool OSRM phải có registry hợp lệ, graph đúng hash và đang dừng. Runner từ chối cổng bận, không tải model/image, tạo container hoặc dùng DB website. Thư mục output phải mới dưới `.runtime/`.
+
+```powershell
+python -X utf8 scripts/ai/evaluation/run_live_baseline.py --evidence .runtime/ai-baseline-new --java-home E:/Tools/Java/jdk-21.0.12.1+1
+```
+
+Có thể chỉ định `--ollama-exe` và `--models` cho đường dẫn đã cài khác. Runner thực hiện Maven verify trước khi start provider; giữ log/XML và hash source/dataset. Nó khởi động Ollama riêng và đúng pool OSRM đã xác minh, rồi dừng đúng PID/container sở hữu trong finally. Không chạy cùng agent hay dịch vụ khác; không sửa source/dataset khi đang đo.
+
+- `AiLiveBaselineIT` là entrypoint opt-in, không thuộc Surefire mặc định: H2/catalog/Clock riêng, API HTTP thật, token chỉ trong môi trường child. Chạy100dev quality và20×3 performance, đọc lại DB để kiểm không mutation. Không gửi heldout.
+- `--ollama-observe` của HTTP runner ghim digest/runtime từ API metadata, kiểm lại cuối series, ghi trạng thái `/api/ps` trước từng request. COLD nghĩa model chưa resident tại thời điểm quan sát; WARM nghĩa cùng digest đang resident; lỗi metadata hoặc digest khác là UNKNOWN. Đây là latency HTTP toàn request, kể cả guard không gọi model, không phải thời gian inference thuần. Không ép unload hoặc gộp60attempt với100quality.
+- `AiEvaluationFixtureTest -Dai.eval.liveQwen=true` dùng Qwen thật cho ca hành trình thường. Recommendation vẫn là quy tắc; adverse dùng provider có kiểm soát; graph vẫn synthetic để giữ oracle. Capture live này là series hỗn hợp, không phải60lần inference hay tuyến OSRM thật.
+- OSRM thật được kiểm riêng bằng `LocationRouteHttpServerTest#onlineRoutePreview_RequiresLiveOsrm_MustBeVerified_BothDirectionsAndMultiPoint`, với graph/image được pin. Bài kiểm tra này không thay baseline semantic của30ca itinerary hoặc chứng minh MySQL.
+
+`status.json` ghi tiến độ và exit từng command. Chất lượng có exit1 vẫn được giữ để phân tích finding; exit2/missing execution làm lượt bị chặn. `BASELINE_COLLECTED_EXPLORATORY` chỉ xác nhận thu thập, không đồng nghĩa numeric gates hoặc review nhãn đạt. DRAFT luôn giữ certified=false. Kiểm log/XML từng lượt; các test có điều kiện bị skip không được tính là PASS.

@@ -63,6 +63,19 @@ class AiEvaluationFixtureTest {
     Path data=repo.resolve("scripts/ai/evaluation/scenarios-v1");
     JsonNode facts;
     Map<String,String> auth=new HashMap<>();
+    boolean liveQwen=Boolean.getBoolean("ai.eval.liveQwen");
+
+    JsonNode ollama(String path)throws Exception{
+        var client=java.net.http.HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+        var request=java.net.http.HttpRequest.newBuilder(URI.create("http://127.0.0.1:11434"+path)).timeout(Duration.ofSeconds(5)).GET().build();
+        var response=client.send(request,java.net.http.HttpResponse.BodyHandlers.ofString());assertEquals(200,response.statusCode());
+        return json.readTree(response.body());
+    }
+    Map<String,String> liveModel()throws Exception{
+        JsonNode chosen=null;for(JsonNode m:ollama("/api/tags").path("models"))if(m.path("name").asText().equals("qwen3:8b"))chosen=m;
+        assertNotNull(chosen,"Model must be installed, no download");
+        return Map.of("name","qwen3:8b","digest",chosen.path("digest").asText(),"runtimeVersion",ollama("/api/version").path("version").asText(),"mode","live");
+    }
 
     String hash(Path path)throws Exception{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));}
     List<JsonNode> cases(String suite)throws Exception{
@@ -167,7 +180,8 @@ class AiEvaluationFixtureTest {
             server.start();
             URI base=URI.create("http://127.0.0.1:"+server.getAddress().getPort());
             var qc=QwenItinerarySequencePlanner.class.getDeclaredConstructor(ObjectMapper.class,URI.class,Duration.class,String.class,boolean.class);qc.setAccessible(true);
-            qwen=qc.newInstance(json,base.resolve("/api/chat"),Duration.ofMillis(cause.equals("QWEN_TIMEOUT")?150:5000),"qwen3:8b",!cause.equals("QWEN_DISABLED"));
+            boolean useLive=liveQwen && cause.isEmpty();
+            qwen=qc.newInstance(json,useLive?URI.create("http://127.0.0.1:11434/api/chat"):base.resolve("/api/chat"),useLive?Duration.ofSeconds(60):Duration.ofMillis(cause.equals("QWEN_TIMEOUT")?150:5000),"qwen3:8b",!cause.equals("QWEN_DISABLED"));
             var oc=OsrmRoutingClient.class.getDeclaredConstructor(ObjectMapper.class,URI.class);oc.setAccessible(true);osrm=oc.newInstance(json,base);
             if(cause.equals("QWEN_CAPACITY")){held=(Semaphore)ReflectionTestUtils.getField(qwen,"capacity");assertTrue(held.tryAcquire());}
             when(planner.planSequence(anyString(),anyList(),anyInt())).thenAnswer(a->qwen.planSequence(a.getArgument(0),a.getArgument(1),a.getArgument(2)));
@@ -188,6 +202,8 @@ class AiEvaluationFixtureTest {
     }
 
     @Test void captureRealApiResponsesWithIsolatedSyntheticFacts()throws Exception{
+        if(liveQwen)assertEquals("1",System.getenv("KDRIVE_EVAL_LIVE"),"Explicit live run required");
+        Map<String,String> model=liveQwen?liveModel():null;
         String destination=System.getProperty("ai.eval.output");Path output=null;
         if(destination!=null){output=Path.of(destination).toAbsolutePath().normalize();assertTrue(output.startsWith(repo.resolve(".runtime")));assertFalse(Files.exists(output),"Refuse existing capture directory");Files.createDirectories(output);}
         facts=json.readTree(data.resolve("facts.json").toFile());initialize();
@@ -204,6 +220,7 @@ class AiEvaluationFixtureTest {
                 ObjectNode row=json.createObjectNode();row.put("caseId",id);row.put("httpStatus",response.getStatus());row.set("body",json.readTree(response.getContentAsByteArray()));row.put("durationMs",ms);row.putNull("error");
                 if(causeConfirmed)row.put("causeCode",s.path("provider").path("cause").asText());else row.putNull("causeCode");
                 row.set("evidence",json.valueToTree(Map.of("fixtureVerified",true,"noMutation",true,"causeConfirmed",causeConfirmed)));observations.add(row);
+                if(output!=null)Files.writeString(output.resolve("observations-progress.jsonl"),json.writeValueAsString(row)+"\n",StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.APPEND);
             }
         }
         assertEquals(60,observations.size());assertEquals(60,observations.stream().map(o->o.path("caseId").asText()).distinct().count());
@@ -221,7 +238,8 @@ class AiEvaluationFixtureTest {
             for(String p:List.of("backend/pom.xml","backend/src/test/java/com/carrental/AiEvaluationFixtureTest.java"))sources.put(p,hash(repo.resolve(p)));
             var git=new ProcessBuilder("git","rev-parse","HEAD").directory(repo.toFile()).start();String revision=new String(git.getInputStream().readAllBytes(),StandardCharsets.UTF_8).strip();assertEquals(0,git.waitFor());
             Map<String,Object> capture=new LinkedHashMap<>();capture.put("schemaVersion","kdrive-ai-capture-v1");capture.put("captureKind","spring-h2-synthetic");capture.put("datasetHashes",hashes);capture.put("sourceRevision",revision);capture.put("sourceHashes",sources);
-            capture.put("observationsPath","observations.jsonl");capture.put("observationsSha256",hash(output.resolve("observations.jsonl")));capture.put("model","synthetic");capture.put("graph","synthetic");capture.put("clockInstant",NOW.toString());
+            if(liveQwen){assertEquals(model,liveModel(),"Model identity drift");capture.put("captureKind","live");}
+            capture.put("observationsPath","observations.jsonl");capture.put("observationsSha256",hash(output.resolve("observations.jsonl")));capture.put("model",liveQwen?model:"synthetic");capture.put("graph","synthetic");capture.put("clockInstant",NOW.toString());
             Files.writeString(output.resolve("capture.json"),json.writerWithDefaultPrettyPrinter().writeValueAsString(capture),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
         }
     }
