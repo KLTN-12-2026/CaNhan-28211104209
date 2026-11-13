@@ -31,11 +31,13 @@ class AiProviderCapacityHttpTest {
     private final AtomicInteger requestCount = new AtomicInteger();
     private final AtomicInteger nextStatus = new AtomicInteger(200);
     private final AtomicInteger holdsRemaining = new AtomicInteger();
+    private final AtomicInteger bodyHoldsRemaining = new AtomicInteger();
     private HttpServer server;
     private ExecutorService serverExecutor;
     private ExecutorService calls;
     private CountDownLatch entered;
     private CountDownLatch release;
+    private CountDownLatch handlerFinished;
     private URI endpoint;
 
     @BeforeEach
@@ -43,6 +45,7 @@ class AiProviderCapacityHttpTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         serverExecutor = Executors.newCachedThreadPool();
         calls = Executors.newCachedThreadPool();
+        handlerFinished = new CountDownLatch(1);
         server.setExecutor(serverExecutor);
         server.createContext("/", exchange -> {
             int current = active.incrementAndGet();
@@ -60,11 +63,25 @@ class AiProviderCapacityHttpTest {
                 byte[] response = response(requestBody);
                 exchange.getResponseHeaders().set("Content-Type", "application/json");
                 exchange.sendResponseHeaders(status, response.length);
-                exchange.getResponseBody().write(response);
+                if (bodyHoldsRemaining.getAndUpdate(value -> Math.max(0, value - 1)) > 0) {
+                    int firstChunk = Math.min(1, response.length);
+                    exchange.getResponseBody().write(response, 0, firstChunk);
+                    exchange.getResponseBody().flush();
+                    entered.countDown();
+                    if (!release.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Response body release latch timed out.");
+                    }
+                    if (response.length > firstChunk) {
+                        exchange.getResponseBody().write(response, firstChunk, response.length - firstChunk);
+                    }
+                } else {
+                    exchange.getResponseBody().write(response);
+                }
             } catch (Exception ignored) {
                 exchange.close();
             } finally {
                 active.decrementAndGet();
+                handlerFinished.countDown();
             }
         });
         server.start();
@@ -149,6 +166,81 @@ class AiProviderCapacityHttpTest {
         assertEquals(OsrmRoutingClient.Status.UNAVAILABLE, osrm.route(points(), deadline).status());
         assertEquals(1, requestCount.get(), "An expired itinerary budget must not dispatch its OSRM stage.");
         assertEquals(AiDiagnostics.Cause.DEADLINE, diagnostics.snapshot().get(0).cause());
+    }
+
+    @Test
+    void providerTimeoutCancelsActualHttpAndReleasesSharedPermitForOtherAdapter() throws Exception {
+        var diagnostics = new AiDiagnostics();
+        var parser = new QwenCriteriaParser(json, endpoint, Duration.ofMillis(300), "qwen3:8b", capacity, diagnostics);
+        var planner = planner();
+        entered = new CountDownLatch(1);
+        release = new CountDownLatch(1);
+        handlerFinished = new CountDownLatch(1);
+        bodyHoldsRemaining.set(1);
+
+        Future<com.carrental.exception.DomainException> failedParser = calls.submit(() ->
+            assertThrows(com.carrental.exception.DomainException.class,
+                () -> parser.parse("synthetic timeout request",
+                    AiRequestDeadline.start(Duration.ofSeconds(3), AiRequestDeadline.Operation.CRITERIA_EXTRACTION))));
+        assertTrue(entered.await(3, TimeUnit.SECONDS), "Parser request should reach a held HTTP response body.");
+        var busyPlanner = assertThrows(
+            QwenItinerarySequencePlanner.QwenPlanningException.class,
+            () -> planner.planSequence("start", candidates(), 2)
+        );
+        assertEquals(429, busyPlanner.getStatusCode());
+
+        var failure = failedParser.get(3, TimeUnit.SECONDS);
+        assertEquals(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, failure.status);
+        assertTrue(diagnostics.snapshot().stream()
+            .anyMatch(event -> event.cause() == AiDiagnostics.Cause.PROVIDER_TIMEOUT));
+        release.countDown();
+        assertTrue(handlerFinished.await(2, TimeUnit.SECONDS), "Cancelled HTTP response handler should finish.");
+
+        assertEquals(List.of("start", "second"), planner.planSequence("start", candidates(), 2).orderedLocationIds());
+        assertEquals(2, requestCount.get());
+        assertEquals(1, maximumActive.get(), "Recovered shared capacity must not be over-released.");
+    }
+
+    @Test
+    void interruptedActualHttpCallClosesTransportAndReleasesPermitWithoutLosingInterrupt() throws Exception {
+        var diagnostics = new AiDiagnostics();
+        var parser = new QwenCriteriaParser(json, endpoint, Duration.ofSeconds(2), "qwen3:8b", capacity, diagnostics);
+        var planner = planner();
+        entered = new CountDownLatch(1);
+        release = new CountDownLatch(1);
+        handlerFinished = new CountDownLatch(1);
+        bodyHoldsRemaining.set(1);
+        var finished = new CountDownLatch(1);
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var interruptPreserved = new java.util.concurrent.atomic.AtomicInteger();
+        Thread caller = new Thread(() -> {
+            try {
+                parser.parse("synthetic interrupt request",
+                    AiRequestDeadline.start(Duration.ofSeconds(4), AiRequestDeadline.Operation.CRITERIA_EXTRACTION));
+            } catch (Throwable error) {
+                failure.set(error);
+                interruptPreserved.set(Thread.currentThread().isInterrupted() ? 1 : 0);
+            } finally {
+                finished.countDown();
+            }
+        });
+        caller.start();
+        assertTrue(entered.await(3, TimeUnit.SECONDS), "Parser request should reach a held HTTP response body.");
+        caller.interrupt();
+        assertTrue(finished.await(3, TimeUnit.SECONDS), "Interrupted adapter call must clean up within a bound.");
+        caller.join(1000);
+        assertFalse(caller.isAlive());
+
+        assertInstanceOf(com.carrental.exception.DomainException.class, failure.get());
+        assertEquals(1, interruptPreserved.get(), "The parser adapter must restore the caller interrupt flag.");
+        assertTrue(diagnostics.snapshot().stream()
+            .anyMatch(event -> event.cause() == AiDiagnostics.Cause.INTERRUPTED));
+        release.countDown();
+        assertTrue(handlerFinished.await(2, TimeUnit.SECONDS), "Interrupted HTTP response handler should finish.");
+
+        assertEquals(List.of("start", "second"), planner.planSequence("start", candidates(), 2).orderedLocationIds());
+        assertEquals(2, requestCount.get());
+        assertEquals(1, maximumActive.get(), "Recovered shared capacity must remain bounded to one Qwen request.");
     }
 
     private void assertBusyAcrossAdapters(QwenCriteriaParser parser, QwenItinerarySequencePlanner planner)

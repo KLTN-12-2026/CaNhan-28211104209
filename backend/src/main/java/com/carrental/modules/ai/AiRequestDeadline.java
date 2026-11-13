@@ -19,6 +19,10 @@ public final class AiRequestDeadline {
         DeadlineExceededException() {
             super("AI request deadline exceeded.");
         }
+
+        DeadlineExceededException(Throwable cause) {
+            super("AI request deadline exceeded.", cause);
+        }
     }
 
     private final long startedAt;
