@@ -69,6 +69,8 @@ class LocationsPilotDatasetTest {
         int durationCount = 0;
         int sourcedAddressCount = 0;
         int unknownAddressCount = 0;
+        int activeCount = 0;
+        int inactiveCount = 0;
         Set<String> activeNames = new HashSet<>();
         Set<String> sourcedAddressNames = Set.of(
             "Bảo tàng Điêu khắc Chăm Đà Nẵng",
@@ -80,8 +82,13 @@ class LocationsPilotDatasetTest {
         for (JsonNode loc : locations) {
             String name = loc.path("name").asText();
             assertFalse(name.isBlank(), "Location name must not be blank");
-            if ("ACTIVE".equals(loc.path("status").asText())) activeNames.add(name);
-            else assertEquals("INACTIVE", loc.path("status").asText());
+            if ("ACTIVE".equals(loc.path("status").asText())) {
+                activeNames.add(name);
+                activeCount++;
+            } else {
+                assertEquals("INACTIVE", loc.path("status").asText());
+                inactiveCount++;
+            }
             double lat = loc.path("latitude").asDouble();
             double lng = loc.path("longitude").asDouble();
             assertTrue(lat >= 15.4 && lat <= 16.7, "Latitude must be within Da Nang - Hoi An bounding box");
@@ -93,6 +100,9 @@ class LocationsPilotDatasetTest {
             if (sourcedAddressNames.contains(name)) {
                 sourcedAddressCount++;
                 assertTrue(prov.path("addressSource").asText().startsWith("https://"));
+                if ("Danh thắng Ngũ Hành Sơn".equals(name)) {
+                    assertEquals("81 Huyền Trân Công Chúa, Đà Nẵng", prov.path("address").asText());
+                }
             } else {
                 unknownAddressCount++;
                 assertTrue(prov.path("address").asText().startsWith("UNKNOWN —"));
@@ -134,7 +144,10 @@ class LocationsPilotDatasetTest {
         assertEquals(1, durationCount, "Only the sourced Cham Museum estimate should remain");
         assertEquals(4, sourcedAddressCount);
         assertEquals(4, unknownAddressCount);
+        assertEquals(1, activeCount);
+        assertEquals(7, inactiveCount);
         assertEquals(Set.of("Bảo tàng Mỹ thuật Đà Nẵng"), activeNames);
+        assertTrue(root.path("catalogNote").asText().contains("Seven locations are INACTIVE."));
     }
 
     @Test

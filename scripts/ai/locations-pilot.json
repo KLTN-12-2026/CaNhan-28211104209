@@ -43,7 +43,7 @@
       "longitude": 108.263527,
       "status": "INACTIVE",
       "provenance": {
-        "address": "81 Huyền Trân Công Chúa, phường Hòa Hải, quận Ngũ Hành Sơn, Đà Nẵng",
+        "address": "81 Huyền Trân Công Chúa, Đà Nẵng",
         "addressSource": "https://danangfantasticity.com/wp-content/uploads/2026/01/Ho-Chieu-Di-san-Da-Nang.pdf (page 5)",
         "coordinatesSource": "https://fr.wikipedia.org/wiki/Montagnes_de_Marbre (the page flags the coordinate as unsourced; reference point and road access remain unverified)",
         "verificationNote": "The city tourism heritage brochure lists the attraction at 81 Huyền Trân Công Chúa and 07:00–17:00, but does not state weekdays; weekly hours remain UNKNOWN. Candidate coordinates are explicitly unsourced and are not an access-point or route proof."
@@ -452,5 +452,5 @@
       }
     }
   ],
-  "catalogNote": "DRAFT, certified=false. Two facilities have verified daily hours, but only the Fine Arts Museum remains ACTIVE; the Da Nang Museum candidate is INACTIVE because its official 31 Trần Phú address conflicts with the mapped 42 Trần Phú candidate. The Cham page reports 07:00–17:00 without weekday scope, so weekly hours remain UNKNOWN; its suggested 01h00 visit time is only an admin estimate. The Ngũ Hành Sơn brochure lists 07:00–17:00 without weekdays. Four legacy entries retain UNKNOWN addresses and unverified candidate coordinates. Six locations are INACTIVE. No vehicle-specific amenity evidence was located in the reviewed repository sources. No main DB apply; road snapping and holiday exceptions are not verified."
+  "catalogNote": "DRAFT, certified=false. Two facilities have verified daily hours, but only the Fine Arts Museum remains ACTIVE; the Da Nang Museum candidate is INACTIVE because its official 31 Trần Phú address conflicts with the mapped 42 Trần Phú candidate. The Cham page reports 07:00–17:00 without weekday scope, so weekly hours remain UNKNOWN; its suggested 01h00 visit time is only an admin estimate. The Ngũ Hành Sơn brochure lists 07:00–17:00 without weekdays. Four legacy entries retain UNKNOWN addresses and unverified candidate coordinates. Seven locations are INACTIVE. No vehicle-specific amenity evidence was located in the reviewed repository sources. No main DB apply; road snapping and holiday exceptions are not verified."
 }
