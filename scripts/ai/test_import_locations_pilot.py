@@ -8,13 +8,18 @@ Kiem thu tu dong cho script import_locations_pilot.py (F06):
 """
 
 import http.server
+import io
 import json
+import math
+import sys
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import import_locations_pilot
 from import_locations_pilot import (
     validate_dataset,
     metadata_matches,
@@ -295,6 +300,139 @@ class ImportLocationsPilotTest(unittest.TestCase):
         finally:
             MockBackendHandler.locations = previous
             MockBackendHandler.fail_location_at = None
+    def test_13_invalid_boundary_schedules_return_field_path_errors(self):
+        source = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        cases = []
+
+        empty_next_day = json.loads(json.dumps(source))
+        weekly = empty_next_day["locations"][0]["metadata"]["weekly"]
+        weekly["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "23:00", "end": "01:00", "nextDay": True}],
+        }
+        weekly["TUESDAY"] = {"state": "INTERVALS", "intervals": []}
+        cases.append((empty_next_day, "locations[0].weekly.TUESDAY"))
+
+        bad_time_next_day = json.loads(json.dumps(source))
+        weekly = bad_time_next_day["locations"][0]["metadata"]["weekly"]
+        weekly["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "23:00", "end": "01:00", "nextDay": True}],
+        }
+        weekly["TUESDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "invalid", "end": "03:00", "nextDay": False}],
+        }
+        cases.append((bad_time_next_day, "locations[0].weekly.TUESDAY.intervals[0].start"))
+
+        bad_next_day_type = json.loads(json.dumps(source))
+        bad_next_day_type["locations"][0]["metadata"]["weekly"]["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "23:00", "end": "01:00", "nextDay": "true"}],
+        }
+        cases.append((bad_next_day_type, "locations[0].weekly.MONDAY.intervals[0].nextDay"))
+
+        empty_exception = json.loads(json.dumps(source))
+        exceptions = empty_exception["locations"][0]["metadata"]["exceptions"]
+        exceptions["2026-11-08"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "23:00", "end": "01:00", "nextDay": True}],
+        }
+        exceptions["2026-11-09"] = {"state": "INTERVALS", "intervals": []}
+        cases.append((empty_exception, "locations[0].exceptions.2026-11-09"))
+
+        for data, field_path in cases:
+            with self.subTest(field_path=field_path):
+                errors = validate_dataset(data)
+                self.assertTrue(any(field_path in error for error in errors), errors)
+
+    def test_14_non_finite_coordinates_are_rejected_with_field_paths(self):
+        source = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        for field in ("latitude", "longitude"):
+            for value in (math.nan, math.inf, -math.inf):
+                with self.subTest(field=field, value=value):
+                    data = json.loads(json.dumps(source))
+                    data["locations"][0][field] = value
+                    errors = validate_dataset(data)
+                    self.assertTrue(
+                        any(f"locations[0].{field}" in error for error in errors),
+                        errors,
+                    )
+
+    def test_15_invalid_cli_report_exits_before_any_http_request(self):
+        data = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        weekly = data["locations"][0]["metadata"]["weekly"]
+        weekly["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "23:00", "end": "01:00", "nextDay": True}],
+        }
+        weekly["TUESDAY"] = {"state": "INTERVALS", "intervals": []}
+        data["locations"][0]["latitude"] = math.nan
+        data["locations"][1]["longitude"] = math.inf
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.json"
+            path.write_text(json.dumps(data, ensure_ascii=False, allow_nan=True), encoding="utf-8")
+            output = io.StringIO()
+            arguments = [
+                "import_locations_pilot.py",
+                "--json", str(path),
+                "--base-url", self.base_url,
+                "--token", "valid-admin-token",
+                "--apply",
+            ]
+            with patch.object(sys, "argv", arguments), patch.object(import_locations_pilot, "http_request") as request:
+                with redirect_stdout(output), self.assertRaises(SystemExit) as exit_info:
+                    import_locations_pilot.main()
+
+        self.assertEqual(exit_info.exception.code, 1)
+        report = json.loads(output.getvalue())
+        self.assertFalse(report["validationSuccess"])
+        self.assertTrue(any("locations[0].weekly.TUESDAY" in error for error in report["errors"]))
+        self.assertTrue(any("locations[0].latitude" in error for error in report["errors"]))
+        self.assertTrue(any("locations[1].longitude" in error for error in report["errors"]))
+        request.assert_not_called()
+
+    def test_16_valid_overnight_unknown_closed_and_nonoverlapping_hours_remain_valid(self):
+        source = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        metadata = source["locations"][0]["metadata"]
+        metadata["hoursEvidence"] = {
+            "url": "https://example.test/hours",
+            "verifiedAt": "2026-10-01T00:00:00Z",
+        }
+        metadata["weekly"]["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [
+                {"start": "08:00", "end": "10:00", "nextDay": False},
+                {"start": "10:00", "end": "12:00", "nextDay": False},
+                {"start": "23:00", "end": "01:00", "nextDay": True},
+            ],
+        }
+        metadata["weekly"]["TUESDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "01:00", "end": "03:00", "nextDay": False}],
+        }
+        metadata["weekly"]["WEDNESDAY"] = {"state": "CLOSED", "intervals": []}
+        metadata["weekly"]["THURSDAY"] = {"state": "UNKNOWN", "intervals": []}
+
+        self.assertEqual(validate_dataset(source), [])
+
+    def test_17_unknown_and_closed_following_overnight_intervals_remain_valid(self):
+        source = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        for next_state in ("UNKNOWN", "CLOSED"):
+            with self.subTest(next_state=next_state):
+                data = json.loads(json.dumps(source))
+                metadata = data["locations"][0]["metadata"]
+                metadata["hoursEvidence"] = {
+                    "url": "https://example.test/hours",
+                    "verifiedAt": "2026-10-01T00:00:00Z",
+                }
+                metadata["weekly"]["MONDAY"] = {
+                    "state": "INTERVALS",
+                    "intervals": [{"start": "23:00", "end": "01:00", "nextDay": True}],
+                }
+                metadata["weekly"]["TUESDAY"] = {"state": next_state, "intervals": []}
+                self.assertEqual(validate_dataset(data), [])
 
 
 if __name__ == "__main__":

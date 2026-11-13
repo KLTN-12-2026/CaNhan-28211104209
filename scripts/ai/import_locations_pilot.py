@@ -113,13 +113,13 @@ def validate_dataset(data):
             end = interval.get("end")
             next_day = interval.get("nextDay")
             if not isinstance(start, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", start):
-                errors.append(f"{interval_prefix}: start phai theo HH:mm.")
+                errors.append(f"{interval_prefix}.start: start phai theo HH:mm.")
                 continue
             if not isinstance(end, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", end):
-                errors.append(f"{interval_prefix}: end phai theo HH:mm.")
+                errors.append(f"{interval_prefix}.end: end phai theo HH:mm.")
                 continue
             if not isinstance(next_day, bool):
-                errors.append(f"{interval_prefix}: nextDay phai la boolean.")
+                errors.append(f"{interval_prefix}.nextDay: nextDay phai la boolean.")
                 continue
             start_minute = int(start[:2]) * 60 + int(start[3:])
             end_minute = int(end[:2]) * 60 + int(end[3:]) + (1440 if next_day else 0)
@@ -131,6 +131,8 @@ def validate_dataset(data):
 
     def check_boundary(previous, current, prefix):
         if previous[0] != "INTERVALS" or current[0] in {"UNKNOWN", "CLOSED"}:
+            return
+        if current[0] == "INTERVALS" and not current[1]:
             return
         first_start = 0 if current[0] == "OPEN_24H" else current[1][0][0]
         for _, _, end, next_day in previous[1]:
@@ -182,18 +184,21 @@ def validate_dataset(data):
             ("latitude", Decimal("15.4"), Decimal("16.7"), "vi do"),
             ("longitude", Decimal("107.4"), Decimal("108.8"), "kinh do"),
         ):
+            field_path = f"{prefix}.{field}"
             value = location.get(field)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
-                errors.append(f"{prefix}: {label} phai la so huu han.")
+                errors.append(f"{field_path}: {label} phai la so huu han.")
                 continue
             try:
                 number = Decimal(str(value))
-                if not number.is_finite() or number < minimum or number > maximum:
-                    errors.append(f"{prefix}: {label} nam ngoai vung Da Nang - Hoi An.")
-                if number.as_tuple().exponent < -7:
-                    errors.append(f"{prefix}: {label} khong duoc co qua 7 chu so thap phan.")
+                if not number.is_finite():
+                    errors.append(f"{field_path}: {label} phai la so huu han.")
+                elif number < minimum or number > maximum:
+                    errors.append(f"{field_path}: {label} nam ngoai vung Da Nang - Hoi An.")
+                elif number.as_tuple().exponent < -7:
+                    errors.append(f"{field_path}: {label} khong duoc co qua 7 chu so thap phan.")
             except InvalidOperation:
-                errors.append(f"{prefix}: {label} khong hop le.")
+                errors.append(f"{field_path}: {label} khong hop le.")
 
         metadata = location.get("metadata")
         if not isinstance(metadata, dict):
