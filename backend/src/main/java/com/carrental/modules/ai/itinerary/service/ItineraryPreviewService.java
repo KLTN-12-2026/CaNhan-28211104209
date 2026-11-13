@@ -334,7 +334,7 @@ public class ItineraryPreviewService {
             .map(l -> new OsrmRoutingClient.Point(l.latitude().doubleValue(), l.longitude().doubleValue()))
             .toList();
 
-        var routeEstimate = osrmRoutingClient.route(points, deadline);
+        var routeEstimate = route(points, deadline);
         if (routeEstimate.status() == OsrmRoutingClient.Status.NO_ROUTE) {
             return new ScheduleComputationResult(noFeasiblePlan(criteria, orderedIds,
                 List.of("Không tìm được tuyến đường lái xe khả thi giữa các điểm tham quan đã chọn.")));
@@ -352,7 +352,7 @@ public class ItineraryPreviewService {
                 List<OsrmRoutingClient.Leg> fetchedLegs = new ArrayList<>();
                 boolean allLegsOk = true;
                 for (int i = 0; i < points.size() - 1; i++) {
-                    var pairRoute = osrmRoutingClient.route(List.of(points.get(i), points.get(i + 1)), deadline);
+                    var pairRoute = route(List.of(points.get(i), points.get(i + 1)), deadline);
                     if (pairRoute.status() != OsrmRoutingClient.Status.VERIFIED) {
                         allLegsOk = false;
                         break;
@@ -474,6 +474,19 @@ public class ItineraryPreviewService {
         );
 
         return new ScheduleComputationResult(items, totals, fingerprint);
+    }
+
+    private OsrmRoutingClient.Estimate route(
+            List<OsrmRoutingClient.Point> points,
+            AiRequestDeadline deadline) {
+        try {
+            return osrmRoutingClient.route(points, deadline);
+        } catch (com.carrental.modules.ai.AiProviderCapacity.CapacityExceededException error) {
+            throw new DomainException(
+                org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                "Dịch vụ định tuyến đang bận xử lý yêu cầu khác; vui lòng thử lại."
+            );
+        }
     }
 
     public List<EffectiveInterval> effectiveIntervals(VisitMetadata metadata, LocalDate date) {

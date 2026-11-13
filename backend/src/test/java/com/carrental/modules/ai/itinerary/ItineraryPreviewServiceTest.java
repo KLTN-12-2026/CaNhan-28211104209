@@ -1,12 +1,16 @@
 package com.carrental.modules.ai.itinerary;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiProviderCapacity;
 import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse;
 import com.carrental.modules.ai.itinerary.service.ItineraryPreviewService;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
+import com.carrental.modules.ai.routing.LocationRouteService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import com.carrental.modules.location.service.LocationService;
 import com.carrental.modules.location.service.LocationService.PublicView;
 import com.carrental.modules.location.service.VisitMetadata;
@@ -24,7 +28,7 @@ import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ItineraryPreviewServiceTest {
@@ -110,6 +114,34 @@ class ItineraryPreviewServiceTest {
         assertTrue(res.totals().totalDwellMinutes() > 0);
         assertTrue(res.totals().totalTravelMinutes() > 0);
         assertTrue(res.totals().totalDistanceMeters() > 0);
+    }
+
+    @Test
+    void directPreviewItineraryPreviewAndSaveAllMapSharedOsrmSaturationTo429() {
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(eq("loc-a"), anyList(), anyInt(), any(AiRequestDeadline.class)))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(
+                List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
+        var capacity = new AiProviderCapacity();
+        var sharedRouter = new OsrmRoutingClient(
+            new ObjectMapper(), URI.create("http://127.0.0.1:1"), capacity);
+        var itinerary = new ItineraryPreviewService(locations, sharedRouter, planner, clock);
+        var directRoute = new LocationRouteService(locations, sharedRouter, true);
+
+        try (var first = capacity.acquire(AiProviderCapacity.Provider.OSRM);
+             var second = capacity.acquire(AiProviderCapacity.Provider.OSRM)) {
+            assertEquals(429, assertThrows(DomainException.class,
+                () -> directRoute.preview(user, List.of("loc-a", "loc-b"))).status.value());
+            assertEquals(429, assertThrows(DomainException.class,
+                () -> itinerary.preview(user, new ItineraryPreviewRequest(
+                    LocalDate.parse("2026-10-20"), "08:00", "14:00", "loc-a", null))).status.value());
+            assertEquals(429, assertThrows(DomainException.class,
+                () -> itinerary.revalidateOrderedLocations(
+                    user, LocalDate.parse("2026-10-20"), "08:00", "14:00",
+                    "loc-a", null, List.of("loc-a", "loc-b"), "fingerprint"))
+                .status.value());
+        }
+        verify(planner, times(1)).planSequence(eq("loc-a"), anyList(), anyInt(), any(AiRequestDeadline.class));
     }
 
     @Test
