@@ -2,7 +2,7 @@
 
 Phiên bản định dạng: `kdrive-ai-eval-v1`.
 
-Tài liệu quy định dữ liệu đầu vào, nhãn, cách tính điểm và kết quả của công cụ đánh giá. Đây không phải API nghiệp vụ mới, dataset đã có, runner đã chạy hoặc chứng nhận chất lượng. Ví dụ/đường dẫn đầu ra dưới đây là định dạng quy ước, không phải tài nguyên runtime có sẵn.
+Tài liệu quy định dữ liệu đầu vào, nhãn, cách tính điểm và kết quả của công cụ đánh giá. Đây không phải API nghiệp vụ mới hoặc chứng nhận chất lượng. [Bộ parser tổng hợp](parser-v1/README.md) có dữ liệu DRAFT và validator integrity offline; runner chấm response/model chưa có. Ví dụ/đường dẫn đầu ra dưới đây là định dạng quy ước, không phải tài nguyên runtime có sẵn.
 
 Contract nghiệp vụ giữ theo [parser/chatbox](../../../docs/modules/ai-assistant.md), [gợi ý xe](../../../docs/modules/ai-recommendation.md), [hành trình](../../../docs/modules/ai-itinerary.md) và [metadata tham quan](../../../docs/modules/location-visit-metadata.md). Khi source và contract mâu thuẫn, ghi finding trước khi chấm; không tự đổi nhãn để giống implementation.
 

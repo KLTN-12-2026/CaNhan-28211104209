@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "kdrive-ai-eval-v1",
+  "branches": [
+    {
+      "id": "eval-dn",
+      "name": "KDrive Đà Nẵng",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "eval-ha",
+      "name": "KDrive Hội An",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "eval-hue",
+      "name": "KDrive Huế",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "eval-center-a",
+      "name": "KDrive Trung Tâm",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "eval-center-b",
+      "name": "KDrive Trung Tâm",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "eval-old",
+      "name": "KDrive Điểm Cũ",
+      "status": "INACTIVE"
+    }
+  ]
+}
