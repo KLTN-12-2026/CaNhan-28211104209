@@ -35,6 +35,20 @@ test('Selected date respects Vietnam midnight and work date; invalid dates fail 
  for(const date of ['', 'bad', '2026-02-30', '2026-10-16T00:00:00Z'])assert.deepEqual(visibleBookings(rows,{queue:'date',date}),[]);
  assert.deepEqual(ids(visibleBookings([...rows,{id:'invalid',createdAt:'bad'}],{queue:'date',date:'2026-10-16'})),['latest','new']);assert.deepEqual(ids(visibleBookings(rows,{queue:'all',date:'bad'})),['latest','new','old','return']);
 });
+test('QR reconciliation stage filters compose with existing filters and keep newest-first order',()=>{
+ const qrRows=[
+  {id:'new-incomplete',vehicleName:'Xe A',customerName:'Khách A',status:'PENDING',createdAt:'2026-10-24T05:00:00Z',qrReconciliation:{stage:'RECEIVED_INCOMPLETE'}},
+  {id:'old-incomplete',vehicleName:'Xe B',customerName:'Khách B',status:'PENDING',createdAt:'2026-10-24T04:00:00Z',qrReconciliation:{stage:'RECEIVED_INCOMPLETE'}},
+  {id:'applied',vehicleName:'Xe C',customerName:'Khách C',status:'CONFIRMED',createdAt:'2026-10-24T06:00:00Z',qrReconciliation:{stage:'APPLIED'}},
+  {id:'no-summary',vehicleName:'Xe D',customerName:'Khách D',status:'PENDING',createdAt:'2026-10-24T03:00:00Z',deposit:{required:true}},
+  {id:'non-qr',vehicleName:'Xe E',customerName:'Khách E',status:'PENDING',createdAt:'2026-10-24T02:00:00Z',deposit:{required:false}},
+ ];
+ assert.deepEqual(ids(visibleBookings(qrRows)),['applied','new-incomplete','old-incomplete','no-summary','non-qr']);
+ assert.deepEqual(ids(visibleBookings(qrRows,{qrStage:'RECEIVED_INCOMPLETE'})),['new-incomplete','old-incomplete']);
+ assert.deepEqual(ids(visibleBookings(qrRows,{qrStage:'RECEIVED_INCOMPLETE',query:'khách a',status:'PENDING',queue:'date',date:'2026-10-24'})),['new-incomplete']);
+ assert.deepEqual(visibleBookings(qrRows,{qrStage:'UNKNOWN'}),[]);
+ assert.deepEqual(ids(visibleBookings(qrRows,{qrStage:''})),['applied','new-incomplete','old-incomplete','no-summary','non-qr']);
+});
 let dom,vite,createRoot,List,Detail,Topbar,Auth,Router,client,originalNow;const originals=new Map(),roots=[],oldMode=process.env.VITE_DATA_MODE;
 before(async()=>{
  dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
@@ -82,6 +96,53 @@ test('Actual staff page renders Vietnamese enum labels, newest first, Today and 
  const [status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];assert.deepEqual([...status.options].slice(1).map(o=>o.textContent),Object.values(bookingStatusLabels));assert.equal(status.options[1].value,'PENDING');assert.equal(queue.value,'all');
  await select(queue,'today');assert.deepEqual(names(c),['Xe vừa tạo','Xe mới']);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'today');assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await select(queue,'all');assert.deepEqual(names(c),['Xe mới','Xe cũ']);assert.doesNotMatch(c.textContent,/Lọc theo ngày tạo đơn/);
  assert.equal(roleLabels.ADMIN,'Quản trị viên');
+});
+test('Staff QR approval queue shows backend reconciliation summary and composes filters',async()=>{
+ const qrRows=[
+  {id:'new-incomplete',vehicleName:'Xe nhận chưa đủ',customerName:'Khách QR',status:'PENDING',createdAt:'2026-10-24T05:00:00Z',startAt:'2026-10-25T03:00:00Z',endAt:'2026-10-26T03:00:00Z',total:2500000,pickupName:'Đà Nẵng',returnName:'Hà Nội',deposit:{required:true,amount:600000,method:'DEMO_QR_MANUAL',missingAmount:0},qrReconciliation:{stage:'RECEIVED_INCOMPLETE',urgency:'DUE_SOON',receivedAmount:750000,reviewDueAt:'2026-10-24T06:00:00Z',processingIssue:'RETRY_REQUIRED',timingIssues:['TRANSFER_LATE','VERIFICATION_LATE']}},
+  {id:'no-summary',vehicleName:'Xe chưa có summary',customerName:'Khách không QR',status:'PENDING',createdAt:'2026-10-24T04:00:00Z',startAt:'2026-10-25T03:00:00Z',endAt:'2026-10-26T03:00:00Z',total:1000000,pickupName:'Đà Nẵng',returnName:'Hà Nội',deposit:{required:true,amount:300000,method:'VNPAY_SANDBOX'}},
+  {id:'non-qr',vehicleName:'Xe không cọc',customerName:'Khách thường',status:'PENDING',createdAt:'2026-10-24T03:00:00Z',startAt:'2026-10-25T03:00:00Z',endAt:'2026-10-26T03:00:00Z',total:900000,pickupName:'Đà Nẵng',returnName:'Hà Nội',deposit:{required:false}},
+  {id:'old-applied',vehicleName:'Xe đã áp dụng',customerName:'Khách khác',status:'CONFIRMED',createdAt:'2026-10-24T02:00:00Z',startAt:'2026-10-25T03:00:00Z',endAt:'2026-10-26T03:00:00Z',total:1800000,pickupName:'Đà Nẵng',returnName:'Hà Nội',deposit:{required:true,amount:400000,method:'DEMO_QR_MANUAL'},qrReconciliation:{stage:'APPLIED',urgency:'NOT_APPLICABLE',receivedAmount:400000,reviewDueAt:null,processingIssue:'NONE',timingIssues:[]}},
+ ];
+ const previousAdapter=client.defaults.adapter;
+ client.defaults.adapter=async config=>({config,data:qrRows,status:200,statusText:'OK',headers:{}});
+ try {
+  const c=await mount();
+  assert.deepEqual(names(c),['Xe nhận chưa đủ','Xe chưa có summary','Xe không cọc','Xe đã áp dụng']);
+  assert.match(c.textContent,/4 đơn phù hợp · Mới tạo trước/);
+  assert.deepEqual([...selectField(c,'Tình trạng cọc').options].map(option=>option.value),['','AWAITING_APPROVAL','AWAITING_TRANSFER','REPORTED_NO_RECEIPT','RECEIVED_INCOMPLETE','AWAITING_APPLICATION','APPLIED','EXPIRED','CLOSED']);
+  assert.match(c.textContent,/Tình trạng cọc: Cần đối soát khoản nhận/);
+  assert.match(c.textContent,/Cọc yêu cầu: 600\.000/);
+  assert.match(c.textContent,/Tổng nhận \(lịch sử\): 750\.000/);
+  assert.match(c.textContent,/Hạn đối soát: 13:00 24\/10\/2026/);
+    for(const warning of ['Sắp đến hạn đối soát','Cần tiếp tục xử lý đối soát','Có khoản chuyển từ hạn đóng cọc trở đi','Xác minh từ hạn đối soát trở đi'])assert.ok(c.textContent.includes(warning));
+  assert.doesNotMatch(c.textContent,/Còn thiếu|Cần chuyển thêm|Yêu cầu khách đóng thêm/);
+  assert.equal(c.querySelector('[aria-label="Đối soát cọc QR"] a'),null);
+
+  const stage=selectField(c,'Tình trạng cọc');
+  await select(stage,'RECEIVED_INCOMPLETE');
+  assert.deepEqual(names(c),['Xe nhận chưa đủ']);
+  assert.match(c.textContent,/1 đơn phù hợp · Mới tạo trước/);
+  await select(selectField(c,'Trạng thái'),'CONFIRMED');
+  assert.deepEqual(names(c),[]);
+  await select(selectField(c,'Trạng thái'),'');
+  const search=[...c.querySelectorAll('label')].find(label=>label.textContent.startsWith('Tìm mã đơn')).querySelector('input');
+  const setSearch=value=>act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(search,value);search.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+  await setSearch('Khách QR');
+  assert.deepEqual(names(c),['Xe nhận chưa đủ']);
+  await select(stage,'');
+  assert.deepEqual(names(c),['Xe nhận chưa đủ']);
+  assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/bookings\/new-incomplete$/);
+  await setSearch('');
+  assert.deepEqual(names(c),['Xe nhận chưa đủ','Xe chưa có summary','Xe không cọc','Xe đã áp dụng']);
+  assert.match(c.textContent,/Tình trạng cọc: Đã ghi nhận cọc vào đơn/);
+
+  for(const [area,mode] of [['user','all'],['admin','all'],['staff','handover'],['staff','return']]){
+   const other=await mount(mode,'/',area);
+   assert.equal([...other.querySelectorAll('label')].some(label=>label.textContent.startsWith('Tình trạng cọc')),false);
+   assert.equal(other.querySelector('[aria-label="Đối soát cọc QR"]'),null);
+  }
+ } finally { client.defaults.adapter=previousAdapter; }
 });
 test('Actual handover/return pages apply work dates and retain operation route IDs',async()=>{
  const c=await mount('handover'),[status,queue]=[selectField(c,'Trạng thái'),selectField(c,'Hàng đợi')];assert.equal(status.value,'CONFIRMED');await select(queue,'today');assert.deepEqual(names(c),['Xe cũ']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/handover\/old$/);assert.doesNotMatch(c.textContent,/Lọc theo ngày nhận xe/);
