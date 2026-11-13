@@ -1,10 +1,13 @@
 package com.carrental.modules.ai.routing;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.carrental.modules.ai.AiProviderCapacity;
+import com.carrental.modules.ai.AiProviderCapacity.Provider;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 
 /** Driving estimates from a locally prepared OSRM graph, never a live-traffic promise. */
 @org.springframework.stereotype.Component
@@ -25,24 +28,30 @@ public final class OsrmRoutingClient {
     }
     private final URI base;
     private final ObjectMapper json;
+    private final AiProviderCapacity capacity;
     private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
         .followRedirects(HttpClient.Redirect.NEVER).build();
     @org.springframework.beans.factory.annotation.Autowired
-    public OsrmRoutingClient(ObjectMapper json){this(json,URI.create("http://127.0.0.1:5000"));}
-    OsrmRoutingClient(ObjectMapper json,URI base){
+    public OsrmRoutingClient(ObjectMapper json, ObjectProvider<AiProviderCapacity> capacity){
+        this(json, URI.create("http://127.0.0.1:5000"), capacity.getIfAvailable(AiProviderCapacity::new));
+    }
+    OsrmRoutingClient(ObjectMapper json){this(json, URI.create("http://127.0.0.1:5000"), new AiProviderCapacity());}
+    public OsrmRoutingClient(ObjectMapper json,URI base){this(json, base, new AiProviderCapacity());}
+    public OsrmRoutingClient(ObjectMapper json, URI base, AiProviderCapacity capacity){
         if(!"http".equals(base.getScheme())||!"127.0.0.1".equals(base.getHost())||base.getUserInfo()!=null
             ||base.getQuery()!=null||base.getFragment()!=null||!List.of("","/").contains(base.getPath()))
             throw new IllegalArgumentException("OSRM phải là dịch vụ loopback.");
-        this.json=json;this.base=base;
+        this.json=json;this.base=base;this.capacity=capacity;
     }
     public Estimate route(List<Point> points){
         if(points==null||points.size()<2||points.size()>8||points.stream().anyMatch(p->p==null))
             throw new IllegalArgumentException("Tuyến cần từ 2 đến 8 tọa độ.");
+        AiProviderCapacity.Permit permit = capacity.acquire(Provider.OSRM);
         String coordinates=String.join(";",points.stream().map(Point::coordinates).toList());
         var request=HttpRequest.newBuilder(base.resolve("/route/v1/driving/"+coordinates+"?overview=false&steps=false&alternatives=false&radiuses="
             +String.join(";",points.stream().map(p->"1000").toList())))
             .timeout(Duration.ofSeconds(5)).GET().build();
-        try {
+        try (permit) {
             var response=com.carrental.modules.ai.LocalHttp.send(client,request,Duration.ofSeconds(5),32768);
             if(response.body().length()>32768)return failed(Status.UNAVAILABLE);
             var body=json.readTree(response.body());
@@ -69,7 +78,8 @@ public final class OsrmRoutingClient {
                 }
             }
             return new Estimate(Status.VERIFIED,meters,seconds,"© OpenStreetMap contributors; OSRM driving estimate",List.copyOf(legs));
-        } catch(InterruptedException error){Thread.currentThread().interrupt();return failed(Status.UNAVAILABLE);}
+        } catch(AiProviderCapacity.CapacityExceededException error){throw error;}
+        catch(InterruptedException error){Thread.currentThread().interrupt();return failed(Status.UNAVAILABLE);}
         catch(Exception error){return failed(Status.UNAVAILABLE);}
     }
     private static Estimate failed(Status status){return new Estimate(status,null,null,"© OpenStreetMap contributors",List.of());}

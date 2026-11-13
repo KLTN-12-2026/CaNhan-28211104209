@@ -1,6 +1,8 @@
 package com.carrental.modules.ai.parser;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiProviderCapacity;
+import com.carrental.modules.ai.AiProviderCapacity.Provider;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
 import java.net.URI;
@@ -8,6 +10,7 @@ import java.net.http.*;
 import java.time.Duration;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -19,30 +22,47 @@ public class QwenCriteriaParser implements CriteriaParser {
     private final URI endpoint;
     private final Duration timeout;
     private final String model;
-    private final java.util.concurrent.Semaphore capacity=new java.util.concurrent.Semaphore(1);
+    private final AiProviderCapacity capacity;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
         .followRedirects(HttpClient.Redirect.NEVER).build();
 
     @org.springframework.beans.factory.annotation.Autowired
-    public QwenCriteriaParser(ObjectMapper mapper, @org.springframework.beans.factory.annotation.Value("${app.qwen-model:qwen3:8b}") String model) {
-        this(mapper, URI.create("http://127.0.0.1:11434/api/chat"), Duration.ofSeconds(60),model);
+    public QwenCriteriaParser(
+            ObjectMapper mapper,
+            @org.springframework.beans.factory.annotation.Value("${app.qwen-model:qwen3:8b}") String model,
+            ObjectProvider<AiProviderCapacity> capacity) {
+        this(mapper, URI.create("http://127.0.0.1:11434/api/chat"), Duration.ofSeconds(60), model,
+            capacity.getIfAvailable(AiProviderCapacity::new));
     }
-    QwenCriteriaParser(ObjectMapper mapper, URI endpoint, Duration timeout) {this(mapper,endpoint,timeout,"qwen3:8b");}
-    QwenCriteriaParser(ObjectMapper mapper, URI endpoint, Duration timeout,String model) {
+    QwenCriteriaParser(ObjectMapper mapper, String model) {
+        this(mapper, URI.create("http://127.0.0.1:11434/api/chat"), Duration.ofSeconds(60), model, new AiProviderCapacity());
+    }
+    QwenCriteriaParser(ObjectMapper mapper, URI endpoint, Duration timeout) {
+        this(mapper, endpoint, timeout, "qwen3:8b", new AiProviderCapacity());
+    }
+    QwenCriteriaParser(ObjectMapper mapper, URI endpoint, Duration timeout, String model) {
+        this(mapper, endpoint, timeout, model, new AiProviderCapacity());
+    }
+    public QwenCriteriaParser(ObjectMapper mapper, URI endpoint, Duration timeout, String model, AiProviderCapacity capacity) {
         if(!Set.of("qwen3:8b","qwen3:4b").contains(model))throw new IllegalArgumentException("Chỉ hỗ trợ Qwen3 cục bộ4B/8B.");
         this.model=model;
         if (!"http".equals(endpoint.getScheme()) || !"127.0.0.1".equals(endpoint.getHost())
             || endpoint.getUserInfo()!=null || endpoint.getQuery()!=null || endpoint.getFragment()!=null)
             throw new IllegalArgumentException("Qwen chỉ được chạy trên loopback.");
-        this.endpoint=endpoint; this.timeout=timeout;
+        this.endpoint=endpoint; this.timeout=timeout; this.capacity=capacity;
         this.json=mapper.copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
     }
     @Override public Extraction parse(String text) {
         if(text==null || text.isBlank() || text.length()>1000) throw DomainException.bad("Nhập nhu cầu từ 1 đến 1000 ký tự.");
-        if(!capacity.tryAcquire())throw new DomainException(HttpStatus.TOO_MANY_REQUESTS,"Trợ lý đang xử lý yêu cầu khác; vui lòng thử lại.");
+        AiProviderCapacity.Permit permit;
         try {
+            permit = capacity.acquire(Provider.QWEN);
+        } catch (AiProviderCapacity.CapacityExceededException error) {
+            throw new DomainException(HttpStatus.TOO_MANY_REQUESTS,"Trợ lý đang xử lý yêu cầu khác; vui lòng thử lại.");
+        }
+        try (permit) {
             var properties=new LinkedHashMap<String,Object>();
             properties.put("intent", Map.of("type","string","enum",List.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION","OUT_OF_SCOPE")));
             for(String name:List.of("pickupDate","returnDate","pickupBranchName","returnBranchName","transmission"))
@@ -69,7 +89,6 @@ public class QwenCriteriaParser implements CriteriaParser {
         } catch(DomainException error){throw error;}
         catch(InterruptedException error){Thread.currentThread().interrupt();throw unavailable();}
         catch(Exception error){throw unavailable();}
-        finally{capacity.release();}
     }
     private static DomainException unavailable(){return new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa đọc được nhu cầu bằng Qwen; hãy dùng biểu mẫu.");}
 }

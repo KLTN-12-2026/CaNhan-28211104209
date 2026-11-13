@@ -2,6 +2,8 @@ package com.carrental.modules.ai.itinerary.service;
 
 import com.carrental.exception.DomainException;
 import com.carrental.modules.ai.LocalHttp;
+import com.carrental.modules.ai.AiProviderCapacity;
+import com.carrental.modules.ai.AiProviderCapacity.Provider;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,7 +42,7 @@ public class QwenItinerarySequencePlanner {
     private final Duration timeout;
     private final String model;
     private final boolean enabled;
-    private final java.util.concurrent.Semaphore capacity = new java.util.concurrent.Semaphore(1);
+    private final AiProviderCapacity capacity;
     private final HttpClient client = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(2))
         .followRedirects(HttpClient.Redirect.NEVER)
@@ -53,11 +55,18 @@ public class QwenItinerarySequencePlanner {
     public QwenItinerarySequencePlanner(
             ObjectMapper mapper,
             @Value("${app.qwen-model:qwen3:8b}") String model,
-            @Value("${app.qwen-parser-enabled:false}") boolean enabled) {
-        this(mapper, URI.create("http://127.0.0.1:11434/api/chat"), Duration.ofSeconds(60), model, enabled);
+            @Value("${app.qwen-parser-enabled:false}") boolean enabled,
+            AiProviderCapacity capacity) {
+        this(mapper, URI.create("http://127.0.0.1:11434/api/chat"), Duration.ofSeconds(60), model, enabled, capacity);
     }
 
     QwenItinerarySequencePlanner(ObjectMapper mapper, URI endpoint, Duration timeout, String model, boolean enabled) {
+        this(mapper, endpoint, timeout, model, enabled, new AiProviderCapacity());
+    }
+
+    public QwenItinerarySequencePlanner(
+            ObjectMapper mapper, URI endpoint, Duration timeout, String model, boolean enabled,
+            AiProviderCapacity capacity) {
         if (!Set.of("qwen3:8b", "qwen3:4b").contains(model)) {
             throw new IllegalArgumentException("Chỉ hỗ trợ Qwen3 cục bộ 4B/8B.");
         }
@@ -69,6 +78,7 @@ public class QwenItinerarySequencePlanner {
         this.endpoint = endpoint;
         this.timeout = timeout;
         this.enabled = enabled;
+        this.capacity = capacity;
         this.json = mapper.copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
@@ -87,12 +97,14 @@ public class QwenItinerarySequencePlanner {
             throw new QwenPlanningException(503, "Dịch vụ AI gợi ý lộ trình hiện không khả dụng (bị tắt).");
         }
 
-        if (!capacity.tryAcquire()) {
-            // Khi đang tải cao, trả 429
+        AiProviderCapacity.Permit permit;
+        try {
+            permit = capacity.acquire(Provider.QWEN);
+        } catch (AiProviderCapacity.CapacityExceededException error) {
             throw new QwenPlanningException(429, "Dịch vụ AI đang bận xử lý yêu cầu khác, vui lòng thử lại sau.");
         }
 
-        try {
+        try (permit) {
             var candidateIds = candidates.stream().map(Candidate::id).toList();
             var allowedReasonCodes = Arrays.stream(SequenceReasonCode.values()).map(Enum::name).toList();
 
@@ -213,8 +225,6 @@ public class QwenItinerarySequencePlanner {
             throw new QwenPlanningException(503, "Xử lý AI bị gián đoạn.");
         } catch (Exception e) {
             throw new QwenPlanningException(503, "Lỗi phân tích phản hồi AI: " + e.getMessage());
-        } finally {
-            capacity.release();
         }
     }
 
