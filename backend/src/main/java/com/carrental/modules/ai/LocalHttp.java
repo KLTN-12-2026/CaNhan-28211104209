@@ -9,6 +9,11 @@ import java.util.concurrent.*;
 public final class LocalHttp {
     private LocalHttp() {}
     public record Response(int status,String body) {}
+    public static final class ResponseTooLargeException extends java.io.IOException {
+        public ResponseTooLargeException() {
+            super("Provider response exceeded its byte limit.");
+        }
+    }
     public static Response send(HttpClient client,HttpRequest request,Duration timeout,int maxBytes) throws Exception {
         return sendInternal(client, request, timeout, maxBytes, null, false);
     }
@@ -35,7 +40,7 @@ public final class LocalHttp {
                 stream.set(input);
                 if(Thread.currentThread().isInterrupted())throw new InterruptedException();
                 byte[] bytes=input.readNBytes(maxBytes+1);
-                if(bytes.length>maxBytes)throw new java.io.IOException("Response exceeds limit");
+                if(bytes.length>maxBytes)throw new ResponseTooLargeException();
                 return new Response(response.statusCode(),new String(bytes,StandardCharsets.UTF_8));
             }
         });
@@ -45,7 +50,12 @@ public final class LocalHttp {
             try {
                 response=future.get(effectiveTimeout.toNanos(),TimeUnit.NANOSECONDS);
             } catch(TimeoutException error) {
-                if(boundedByDeadline)throw new AiRequestDeadline.DeadlineExceededException();
+                if (boundedByDeadline && deadline.remaining().compareTo(timeout) <= 0) {
+                    throw new AiRequestDeadline.DeadlineExceededException();
+                }
+                throw error;
+            } catch (ExecutionException error) {
+                if (error.getCause() instanceof Exception cause) throw cause;
                 throw error;
             }
             if(boundedByDeadline)deadline.requireRemaining();

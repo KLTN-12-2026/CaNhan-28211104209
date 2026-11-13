@@ -1,5 +1,7 @@
 package com.carrental.modules.ai.itinerary.service;
 
+import com.carrental.modules.ai.AiDiagnostics;
+import com.carrental.modules.ai.AiProviderCapacity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -27,7 +29,10 @@ class QwenItinerarySequencePlannerTest {
         });
         server.start();
         try {
-            var planner = new QwenItinerarySequencePlanner(json, URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/api/chat"), Duration.ofSeconds(2), "qwen3:8b", true);
+            var diagnostics = new AiDiagnostics();
+            var planner = new QwenItinerarySequencePlanner(
+                json, URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/api/chat"),
+                Duration.ofSeconds(2), "qwen3:8b", true, new AiProviderCapacity(), diagnostics);
             assertEquals(List.of("id-a","id-b"), planner.planSequence("id-a", pool, 2).orderedLocationIds());
             for (String invalid : List.of("not json", valid.substring(0,valid.length()-1)+",\"extra\":true}",
                 valid.replace("id-b", "outside"), valid.replace("id-b", "id-a"),
@@ -37,6 +42,9 @@ class QwenItinerarySequencePlannerTest {
                 content.set(invalid);
                 assertEquals(503, assertThrows(QwenItinerarySequencePlanner.QwenPlanningException.class, () -> planner.planSequence("id-a", pool, 2)).getStatusCode());
             }
+            assertEquals(1, count(diagnostics, AiDiagnostics.Cause.SUCCESS));
+            assertEquals(3, count(diagnostics, AiDiagnostics.Cause.SCHEMA_INVALID));
+            assertEquals(4, count(diagnostics, AiDiagnostics.Cause.INVALID_REFERENCE));
         } finally {server.stop(0);}
     }
 
@@ -52,14 +60,23 @@ class QwenItinerarySequencePlannerTest {
         });server.start();
         try {
             URI endpoint=URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/api/chat");
-            var planner=new QwenItinerarySequencePlanner(json,endpoint,Duration.ofSeconds(2),"qwen3:8b",true);
+            var diagnostics=new AiDiagnostics();
+            var capacity=new AiProviderCapacity();
+            var planner=new QwenItinerarySequencePlanner(json,endpoint,Duration.ofSeconds(2),"qwen3:8b",true,capacity,diagnostics);
             Future<?> first=worker.submit(() -> planner.planSequence("id-a",pool,2));
             assertTrue(entered.await(2,TimeUnit.SECONDS));
             assertEquals(429,assertThrows(QwenItinerarySequencePlanner.QwenPlanningException.class,()->planner.planSequence("id-a",pool,2)).getStatusCode());
             release.countDown();assertNotNull(first.get(3,TimeUnit.SECONDS));
-            var disabled=new QwenItinerarySequencePlanner(json,endpoint,Duration.ofMillis(50),"qwen3:8b",false);
+            var disabled=new QwenItinerarySequencePlanner(json,endpoint,Duration.ofMillis(50),"qwen3:8b",false,capacity,diagnostics);
             assertEquals(503,assertThrows(QwenItinerarySequencePlanner.QwenPlanningException.class,()->disabled.planSequence("id-a",pool,2)).getStatusCode());
+            assertEquals(1,count(diagnostics,AiDiagnostics.Cause.CAPACITY));
+            assertEquals(1,count(diagnostics,AiDiagnostics.Cause.DISABLED));
         } finally {release.countDown();server.stop(0);worker.shutdownNow();}
+    }
+
+    private static long count(AiDiagnostics diagnostics, AiDiagnostics.Cause cause) {
+        return diagnostics.snapshot().stream().filter(event -> event.cause() == cause)
+            .mapToLong(AiDiagnostics.Event::count).sum();
     }
 
     @Test void wholeCallDeadlineRejectsStalledHttpResponse() throws Exception {

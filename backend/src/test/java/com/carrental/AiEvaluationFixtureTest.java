@@ -1,6 +1,8 @@
 package com.carrental;
 
 import com.carrental.modules.ai.AiRequestDeadline;
+import com.carrental.modules.ai.AiProviderCapacity;
+import com.carrental.modules.ai.AiProviderCapacity.Provider;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.carrental.modules.location.service.VisitMetadata;
@@ -138,7 +140,7 @@ class AiEvaluationFixtureTest {
     final class Providers implements AutoCloseable {
         HttpServer server; ExecutorService executor=Executors.newCachedThreadPool();
         AtomicInteger modelCalls=new AtomicInteger(),routeCalls=new AtomicInteger();
-        QwenItinerarySequencePlanner qwen; OsrmRoutingClient osrm; Semaphore held;
+        QwenItinerarySequencePlanner qwen; OsrmRoutingClient osrm; AiProviderCapacity.Permit held;
         JsonNode scenario; String cause;
         Providers(JsonNode s)throws Exception{
             scenario=s;cause=s.path("provider").path("cause").asText("");
@@ -180,11 +182,12 @@ class AiEvaluationFixtureTest {
             });
             server.start();
             URI base=URI.create("http://127.0.0.1:"+server.getAddress().getPort());
-            var qc=QwenItinerarySequencePlanner.class.getDeclaredConstructor(ObjectMapper.class,URI.class,Duration.class,String.class,boolean.class);qc.setAccessible(true);
+            var sharedCapacity=new AiProviderCapacity();
+            var qc=QwenItinerarySequencePlanner.class.getDeclaredConstructor(ObjectMapper.class,URI.class,Duration.class,String.class,boolean.class,AiProviderCapacity.class);qc.setAccessible(true);
             boolean useLive=liveQwen && cause.isEmpty();
-            qwen=qc.newInstance(json,useLive?URI.create("http://127.0.0.1:11434/api/chat"):base.resolve("/api/chat"),useLive?Duration.ofSeconds(60):Duration.ofMillis(cause.equals("QWEN_TIMEOUT")?150:5000),"qwen3:8b",!cause.equals("QWEN_DISABLED"));
-            var oc=OsrmRoutingClient.class.getDeclaredConstructor(ObjectMapper.class,URI.class);oc.setAccessible(true);osrm=oc.newInstance(json,base);
-            if(cause.equals("QWEN_CAPACITY")){held=(Semaphore)ReflectionTestUtils.getField(qwen,"capacity");assertTrue(held.tryAcquire());}
+            qwen=qc.newInstance(json,useLive?URI.create("http://127.0.0.1:11434/api/chat"):base.resolve("/api/chat"),useLive?Duration.ofSeconds(60):Duration.ofMillis(cause.equals("QWEN_TIMEOUT")?150:5000),"qwen3:8b",!cause.equals("QWEN_DISABLED"),sharedCapacity);
+            var oc=OsrmRoutingClient.class.getDeclaredConstructor(ObjectMapper.class,URI.class,AiProviderCapacity.class);oc.setAccessible(true);osrm=oc.newInstance(json,base,sharedCapacity);
+            if(cause.equals("QWEN_CAPACITY"))held=sharedCapacity.acquire(Provider.QWEN);
             when(planner.planSequence(anyString(),anyList(),anyInt(),any(AiRequestDeadline.class)))
                 .thenAnswer(a->qwen.planSequence(a.getArgument(0),a.getArgument(1),a.getArgument(2),a.getArgument(3)));
             when(routing.route(anyList(),any(AiRequestDeadline.class))).thenAnswer(a->osrm.route(a.getArgument(0),a.getArgument(1)));
@@ -194,11 +197,16 @@ class AiEvaluationFixtureTest {
             if(cause.equals("QWEN_DISABLED") || cause.equals("QWEN_CAPACITY")){assertEquals(0,modelCalls.get());assertEquals(0,routeCalls.get());}
             else if(cause.startsWith("QWEN_")){assertEquals(1,modelCalls.get());assertEquals(0,routeCalls.get());}
             else{assertEquals(1,modelCalls.get());assertEquals(1,routeCalls.get());}
-            var capacity=(Semaphore)ReflectionTestUtils.getField(qwen,"capacity");assertEquals(held==null?1:0,capacity.availablePermits());
+            var capacity=(AiProviderCapacity)ReflectionTestUtils.getField(qwen,"capacity");
+            if(held==null) {
+                try(var permit=capacity.acquire(Provider.QWEN)) { assertNotNull(permit); }
+            } else {
+                assertThrows(AiProviderCapacity.CapacityExceededException.class,()->capacity.acquire(Provider.QWEN));
+            }
             return true;
         }
         public void close()throws Exception{
-            if(held!=null){held.release();assertEquals(1,held.availablePermits());}
+            if(held!=null)held.close();
             server.stop(0);executor.shutdownNow();assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS));
         }
     }

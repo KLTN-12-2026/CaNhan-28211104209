@@ -53,7 +53,7 @@ public class ItineraryPreviewService {
     }
 
     public ItineraryPreviewResponse preview(Actor actor, ItineraryPreviewRequest request) {
-        AiRequestDeadline deadline = AiRequestDeadline.start();
+        AiRequestDeadline deadline = AiRequestDeadline.start(AiRequestDeadline.Operation.ITINERARY_PREVIEW);
         actor.require("USER");
         validateRequest(request);
 
@@ -190,7 +190,8 @@ public class ItineraryPreviewService {
             List<String> orderedLocationIds,
             String expectedFingerprint) {
         return revalidateOrderedLocations(actor, tripDate, startTimeStr, endTimeStr, startLocationId,
-            preferredCategoryId, orderedLocationIds, expectedFingerprint, AiRequestDeadline.start());
+            preferredCategoryId, orderedLocationIds, expectedFingerprint,
+            AiRequestDeadline.start(AiRequestDeadline.Operation.ITINERARY_SAVE));
     }
 
     public VerifiedSchedule revalidateOrderedLocations(

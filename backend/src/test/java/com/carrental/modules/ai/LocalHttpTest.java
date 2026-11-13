@@ -21,11 +21,17 @@ class LocalHttpTest {
     }
     @Test void responseBodyCannotExceedByteLimit()throws Exception{
         var request=request(false);
-        assertThrows(java.util.concurrent.ExecutionException.class,()->LocalHttp.send(HttpClient.newHttpClient(),request,Duration.ofSeconds(2),16));
+        assertThrows(LocalHttp.ResponseTooLargeException.class,()->LocalHttp.send(HttpClient.newHttpClient(),request,Duration.ofSeconds(2),16));
     }
     @Test void deadlineAlsoBoundsStalledBodyAfterHeaders()throws Exception{
         var request=request(true);long start=System.nanoTime();
         assertThrows(TimeoutException.class,()->LocalHttp.send(HttpClient.newHttpClient(),request,Duration.ofMillis(150),1024));
         assertTrue(Duration.ofNanos(System.nanoTime()-start).compareTo(Duration.ofSeconds(1))<0);
+    }
+    @Test void sharedDeadlineBoundsAStalledProviderCall()throws Exception{
+        var request=request(true);
+        var deadline=AiRequestDeadline.start(Duration.ofMillis(150),AiRequestDeadline.Operation.ROUTE_PREVIEW);
+        assertThrows(AiRequestDeadline.DeadlineExceededException.class,
+            ()->LocalHttp.send(HttpClient.newHttpClient(),request,Duration.ofSeconds(2),1024,deadline));
     }
 }

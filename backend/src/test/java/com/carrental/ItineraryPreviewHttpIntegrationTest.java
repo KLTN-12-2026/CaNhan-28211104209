@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -28,7 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
     "app.seed-enabled=true",
     "app.seed-password=LocationApiTestOnly123!",
-    "app.jwt-secret=preview-http-test-secret-at-least-32-bytes"
+    "app.jwt-secret=preview-http-test-secret-at-least-32-bytes",
+    "app.qwen-parser-enabled=false",
+    "app.gemini-parser-enabled=false",
+    "app.ai-routing-enabled=false"
 })
 @AutoConfigureMockMvc
 public class ItineraryPreviewHttpIntegrationTest {
@@ -188,6 +192,16 @@ public class ItineraryPreviewHttpIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void healthIsPublicAndDoesNotClaimDisabledProviderReadiness() throws Exception {
+        mvc.perform(get("/api/v1/health"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.ai.qwen.configuredEnabled").value(false))
+            .andExpect(jsonPath("$.ai.qwen.readiness").value("DISABLED"))
+            .andExpect(jsonPath("$.ai.osrm.readiness").value("NOT_CHECKED"));
     }
 
     @Test

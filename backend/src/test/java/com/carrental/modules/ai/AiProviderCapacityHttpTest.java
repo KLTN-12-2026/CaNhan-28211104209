@@ -131,10 +131,12 @@ class AiProviderCapacityHttpTest {
         AtomicLong ticker = new AtomicLong(100);
         var deadline = AiRequestDeadline.withTicker(Duration.ofSeconds(60), ticker::get);
         var planner = planner();
+        var diagnostics = new AiDiagnostics();
         var osrm = new OsrmRoutingClient(
             json,
             URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"),
-            capacity
+            capacity,
+            diagnostics
         );
 
         assertEquals(
@@ -146,6 +148,7 @@ class AiProviderCapacityHttpTest {
 
         assertEquals(OsrmRoutingClient.Status.UNAVAILABLE, osrm.route(points(), deadline).status());
         assertEquals(1, requestCount.get(), "An expired itinerary budget must not dispatch its OSRM stage.");
+        assertEquals(AiDiagnostics.Cause.DEADLINE, diagnostics.snapshot().get(0).cause());
     }
 
     private void assertBusyAcrossAdapters(QwenCriteriaParser parser, QwenItinerarySequencePlanner planner)

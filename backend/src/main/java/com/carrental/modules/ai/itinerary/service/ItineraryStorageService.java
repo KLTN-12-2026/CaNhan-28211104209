@@ -48,7 +48,7 @@ public class ItineraryStorageService {
 
     @Transactional
     public ItineraryDetailDto create(Actor actor, CreateItineraryRequest request) {
-        AiRequestDeadline deadline = AiRequestDeadline.start();
+        AiRequestDeadline deadline = AiRequestDeadline.start(AiRequestDeadline.Operation.ITINERARY_SAVE);
         actor.require("USER");
         if (request == null || request.title() == null || request.title().isBlank()) {
             throw DomainException.bad("Tiêu đề hành trình không được để trống.");
