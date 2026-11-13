@@ -8,7 +8,7 @@
 - [itinerary.jsonl](itinerary.jsonl): 10 FEASIBLE, 5 INFEASIBLE, 5 NEEDS_DATA, 5 PROVIDER_ADVERSE, 5 INVALID_OR_ACCESS.
 - [facts.json](facts.json): catalog tổng hợp, tình trạng xe/booking, metadata, ma trận tuyến có hướng, bảng tính tiền/loại xe và bằng chứng lịch.
 - [manifest.json](manifest.json): version, hashes của hai JSONL và facts, 60 profile độc lập theo caseId.
-- [validator](../validate_scenarios.py), [tests](../test_validate_scenarios.py): chỉ đọc dữ liệu, kiểm schema/integrity và oracle hữu hạn bằng Python stdlib; không gọi HTTP, Qwen, OSRM hoặc DB, không chấm response API.
+- [validator](../validate_scenarios.py), [tests](../test_validate_scenarios.py): chỉ đọc dữ liệu, kiểm schema/integrity và oracle hữu hạn bằng Python stdlib; không gọi HTTP, Qwen, OSRM hoặc DB, không chấm response API. [Runner và fixture test](../RUNNER.md) thực hiện bước đó riêng.
 
 Từ root repository, dùng Python 3.12:
 
@@ -19,15 +19,15 @@ python -X utf8 scripts/ai/evaluation/validate_parser_dataset.py
 python -X utf8 scripts/ai/evaluation/test_validate_parser_dataset.py -v
 ```
 
-Validator dùng helper JSON/path/hash của parser; hai suite test kiểm riêng dependency này. Exit0 nghĩa integrity/oracle synthetic nhất quán; exit2 kèm DATASET_INVALID nghĩa từ chối dataset. Các test mutation chỉ sửa bản copy trong thư mục tạm. Không gọi validator này là runner chấm API; runner đó thuộc mốc tiếp theo.
+Validator dùng helper JSON/path/hash của parser; hai suite test kiểm riêng dependency này. Exit0 nghĩa integrity/oracle synthetic nhất quán; exit2 kèm DATASET_INVALID nghĩa từ chối dataset. Các test mutation chỉ sửa bản copy trong thư mục tạm. Không gọi validator này là runner chấm API; dùng run_evaluation.py cho bước chấm riêng.
 
 ## Fixture và schema facts
 
 `facts.json` có đúng schemaVersion, synthetic, branches, routes, vehicles, scenarios. `synthetic=true`; branch/vehicle ID là logical ID. `scenarios[fixtureRef]` là trạng thái **riêng** của ca đó, không phải delta cộng dồn từ ca trước. Các profile cùng pin facts hash, UTC clock `2027-02-01T00:00:00Z`, timezone `Asia/Ho_Chi_Minh`, không bindings. Ngày ca chính `2027-02-10` là thứ Tư. Không đổi đồng hồ hệ điều hành.
 
-Khi xây runner, phải inject Clock vào backend fixture hoặc đóng băng một run manifest dịch ngày nhất quán theo hợp đồng đánh giá. Metadata, exceptions, booking, ngày nguồn và ngày request đều phải đi cùng reference clock; không chỉ thay ngày trong payload. Mỗi ca chỉ expose đúng catalog/booking được chỉ định. Logical ID→ID fixture phải được ghi trong run manifest và dùng cho cả input, gold, route stubs. Chưa có loader/seed hoặc fixture adapter trong bộ này; validator không chứng minh API hiện tại đã nhận được các facts này.
+Khi xây runner, phải inject Clock vào backend fixture hoặc đóng băng một run manifest dịch ngày nhất quán theo hợp đồng đánh giá. Metadata, exceptions, booking, ngày nguồn và ngày request đều phải đi cùng reference clock; không chỉ thay ngày trong payload. Mỗi ca chỉ expose đúng catalog/booking được chỉ định. Logical ID→ID fixture phải được ghi trong run manifest và dùng cho cả input, gold, route stubs. Fixture test backend và runner được mô tả tại [hướng dẫn chạy](../RUNNER.md). Validator riêng vẫn không chứng minh API đã nhận facts.
 
-Với recommendation, `vehicleIds` chọn catalog chính xác, `bookings` chứa dữ liệu lịch tổng hợp; không có booking ẩn. Fixture này chỉ sử dụng CONFIRMED và PENDING, không chứng minh toàn bộ state machine. Mỗi booking mang ngày theo chính sách calendar; giữ hết ngày trả, số ngày tính phí là returnDate−pickupDate. `audit[vehicleId]` có rentalDays, rentalTotal, oneWayFee, total, excludedBy. Các lý do loại gồm INACTIVE, SEATS, BUDGET, OVERLAP, BRANCH_CHAIN và có thể đồng thời nhiều lý do. Xe free giá0 chỉ có trong rec-20; các ca khác không được seed xe đó. Tuyến dn→ha phí150000 khác ha→dn phí100000; cùng chi nhánh phí0.
+Với recommendation, `vehicleIds` chọn catalog chính xác, `bookings` chứa dữ liệu lịch tổng hợp; không có booking ẩn. Fixture này chỉ sử dụng CONFIRMED và PENDING, không chứng minh toàn bộ state machine. Mỗi booking mang ngày theo chính sách calendar; giữ hết ngày trả, số ngày tính phí là returnDate−pickupDate. `audit[vehicleId]` có rentalDays, rentalTotal, oneWayFee, total, excludedBy. Các lý do loại gồm INACTIVE, SEATS, BUDGET, OVERLAP, BRANCH_CHAIN và có thể đồng thời nhiều lý do. Giá ngày của xe phải lớn hơn0 theo schema. rec-20 dùng catalog riêng m4 và biên ngân sách9007199254740991, không tạo xe miễn phí. Tuyến dn→ha phí150000 khác ha→dn phí100000; cùng chi nhánh phí0.
 
 Với itinerary, `locations` là catalog riêng có ACTIVE/INACTIVE, tọa độ tổng hợp và metadata theo [contract tham quan](../../../../docs/modules/location-visit-metadata.md). Evidence URL chỉ dùng miền `example.invalid`, không truy cập website. `legs` ghi đầy đủ mọi cặp có hướng trong catalog, không gồm self edge. VERIFIED có durationSeconds/distanceMeters; NO_ROUTE không có số liệu. Tuyến nhiều điểm được fixture adapter ghép từ từng chặng, không tự suy tuyến ngược. Đây là synthetic route series, **không chứng minh OSRM/graph thực**.
 
@@ -48,7 +48,7 @@ Các lịch khác witness vẫn có thể đúng: runner API phải kiểm facts
 | rec-01…08 | Số người2/4/5/7/9, ngân sách và thời lượng1/2/4 ngày, ưu tiên hộp số |
 | rec-09…12 | Wifi/GPS/child và mã amenity không tồn tại; không bịa facts |
 | rec-13…16 | Phí tuyến có hướng, tổng bằng ngân sách và thiếu một đồng |
-| rec-17…20 | Booking trùng, PENDING hết hạn, chuỗi chi nhánh của booking tiếp theo, ngân sách/giá0 |
+| rec-17…20 | Booking trùng, PENDING hết hạn, chuỗi chi nhánh của booking tiếp theo, biên ngân sách nguyên an toàn lớn nhất |
 | rec-21…25 | Không xe vì ngân sách, ghế, nơi nhận, bảo trì, giữ hết ngày trả |
 | rec-26…30 | Số người sai, ngân sách âm, thứ tự ngày, amenity lặp, field lạ |
 | iti-01…04 | Hai điểm, chờ mở cửa, nghỉ trưa, ngoại lệ thay tuần |

@@ -100,6 +100,10 @@ class ScenarioTests(unittest.TestCase):
         self.facts['vehicles'][0]['dailyPrice']=True
         self.rejects('integer/range')
 
+    def test_zero_price_violates_database_contract(self):
+        self.facts['vehicles'][0]['dailyPrice']=0
+        self.rejects('integer/range')
+
     def test_float_money(self):
         self.facts['scenarios']['rec-01']['audit']['a4']['total']=400000.0
         self.rejects('integer/range')

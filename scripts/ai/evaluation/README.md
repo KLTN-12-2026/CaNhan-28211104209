@@ -2,7 +2,7 @@
 
 Phiên bản định dạng: `kdrive-ai-eval-v1`.
 
-Tài liệu quy định dữ liệu đầu vào, nhãn, cách tính điểm và kết quả của công cụ đánh giá. Đây không phải API nghiệp vụ mới hoặc chứng nhận chất lượng. [Bộ parser tổng hợp](parser-v1/README.md) và [bộ tình huống xe/hành trình](scenarios-v1/README.md) có dữ liệu DRAFT cùng validator offline; bộ tình huống kèm facts và oracle hữu hạn. Runner chấm response/model chưa có. Ví dụ/đường dẫn đầu ra dưới đây là định dạng quy ước, không phải tài nguyên runtime có sẵn.
+Tài liệu quy định dữ liệu đầu vào, nhãn, cách tính điểm và kết quả của công cụ đánh giá. Đây không phải API nghiệp vụ mới hoặc chứng nhận chất lượng. [Bộ parser tổng hợp](parser-v1/README.md) và [bộ tình huống xe/hành trình](scenarios-v1/README.md) có dữ liệu DRAFT cùng validator offline; bộ tình huống kèm facts và oracle hữu hạn. [Runner chấm API](RUNNER.md) hỗ trợ capture từ fixture backend và HTTP parser trên catalog đã chuẩn bị; nhãn DRAFT chỉ dùng exploratory, không chứng nhận chất lượng. Ví dụ/đường dẫn đầu ra dưới đây là định dạng quy ước, không phải tài nguyên runtime có sẵn.
 
 Contract nghiệp vụ giữ theo [parser/chatbox](../../../docs/modules/ai-assistant.md), [gợi ý xe](../../../docs/modules/ai-recommendation.md), [hành trình](../../../docs/modules/ai-itinerary.md) và [metadata tham quan](../../../docs/modules/location-visit-metadata.md). Khi source và contract mâu thuẫn, ghi finding trước khi chấm; không tự đổi nhãn để giống implementation.
 
@@ -173,4 +173,4 @@ Ví dụ tính tay: CLEAR có50ca,47đúng,1sai,2timeout → C48, F47, coverage9
 - Report tổng hợp có planned/executed/outcome counts theo suite/split/category, metric numerator/denominator/coverage, latency groups và skipped/blocked reasons. Mọi caseId xuất hiện đúng một lần trong quality series; không mất mẫu hoặc trùng mẫu để đạt coverage.
 - Exit0: cả dữ liệu/runner hợp lệ và mọi assertion/gate được yêu cầu của chế độ đó đạt. Exit1: run thực thi có assertion/gate fail. Exit2: dataset/preflight invalid hoặc môi trường blocked nên chưa đủ thực thi. Quality chưa đạt ở baseline là exit1 kèm report, không sửa exit thành0 để gọi AI PASS. Việc hoàn thành đo baseline được xác nhận bằng runner kiểm chứng + report đầy đủ, không bằng AI đạt điểm cao.
 
-Không có số liệu chất lượng, command runner đã hoạt động hoặc trạng thái nghiệm thu nào được tuyên bố bởi tài liệu đặc tả này.
+Cách chạy và giới hạn runner tại [RUNNER.md](RUNNER.md). Tài liệu đặc tả này không tuyên bố chất lượng model hoặc nghiệm thu độc lập.

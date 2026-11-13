@@ -353,7 +353,7 @@ def validate(root):
     unique([v['id'] for v in facts['vehicles']])
     for v in facts['vehicles']:
         keys(v, {'id','name','seats','dailyPrice','transmission','amenityIds','currentBranchId','status'}, 'vehicle')
-        integer(v['seats'],2,9); integer(v['dailyPrice']); unique(v['amenityIds'])
+        integer(v['seats'],2,9); integer(v['dailyPrice'],1); unique(v['amenityIds'])
         require(v['status'] in ('ACTIVE','MAINTENANCE') and v['transmission'] in ('AUTO','MANUAL')
                 and v['currentBranchId'] in branches and v['name'], 'vehicle facts')
     ids = set(); suites = set(); counts = {}; access = Counter(); causes = set()
