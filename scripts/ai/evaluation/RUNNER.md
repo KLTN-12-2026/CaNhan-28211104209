@@ -92,3 +92,21 @@ Có thể chỉ định `--ollama-exe` và `--models` cho đường dẫn đã c
 - OSRM thật được kiểm riêng bằng `LocationRouteHttpServerTest#onlineRoutePreview_RequiresLiveOsrm_MustBeVerified_BothDirectionsAndMultiPoint`, với graph/image được pin. Bài kiểm tra này không thay baseline semantic của30ca itinerary hoặc chứng minh MySQL.
 
 `status.json` ghi tiến độ và exit từng command. Chất lượng có exit1 vẫn được giữ để phân tích finding; exit2/missing execution làm lượt bị chặn. `BASELINE_COLLECTED_EXPLORATORY` chỉ xác nhận thu thập, không đồng nghĩa numeric gates hoặc review nhãn đạt. DRAFT luôn giữ certified=false. Kiểm log/XML từng lượt; các test có điều kiện bị skip không được tính là PASS.
+
+## G4 one-shot Qwen smoke
+
+`backend/src/test/java/com/carrental/AiLiveSmokeIT.java` is an explicit two-inference smoke through the real Spring Boot HTTP server. It uses a dedicated H2 database, synthetic user and location fixtures, the real Qwen parser/planner/shared capacity/diagnostics, and one synthetic OSRM route stub. It does not call live OSRM, persist itineraries, or run the 100+60 baseline. The parser and planner case IDs and expected results are fixed in the test; each is attempted once in order, and sanitized per-attempt evidence records HTTP status, duration, observed diagnostics cause, and summarized output without tokens, raw prompts, or response bodies.
+
+Before running, verify the existing loopback Ollama identity, `/api/version`, `/api/tags`, `/api/ps`, `qwen3:8b` tag digest against the local manifest, and blob sizes. A model not resident before the first case is recorded as such; do not unload or otherwise manipulate a user-owned service to create a cold run. Never start a second Ollama server or call a provider health/inference probe outside the two planned backend requests. Use a new output directory under this task's `.runtime` evidence folder:
+
+```powershell
+$runId = [guid]::NewGuid().ToString('N')
+$evidence = 'E:/AI/BERT_Project/codepython/KLTN/.runtime/coordination-ai-g4-smoke-copilot-20261103-01/evidence'
+$preflight = "$evidence/ollama-preflight-$runId.json"
+$output = "$evidence/smoke-run-$runId"
+# Write a fresh metadata-only preflight to $preflight before starting the focused test.
+Set-Location 'E:/AI/BERT_Project/codepython/KLTN/backend'
+./mvnw.cmd "-Dtest=AiLiveSmokeIT" "-Dai.eval.liveSmoke=true" "-Dai.eval.preflight=$preflight" "-Dai.eval.output=$output" test
+```
+
+The test refuses an existing output directory and verifies its H2 URL. It records both attempts even when one has a provider/API/quality failure; a non-matching expected result fails the focused test and remains a finding, not a reason to retry. The itinerary preview uses a test-only OSRM stub, so results support only the Qwen/backend itinerary smoke, not route or OSRM acceptance. Read the resulting summary together with Ollama metadata readback; test success alone does not certify the model or the G4 system.
