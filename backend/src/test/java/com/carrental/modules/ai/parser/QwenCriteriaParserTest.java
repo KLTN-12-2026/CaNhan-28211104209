@@ -1,6 +1,8 @@
 package com.carrental.modules.ai.parser;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiDiagnostics;
+import com.carrental.modules.ai.AiProviderCapacity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.net.*;
@@ -13,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class QwenCriteriaParserTest {
     private final ObjectMapper json=new ObjectMapper();
+    private final AiDiagnostics diagnostics=new AiDiagnostics();
     private HttpServer server;
     private final AtomicInteger calls=new AtomicInteger();
     private String requestBody,requestKey,requestPath;
@@ -24,7 +27,8 @@ class QwenCriteriaParserTest {
             if(response.equals("SLOW"))Thread.sleep(350);
             byte[] bytes=response.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(status,bytes.length);exchange.getResponseBody().write(bytes);
         }catch(Exception ignored){}finally{exchange.close();}});server.start();
-        return new QwenCriteriaParser(json,URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/model"),deadline);
+        return new QwenCriteriaParser(json,URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/model"),
+            deadline,"qwen3:8b",new AiProviderCapacity(),diagnostics);
     }
     private String envelope(String text)throws Exception{return json.writeValueAsString(Map.of("done",true,"done_reason","stop","message",Map.of("role","assistant","content",text)));}
     private String valid(){return "{\"intent\":\"RECOMMEND_VEHICLE\",\"passengers\":4,\"budgetVndTotal\":3000000,\"pickupBranchName\":\"Đà Nẵng\",\"unresolvedFields\":[\"pickupDate\",\"returnDate\"],\"conflicts\":[]}";}
@@ -32,6 +36,7 @@ class QwenCriteriaParserTest {
         var p=parser(200,envelope(valid()),Duration.ofSeconds(2));var result=p.parse("4 người, ngân sách 3 triệu, nhận Đà Nẵng");
         assertEquals(4,result.passengers());assertEquals(3000000,result.budgetVndTotal());assertEquals("Đà Nẵng",result.pickupBranchName());assertNull(result.pickupDate());
         assertEquals(1,calls.get());assertNull(requestKey);
+        assertEquals(AiDiagnostics.Cause.SUCCESS,diagnostics.snapshot().get(0).cause());
         var body=json.readTree(requestBody);assertFalse(body.has("tools"));assertFalse(body.path("think").asBoolean());assertFalse(body.path("stream").asBoolean());assertEquals("qwen3:8b",body.path("model").asText());assertTrue(body.path("format").isObject());
     }
     @Test void invalidInputDoesNotCallProvider()throws Exception{
@@ -39,12 +44,14 @@ class QwenCriteriaParserTest {
     }
     @Test void errorsAreSanitizedAndNeverRetried()throws Exception{
         var p=parser(429,"raw-provider-error synthetic-test-key",Duration.ofSeconds(2));var error=assertThrows(DomainException.class,()->p.parse("tìm xe"));assertEquals(503,error.status.value());assertFalse(error.getMessage().contains("synthetic-test-key"));assertEquals(1,calls.get());
+        assertEquals(AiDiagnostics.Cause.PROVIDER_HTTP,diagnostics.snapshot().get(0).cause());
     }
     @Test void redirectsAreNotFollowed()throws Exception{
         var p=parser(302,"redirect",Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());assertEquals(1,calls.get());
     }
     @Test void deadlineFailsClosed()throws Exception{
         var p=parser(200,"SLOW",Duration.ofMillis(80));long start=System.nanoTime();assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());assertTrue(Duration.ofNanos(System.nanoTime()-start).compareTo(Duration.ofSeconds(2))<0);
+        assertEquals(AiDiagnostics.Cause.PROVIDER_TIMEOUT,diagnostics.snapshot().get(0).cause());
     }
     @Test void blockedAndToolOutputsAreRejected()throws Exception{
         var p=parser(200,"{\"candidates\":[{\"finishReason\":\"SAFETY\",\"content\":{\"parts\":[{\"functionCall\":{}}]}}]}",Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
@@ -63,7 +70,10 @@ class QwenCriteriaParserTest {
     }
     @Test void beanIsOptInAndStartsWithoutCloudCredentials(){
         var runner=new org.springframework.boot.test.context.runner.ApplicationContextRunner()
-            .withBean(ObjectMapper.class,ObjectMapper::new).withUserConfiguration(QwenCriteriaParser.class);
+            .withBean(ObjectMapper.class,ObjectMapper::new)
+            .withBean(AiDiagnostics.class,AiDiagnostics::new)
+            .withBean(AiProviderCapacity.class,AiProviderCapacity::new)
+            .withUserConfiguration(QwenCriteriaParser.class);
         runner.run(context->assertFalse(context.containsBean("qwenCriteriaParser")));
         runner.withPropertyValues("app.qwen-parser-enabled=true").run(context->{assertNull(context.getStartupFailure());assertEquals(1,context.getBeansOfType(CriteriaParser.class).size());});
     }
@@ -85,5 +95,10 @@ class QwenCriteriaParserTest {
     }
     @Test void nonIsoDatesRejected() throws Exception {
         var p=parser(200,envelope(valid().replace("\"passengers\":4","\"pickupDate\":\"20/10/2100\",\"passengers\":4")),Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("20/10/2100")).status.value());
+    }
+    @Test void oversizedProviderBodyHasItsOwnCause()throws Exception{
+        var p=parser(200,"x".repeat(17000),Duration.ofSeconds(2));
+        assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+        assertEquals(AiDiagnostics.Cause.RESPONSE_TOO_LARGE,diagnostics.snapshot().get(0).cause());
     }
 }

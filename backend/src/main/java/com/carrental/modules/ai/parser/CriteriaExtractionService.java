@@ -1,10 +1,14 @@
 package com.carrental.modules.ai.parser;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiDiagnostics;
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
 import java.text.Normalizer;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,18 +18,35 @@ import org.springframework.stereotype.Service;
 public class CriteriaExtractionService {
     private final ObjectProvider<QwenCriteriaParser> parser;
     private final RentalBranchCatalog branches;
-    public CriteriaExtractionService(ObjectProvider<QwenCriteriaParser> parser,RentalBranchCatalog branches){this.parser=parser;this.branches=branches;}
+    private final AiDiagnostics diagnostics;
+    private final String model;
+    @Autowired
+    public CriteriaExtractionService(
+            ObjectProvider<QwenCriteriaParser> parser,
+            RentalBranchCatalog branches,
+            AiDiagnostics diagnostics,
+            @Value("${app.qwen-model:qwen3:8b}") String model) {
+        this.parser=parser;this.branches=branches;this.diagnostics=diagnostics;this.model=model;
+    }
+    public CriteriaExtractionService(ObjectProvider<QwenCriteriaParser> parser,RentalBranchCatalog branches){
+        this(parser,branches,new AiDiagnostics(),"qwen3:8b");
+    }
     public record Draft(String pickupDate,String returnDate,String pickupBranchId,String returnBranchId,Integer passengers,Long budgetVndTotal,String transmission) {}
     public record Result(String status,Draft draft,List<String> unresolvedFields) {}
     public Result extract(Actor actor,String text){
+        AiRequestDeadline deadline=AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION);
         actor.require("USER");
         if(text==null||text.isBlank()||text.length()>1000)throw DomainException.bad("Nhập nhu cầu từ1 đến1000 ký tự.");
         // Refuse common sensitive identifiers before inference; no transcript or user account is forwarded.
         if(text.matches("(?s).*[^\\s@]+@[^\\s@]+\\.[^\\s@]+.*") || text.matches("(?s).*(?<!\\d)(?:0\\d{9}|84\\d{9}|\\d{12,16})(?!\\d).*"))
             throw DomainException.bad("Vui lòng bỏ email, số điện thoại hoặc số giấy tờ khỏi nhu cầu thuê xe.");
         var engine=parser.getIfAvailable();
-        if(engine==null)throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
-        var extracted=engine.parse(text);
+        if(engine==null) {
+            diagnostics.record(deadline.operation(), AiDiagnostics.Provider.QWEN, model,
+                AiDiagnostics.Cause.DISABLED, deadline.elapsedNanos());
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
+        }
+        var extracted=engine.parse(text,deadline);
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
         var active=branches.active();

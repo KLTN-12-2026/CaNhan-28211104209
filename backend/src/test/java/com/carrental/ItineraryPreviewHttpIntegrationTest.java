@@ -1,5 +1,6 @@
 package com.carrental;
 
+import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,7 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
     "app.seed-enabled=true",
     "app.seed-password=LocationApiTestOnly123!",
-    "app.jwt-secret=preview-http-test-secret-at-least-32-bytes"
+    "app.jwt-secret=preview-http-test-secret-at-least-32-bytes",
+    "app.qwen-parser-enabled=false",
+    "app.gemini-parser-enabled=false",
+    "app.ai-routing-enabled=false"
 })
 @AutoConfigureMockMvc
 public class ItineraryPreviewHttpIntegrationTest {
@@ -190,13 +195,23 @@ public class ItineraryPreviewHttpIntegrationTest {
     }
 
     @Test
+    void healthIsPublicAndDoesNotClaimDisabledProviderReadiness() throws Exception {
+        mvc.perform(get("/api/v1/health"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.ai.qwen.configuredEnabled").value(false))
+            .andExpect(jsonPath("$.ai.qwen.readiness").value("DISABLED"))
+            .andExpect(jsonPath("$.ai.osrm.readiness").value("NOT_CHECKED"));
+    }
+
+    @Test
     void postPreview_ReturnsValidatedWithFullSnapshotAndAttribution() throws Exception {
-        when(sequencePlanner.planSequence(eq(locId1), anyList(), anyInt()))
+        when(sequencePlanner.planSequence(eq(locId1), anyList(), anyInt(), any(AiRequestDeadline.class)))
             .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locId1, locId2), "QWEN_OPTIMIZED"));
 
         // Mock OSRM leg routing
         var leg = new OsrmRoutingClient.Leg(12000.0, 1080.0); // 12km, 18 phút
-        when(osrmRoutingClient.route(anyList())).thenReturn(
+        when(osrmRoutingClient.route(anyList(), any(AiRequestDeadline.class))).thenReturn(
             new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 12000.0, 1080.0, "OSM Test", List.of(leg))
         );
 
@@ -230,7 +245,7 @@ public class ItineraryPreviewHttpIntegrationTest {
 
     @Test
     void postPreview_ReturnsUnavailableWhenQwenFails() throws Exception {
-        when(sequencePlanner.planSequence(any(), any(), anyInt()))
+        when(sequencePlanner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(503, "Dịch vụ AI hiện không khả dụng (bị tắt)."));
 
         String tripDate = LocalDate.now().plusDays(2).toString();
@@ -252,7 +267,7 @@ public class ItineraryPreviewHttpIntegrationTest {
 
     @Test
     void postPreview_ReturnsTooManyRequestsWhenQwenBusy() throws Exception {
-        when(sequencePlanner.planSequence(any(), any(), anyInt()))
+        when(sequencePlanner.planSequence(any(), any(), anyInt(), any(AiRequestDeadline.class)))
             .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(429, "Dịch vụ AI đang bận"));
 
         String tripDate = LocalDate.now().plusDays(2).toString();

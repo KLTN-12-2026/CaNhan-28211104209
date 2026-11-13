@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "kdrive-ai-eval-v1",
+  "datasetVersion": "parser-v1-draft-2",
+  "datasets": [
+    {
+      "path": "dev.jsonl",
+      "sha256": "17527cafd5ff4903fe4143b4145ce49727bdc20283a46360f64c3fa66304b1d8",
+      "suite": "parser",
+      "split": "dev",
+      "count": 100
+    },
+    {
+      "path": "heldout.jsonl",
+      "sha256": "202793e74605c44d77f857c620816d18b0482de991024f2339dd7e802ddcbcda",
+      "suite": "parser",
+      "split": "heldout",
+      "count": 100
+    }
+  ],
+  "profiles": {
+    "synthetic-branches-v1": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {
+        "pickupDate": "2027-02-10",
+        "returnDate": "2027-02-14",
+        "laterDate": "2027-02-16",
+        "lastDate": "2027-02-20",
+        "pickupDmy": "10/02/2027",
+        "returnDmy": "14/02/2027",
+        "dnBranchId": "eval-dn",
+        "haBranchId": "eval-ha",
+        "hueBranchId": "eval-hue"
+      },
+      "factsPath": "facts.json",
+      "factsSha256": "e74c35cfdb9a0ff84e3fab8c5a623111f5a5f64a66d36453bfc02a421629e29b",
+      "providerMode": "synthetic"
+    }
+  },
+  "reviewState": "DRAFT"
+}

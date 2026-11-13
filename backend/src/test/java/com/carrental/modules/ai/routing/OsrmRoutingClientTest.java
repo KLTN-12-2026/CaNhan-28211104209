@@ -1,5 +1,7 @@
 package com.carrental.modules.ai.routing;
 
+import com.carrental.modules.ai.AiDiagnostics;
+import com.carrental.modules.ai.AiProviderCapacity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import java.net.*;
@@ -11,10 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class OsrmRoutingClientTest {
     private HttpServer server;
     private String path;
+    private AiDiagnostics diagnostics;
 
     @AfterEach void stop(){if(server!=null)server.stop(0);}
 
     private OsrmRoutingClient client(int status,String body)throws Exception{
+        diagnostics=new AiDiagnostics();
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/",x->{
             path=x.getRequestURI().toString();
@@ -24,7 +28,8 @@ class OsrmRoutingClientTest {
             x.close();
         });
         server.start();
-        return new OsrmRoutingClient(new ObjectMapper(),URI.create("http://127.0.0.1:"+server.getAddress().getPort()));
+        return new OsrmRoutingClient(new ObjectMapper(),URI.create("http://127.0.0.1:"+server.getAddress().getPort()),
+            new AiProviderCapacity(),diagnostics);
     }
 
     private List<OsrmRoutingClient.Point> points(){
@@ -42,6 +47,7 @@ class OsrmRoutingClientTest {
         assertTrue(path.contains("108.2,16.05;108.33,15.88"));
         assertTrue(path.contains("radiuses=1000;1000"));
         assertTrue(result.attribution().contains("OpenStreetMap"));
+        assertEquals(AiDiagnostics.Cause.SUCCESS,diagnostics.snapshot().get(0).cause());
     }
 
     @Test void noRouteHasNoInventedEstimate()throws Exception{
@@ -49,12 +55,14 @@ class OsrmRoutingClientTest {
         assertEquals(OsrmRoutingClient.Status.NO_ROUTE,result.status());
         assertNull(result.durationSeconds());
         assertNull(result.distanceMeters());
+        assertEquals(AiDiagnostics.Cause.NO_ROUTE,diagnostics.snapshot().get(0).cause());
     }
 
     @Test void malformedAndNegativeFactsFailClosed()throws Exception{
         var result=client(200,"{\"code\":\"Ok\",\"routes\":[{\"distance\":-1,\"duration\":2}]}").route(points());
         assertEquals(OsrmRoutingClient.Status.UNAVAILABLE,result.status());
         assertNull(result.distanceMeters());
+        assertEquals(AiDiagnostics.Cause.SCHEMA_INVALID,diagnostics.snapshot().get(0).cause());
     }
 
     @Test void negativeOrMalformedLegsFailClosed()throws Exception{
@@ -73,6 +81,14 @@ class OsrmRoutingClientTest {
 
     @Test void unavailableServiceDoesNotBecomeNoRoute()throws Exception{
         assertEquals(OsrmRoutingClient.Status.UNAVAILABLE,client(503,"internal detail").route(points()).status());
+        assertEquals(AiDiagnostics.Cause.PROVIDER_HTTP,diagnostics.snapshot().get(0).cause());
+    }
+
+    @Test void malformedEnvelopeAndOversizedBodyHaveDistinctCauses()throws Exception{
+        assertEquals(OsrmRoutingClient.Status.UNAVAILABLE,client(200,"malformed").route(points()).status());
+        assertEquals(AiDiagnostics.Cause.ENVELOPE_INVALID,diagnostics.snapshot().get(0).cause());
+        assertEquals(OsrmRoutingClient.Status.UNAVAILABLE,client(200,"x".repeat(33000)).route(points()).status());
+        assertEquals(AiDiagnostics.Cause.RESPONSE_TOO_LARGE,diagnostics.snapshot().get(0).cause());
     }
 
     @Test void invalidCoordinatesAndRemoteHostsRejected(){

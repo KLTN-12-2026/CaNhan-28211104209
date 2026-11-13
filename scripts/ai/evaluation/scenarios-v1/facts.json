@@ -1,0 +1,6426 @@
+{
+  "schemaVersion": "kdrive-ai-eval-v1",
+  "synthetic": true,
+  "branches": [
+    {
+      "id": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "ha",
+      "status": "ACTIVE"
+    }
+  ],
+  "routes": [
+    {
+      "pickup": "dn",
+      "returned": "dn",
+      "fee": 0
+    },
+    {
+      "pickup": "ha",
+      "returned": "ha",
+      "fee": 0
+    },
+    {
+      "pickup": "dn",
+      "returned": "ha",
+      "fee": 150000
+    },
+    {
+      "pickup": "ha",
+      "returned": "dn",
+      "fee": 100000
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "a4",
+      "name": "Xe tổng hợp a4",
+      "seats": 4,
+      "dailyPrice": 200000,
+      "transmission": "AUTO",
+      "amenityIds": [
+        "wifi"
+      ],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "m4",
+      "name": "Xe tổng hợp m4",
+      "seats": 4,
+      "dailyPrice": 180000,
+      "transmission": "MANUAL",
+      "amenityIds": [],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "a5",
+      "name": "Xe tổng hợp a5",
+      "seats": 5,
+      "dailyPrice": 300000,
+      "transmission": "AUTO",
+      "amenityIds": [
+        "gps"
+      ],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "m7",
+      "name": "Xe tổng hợp m7",
+      "seats": 7,
+      "dailyPrice": 350000,
+      "transmission": "MANUAL",
+      "amenityIds": [
+        "child"
+      ],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "a7",
+      "name": "Xe tổng hợp a7",
+      "seats": 7,
+      "dailyPrice": 500000,
+      "transmission": "AUTO",
+      "amenityIds": [
+        "wifi",
+        "child"
+      ],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "a9",
+      "name": "Xe tổng hợp a9",
+      "seats": 9,
+      "dailyPrice": 700000,
+      "transmission": "AUTO",
+      "amenityIds": [
+        "gps"
+      ],
+      "currentBranchId": "dn",
+      "status": "ACTIVE"
+    },
+    {
+      "id": "maint",
+      "name": "Xe tổng hợp maint",
+      "seats": 9,
+      "dailyPrice": 100000,
+      "transmission": "AUTO",
+      "amenityIds": [],
+      "currentBranchId": "dn",
+      "status": "MAINTENANCE"
+    },
+    {
+      "id": "ha7",
+      "name": "Xe tổng hợp ha7",
+      "seats": 7,
+      "dailyPrice": 250000,
+      "transmission": "AUTO",
+      "amenityIds": [],
+      "currentBranchId": "ha",
+      "status": "ACTIVE"
+    }
+  ],
+  "scenarios": {
+    "rec-01": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-02": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-03": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-04": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": []
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-05": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": []
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-06": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-07": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 1,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 1,
+          "rentalTotal": 180000,
+          "oneWayFee": 0,
+          "total": 180000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 1,
+          "rentalTotal": 300000,
+          "oneWayFee": 0,
+          "total": 300000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 1,
+          "rentalTotal": 350000,
+          "oneWayFee": 0,
+          "total": 350000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 1,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 1,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 1,
+          "rentalTotal": 100000,
+          "oneWayFee": 0,
+          "total": 100000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 1,
+          "rentalTotal": 250000,
+          "oneWayFee": 0,
+          "total": 250000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-08": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 4,
+          "rentalTotal": 800000,
+          "oneWayFee": 0,
+          "total": 800000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 4,
+          "rentalTotal": 720000,
+          "oneWayFee": 0,
+          "total": 720000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 4,
+          "rentalTotal": 1200000,
+          "oneWayFee": 0,
+          "total": 1200000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 4,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 4,
+          "rentalTotal": 2000000,
+          "oneWayFee": 0,
+          "total": 2000000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 4,
+          "rentalTotal": 2800000,
+          "oneWayFee": 0,
+          "total": 2800000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 4,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 4,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-09": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-10": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-11": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": []
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": []
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-12": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-13": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 150000,
+          "total": 550000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 150000,
+          "total": 510000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 150000,
+          "total": 750000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 150000,
+          "total": 850000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 150000,
+          "total": 1150000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 150000,
+          "total": 1550000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 150000,
+          "total": 350000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 150000,
+          "total": 650000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-14": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 100000,
+          "total": 500000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 100000,
+          "total": 460000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 100000,
+          "total": 700000,
+          "excludedBy": [
+            "SEATS",
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 100000,
+          "total": 800000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 100000,
+          "total": 1100000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 100000,
+          "total": 1500000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 100000,
+          "total": 300000,
+          "excludedBy": [
+            "INACTIVE",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 100000,
+          "total": 600000,
+          "excludedBy": []
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-15": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-16": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-17": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [
+        {
+          "vehicleId": "a4",
+          "status": "CONFIRMED",
+          "pickupDate": "2027-02-11",
+          "returnDate": "2027-02-13",
+          "pickupBranchId": "dn",
+          "returnBranchId": "dn",
+          "expiresAt": null
+        }
+      ],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "OVERLAP"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-18": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [
+        {
+          "vehicleId": "a4",
+          "status": "PENDING",
+          "pickupDate": "2027-02-11",
+          "returnDate": "2027-02-13",
+          "pickupBranchId": "dn",
+          "returnBranchId": "dn",
+          "expiresAt": "2027-01-31T23:59:00Z"
+        }
+      ],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": []
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-19": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [
+        {
+          "vehicleId": "a4",
+          "status": "CONFIRMED",
+          "pickupDate": "2027-02-14",
+          "returnDate": "2027-02-16",
+          "pickupBranchId": "dn",
+          "returnBranchId": "dn",
+          "expiresAt": null
+        }
+      ],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 150000,
+          "total": 550000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 150000,
+          "total": 510000,
+          "excludedBy": []
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 150000,
+          "total": 750000,
+          "excludedBy": []
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 150000,
+          "total": 850000,
+          "excludedBy": []
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 150000,
+          "total": 1150000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 150000,
+          "total": 1550000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 150000,
+          "total": 350000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 150000,
+          "total": 650000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-20": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "m4"
+      ],
+      "bookings": [],
+      "audit": {
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": []
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-21": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE",
+            "BUDGET"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "BUDGET",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-22": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BUDGET"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-23": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4",
+        "m4",
+        "a5",
+        "m7",
+        "a7",
+        "a9",
+        "maint",
+        "ha7"
+      ],
+      "bookings": [],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "m4": {
+          "rentalDays": 2,
+          "rentalTotal": 360000,
+          "oneWayFee": 0,
+          "total": 360000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a5": {
+          "rentalDays": 2,
+          "rentalTotal": 600000,
+          "oneWayFee": 0,
+          "total": 600000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "m7": {
+          "rentalDays": 2,
+          "rentalTotal": 700000,
+          "oneWayFee": 0,
+          "total": 700000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a7": {
+          "rentalDays": 2,
+          "rentalTotal": 1000000,
+          "oneWayFee": 0,
+          "total": 1000000,
+          "excludedBy": [
+            "SEATS",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "a9": {
+          "rentalDays": 2,
+          "rentalTotal": 1400000,
+          "oneWayFee": 0,
+          "total": 1400000,
+          "excludedBy": [
+            "BRANCH_CHAIN"
+          ]
+        },
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE",
+            "BRANCH_CHAIN"
+          ]
+        },
+        "ha7": {
+          "rentalDays": 2,
+          "rentalTotal": 500000,
+          "oneWayFee": 0,
+          "total": 500000,
+          "excludedBy": [
+            "SEATS"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-24": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "maint"
+      ],
+      "bookings": [],
+      "audit": {
+        "maint": {
+          "rentalDays": 2,
+          "rentalTotal": 200000,
+          "oneWayFee": 0,
+          "total": 200000,
+          "excludedBy": [
+            "INACTIVE"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-25": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [
+        {
+          "vehicleId": "a4",
+          "status": "CONFIRMED",
+          "pickupDate": "2027-02-12",
+          "returnDate": "2027-02-13",
+          "pickupBranchId": "dn",
+          "returnBranchId": "dn",
+          "expiresAt": null
+        }
+      ],
+      "audit": {
+        "a4": {
+          "rentalDays": 2,
+          "rentalTotal": 400000,
+          "oneWayFee": 0,
+          "total": 400000,
+          "excludedBy": [
+            "OVERLAP"
+          ]
+        }
+      },
+      "invalidCause": null
+    },
+    "rec-26": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [],
+      "audit": {},
+      "invalidCause": "PASSENGERS_RANGE"
+    },
+    "rec-27": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [],
+      "audit": {},
+      "invalidCause": "BUDGET_NEGATIVE"
+    },
+    "rec-28": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [],
+      "audit": {},
+      "invalidCause": "DATE_ORDER"
+    },
+    "rec-29": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [],
+      "audit": {},
+      "invalidCause": "DUPLICATE_AMENITY"
+    },
+    "rec-30": {
+      "suite": "recommendation",
+      "vehicleIds": [
+        "a4"
+      ],
+      "bookings": [],
+      "audit": {},
+      "invalidCause": "UNKNOWN_FIELD"
+    },
+    "iti-01": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "09:10",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-02": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "10:00",
+                    "end": "12:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "10:30",
+                "waitMinutes": 80,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-03": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "12:00",
+                    "nextDay": false
+                  },
+                  {
+                    "start": "13:00",
+                    "end": "17:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "11:00",
+                "departure": "11:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "11:40",
+                "departure": "14:00",
+                "waitMinutes": 80,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-04": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {
+              "2027-02-10": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "09:00",
+                    "end": "11:00",
+                    "nextDay": false
+                  }
+                ]
+              }
+            },
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "09:30",
+                "waitMinutes": 20,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-05": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              },
+              "TUESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "22:00",
+                    "end": "02:00",
+                    "nextDay": true
+                  }
+                ]
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              },
+              "TUESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "22:00",
+                    "end": "02:00",
+                    "nextDay": true
+                  }
+                ]
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "00:30",
+                "departure": "01:00",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "01:10",
+                "departure": "01:40",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-06": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 61,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 61,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 2,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:32",
+                "departure": "09:02",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-07": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "c",
+          "name": "Điểm tổng hợp c",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0599,
+          "longitude": 108.2099,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 1200,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 300,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b",
+        "c"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b",
+              "c"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "09:10",
+                "waitMinutes": 0,
+                "travelMinutes": 20,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "c",
+                "arrival": "09:30",
+                "departure": "10:00",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-08": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "c",
+          "name": "Điểm tổng hợp c",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0599,
+          "longitude": 108.2099,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "d",
+          "name": "Điểm tổng hợp d",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.060000000000002,
+          "longitude": 108.21000000000001,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "d",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "d",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "d",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "d",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "d",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "d",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "09:10",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "c",
+                "arrival": "09:20",
+                "departure": "09:50",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "d",
+                "arrival": "10:00",
+                "departure": "10:30",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-09": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "11:00",
+                    "end": "12:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "c",
+          "name": "Điểm tổng hợp c",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0599,
+          "longitude": 108.2099,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "c"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "c",
+                "arrival": "08:40",
+                "departure": "09:10",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-10": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "c",
+          "name": "Điểm tổng hợp c",
+          "status": "INACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0599,
+          "longitude": 108.2099,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "items": [
+              {
+                "locationId": "a",
+                "arrival": "08:00",
+                "departure": "08:30",
+                "waitMinutes": 0,
+                "travelMinutes": 10,
+                "distanceMeters": 1000
+              },
+              {
+                "locationId": "b",
+                "arrival": "08:40",
+                "departure": "09:10",
+                "waitMinutes": 0,
+                "travelMinutes": null,
+                "distanceMeters": null
+              }
+            ]
+          }
+        ],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-11": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "cause": "END_TIME"
+          }
+        ],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-12": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "c",
+          "name": "Điểm tổng hợp c",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0599,
+          "longitude": 108.2099,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "a",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "c",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "c",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "cause": "END_TIME"
+          },
+          {
+            "order": [
+              "a",
+              "c"
+            ],
+            "cause": "END_TIME"
+          },
+          {
+            "order": [
+              "a",
+              "b",
+              "c"
+            ],
+            "cause": "END_TIME"
+          },
+          {
+            "order": [
+              "a",
+              "c",
+              "b"
+            ],
+            "cause": "END_TIME"
+          }
+        ],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-13": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "08:50",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "cause": "OPENING_WINDOW"
+          }
+        ],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-14": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "NO_ROUTE",
+          "durationSeconds": null,
+          "distanceMeters": null
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "cause": "NO_ROUTE"
+          }
+        ],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-15": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "22:00",
+                    "end": "02:00",
+                    "nextDay": true
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "22:00",
+                    "end": "02:00",
+                    "nextDay": true
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [
+          {
+            "order": [
+              "a",
+              "b"
+            ],
+            "cause": "DAY_BOUNDARY"
+          }
+        ],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-16": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": null
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [
+          "a.metadata"
+        ],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-17": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": null,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": null
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [
+          "a.durationMinutes"
+        ],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-18": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [
+          "minimum_two_candidates"
+        ],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-19": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": null
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [
+          "b.metadata",
+          "minimum_two_candidates"
+        ],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-20": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "UNKNOWN",
+                "intervals": []
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [
+          "b.hours",
+          "minimum_two_candidates"
+        ],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-21": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "QWEN_DISABLED",
+        "osrm": "NOT_CALLED",
+        "cause": "QWEN_DISABLED",
+        "readback": [
+          "QWEN_PARSER_ENABLED=false",
+          "zero model and route calls"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-22": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "QWEN_TIMEOUT",
+        "osrm": "NOT_CALLED",
+        "cause": "QWEN_TIMEOUT",
+        "readback": [
+          "controlled model transport timeout",
+          "no OSRM calls",
+          "permit released"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-23": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "QWEN_INVALID_IDS",
+        "osrm": "NOT_CALLED",
+        "cause": "QWEN_INVALID_IDS",
+        "readback": [
+          "model responds with ID absent from catalog",
+          "no OSRM calls",
+          "permit released"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-24": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "OSRM_UNAVAILABLE",
+        "cause": "OSRM_UNAVAILABLE",
+        "readback": [
+          "valid model sequence a,b",
+          "controlled routing transport failure",
+          "no schedule or persistence"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-25": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "QWEN_CAPACITY",
+        "osrm": "NOT_CALLED",
+        "cause": "QWEN_CAPACITY",
+        "readback": [
+          "fixture owns occupied planner permit before dispatch",
+          "HTTP 429",
+          "no extra model or OSRM call",
+          "release owned permit in finally"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-26": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-27": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-28": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-29": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    },
+    "iti-30": {
+      "suite": "itinerary",
+      "locations": [
+        {
+          "id": "a",
+          "name": "Điểm tổng hợp a",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0597,
+          "longitude": 108.2097,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        },
+        {
+          "id": "b",
+          "name": "Điểm tổng hợp b",
+          "status": "ACTIVE",
+          "categoryId": "culture",
+          "latitude": 16.0598,
+          "longitude": 108.2098,
+          "metadata": {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 30,
+            "weekly": {
+              "WEDNESDAY": {
+                "state": "INTERVALS",
+                "intervals": [
+                  {
+                    "start": "08:00",
+                    "end": "18:00",
+                    "nextDay": false
+                  }
+                ]
+              },
+              "TUESDAY": {
+                "state": "CLOSED",
+                "intervals": []
+              }
+            },
+            "exceptions": {},
+            "hoursEvidence": {
+              "url": "https://example.invalid/synthetic-hours",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            },
+            "durationEvidence": {
+              "url": "https://example.invalid/synthetic-duration",
+              "verifiedAt": "2027-01-01T00:00:00Z"
+            }
+          }
+        }
+      ],
+      "legs": [
+        {
+          "source": "a",
+          "target": "b",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        },
+        {
+          "source": "b",
+          "target": "a",
+          "status": "VERIFIED",
+          "durationSeconds": 600,
+          "distanceMeters": 1000
+        }
+      ],
+      "provider": {
+        "qwen": "VALID_SEQUENCE",
+        "osrm": "VERIFIED",
+        "cause": null,
+        "readback": [
+          "planner returns IDs from candidate pool",
+          "directed legs match fixture"
+        ]
+      },
+      "proposedOrder": [
+        "a",
+        "b"
+      ],
+      "proof": {
+        "candidateIds": [
+          "a",
+          "b"
+        ],
+        "minPoints": 2,
+        "maxPoints": 4,
+        "startFixed": "a",
+        "witnessSchedules": [],
+        "rejectedOrders": [],
+        "missingFacts": [],
+        "scope": "Only listed ACTIVE known-fact candidates; no approach/return leg; all ordered subsets of size 2..4 starting at a."
+      }
+    }
+  }
+}

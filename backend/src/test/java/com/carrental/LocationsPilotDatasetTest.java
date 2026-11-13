@@ -64,12 +64,31 @@ class LocationsPilotDatasetTest {
         assertTrue(locations.isArray());
         assertEquals(8, locations.size(), "Pilot dataset must contain exactly 8 locations");
 
-        int validMetadataCount = 0;
+        int verifiedHoursCount = 0;
         int unknownCount = 0;
+        int durationCount = 0;
+        int sourcedAddressCount = 0;
+        int unknownAddressCount = 0;
+        int activeCount = 0;
+        int inactiveCount = 0;
+        Set<String> activeNames = new HashSet<>();
+        Set<String> sourcedAddressNames = Set.of(
+            "Bảo tàng Điêu khắc Chăm Đà Nẵng",
+            "Danh thắng Ngũ Hành Sơn",
+            "Bảo tàng Đà Nẵng",
+            "Bảo tàng Mỹ thuật Đà Nẵng"
+        );
 
         for (JsonNode loc : locations) {
             String name = loc.path("name").asText();
             assertFalse(name.isBlank(), "Location name must not be blank");
+            if ("ACTIVE".equals(loc.path("status").asText())) {
+                activeNames.add(name);
+                activeCount++;
+            } else {
+                assertEquals("INACTIVE", loc.path("status").asText());
+                inactiveCount++;
+            }
             double lat = loc.path("latitude").asDouble();
             double lng = loc.path("longitude").asDouble();
             assertTrue(lat >= 15.4 && lat <= 16.7, "Latitude must be within Da Nang - Hoi An bounding box");
@@ -78,6 +97,18 @@ class LocationsPilotDatasetTest {
             JsonNode prov = loc.path("provenance");
             assertTrue(prov.hasNonNull("address"), "Provenance must have address");
             assertTrue(prov.hasNonNull("coordinatesSource"), "Provenance must have coordinatesSource");
+            if (sourcedAddressNames.contains(name)) {
+                sourcedAddressCount++;
+                assertTrue(prov.path("addressSource").asText().startsWith("https://"));
+                if ("Danh thắng Ngũ Hành Sơn".equals(name)) {
+                    assertEquals("81 Huyền Trân Công Chúa, Đà Nẵng", prov.path("address").asText());
+                }
+            } else {
+                unknownAddressCount++;
+                assertTrue(prov.path("address").asText().startsWith("UNKNOWN —"));
+                assertTrue(prov.path("coordinatesSource").asText().startsWith("UNKNOWN —"));
+                assertEquals("INACTIVE", loc.path("status").asText());
+            }
 
             JsonNode meta = loc.path("metadata");
             assertEquals("Asia/Ho_Chi_Minh", meta.path("timezone").asText());
@@ -92,18 +123,31 @@ class LocationsPilotDatasetTest {
 
             if (allUnknown) {
                 unknownCount++;
-                assertTrue(meta.path("durationMinutes").isNull());
                 assertTrue(meta.path("hoursEvidence").isNull());
             } else {
-                validMetadataCount++;
-                assertTrue(meta.path("durationMinutes").asInt() > 0);
+                verifiedHoursCount++;
                 assertTrue(meta.path("hoursEvidence").path("url").asText().startsWith("http"));
+                assertTrue(meta.path("hoursEvidence").path("verifiedAt").asText().contains("T"));
+            }
+
+            if (meta.path("durationMinutes").isNull()) {
+                assertTrue(meta.path("durationEvidence").isNull());
+            } else {
+                durationCount++;
+                assertTrue(meta.path("durationMinutes").asInt() > 0);
                 assertTrue(meta.path("durationEvidence").path("url").asText().startsWith("http"));
             }
         }
 
-        assertTrue(validMetadataCount >= 4, "Must have at least 4 locations with full verified visit facts");
-        assertTrue(unknownCount >= 2, "Must have locations deliberately left UNKNOWN without inventing facts");
+        assertEquals(2, verifiedHoursCount, "Only source-backed weekly schedules should be retained");
+        assertEquals(6, unknownCount, "Unverified schedules must remain UNKNOWN");
+        assertEquals(1, durationCount, "Only the sourced Cham Museum estimate should remain");
+        assertEquals(4, sourcedAddressCount);
+        assertEquals(4, unknownAddressCount);
+        assertEquals(1, activeCount);
+        assertEquals(7, inactiveCount);
+        assertEquals(Set.of("Bảo tàng Mỹ thuật Đà Nẵng"), activeNames);
+        assertTrue(root.path("catalogNote").asText().contains("Seven locations are INACTIVE."));
     }
 
     @Test
@@ -164,7 +208,14 @@ class LocationsPilotDatasetTest {
             .andReturn();
         assertEquals(200, publicCatalog.getResponse().getStatus());
         JsonNode catalogList = json.readTree(publicCatalog.getResponse().getContentAsString());
-        assertTrue(catalogList.size() >= 8, "Public catalog must return created locations");
+        Set<String> publicNames = new HashSet<>();
+        catalogList.forEach(location -> publicNames.add(location.path("name").asText()));
+        assertTrue(publicNames.contains("Bảo tàng Mỹ thuật Đà Nẵng"));
+        for (JsonNode location : locations) {
+            if ("INACTIVE".equals(location.path("status").asText())) {
+                assertFalse(publicNames.contains(location.path("name").asText()));
+            }
+        }
 
         // 3. Second Pass: Idempotency check via existing list
         MvcResult adminList = mvc.perform(MockMvcRequestBuilders.get("/api/v1/admin/locations")

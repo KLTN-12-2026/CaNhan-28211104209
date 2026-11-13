@@ -1,0 +1,503 @@
+{
+  "schemaVersion": "kdrive-ai-eval-v1",
+  "datasetVersion": "scenarios-v1-draft-2",
+  "reviewState": "DRAFT",
+  "datasets": [
+    {
+      "path": "recommendation.jsonl",
+      "sha256": "7ccbe797d159a8cc7eacc5ec2e663f1585ebf8fe97446f93a86f2fb65452db6c",
+      "suite": "recommendation",
+      "split": "dev",
+      "count": 30
+    },
+    {
+      "path": "itinerary.jsonl",
+      "sha256": "ed30ea7520fef5ce0d3127699e0b4636805f0a3350d06950b3b9293989bd955d",
+      "suite": "itinerary",
+      "split": "dev",
+      "count": 30
+    }
+  ],
+  "profiles": {
+    "rec-01": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-02": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-03": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-04": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-05": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-06": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-07": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-08": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-09": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-10": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-11": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-12": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-13": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-14": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-15": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-16": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-17": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-18": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-19": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-20": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-21": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-22": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-23": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-24": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-25": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-26": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-27": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-28": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-29": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "rec-30": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-01": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-02": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-03": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-04": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-05": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-06": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-07": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-08": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-09": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-10": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-11": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-12": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-13": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-14": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-15": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-16": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-17": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-18": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-19": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-20": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-21": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "adverse"
+    },
+    "iti-22": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "adverse"
+    },
+    "iti-23": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "adverse"
+    },
+    "iti-24": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "adverse"
+    },
+    "iti-25": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "adverse"
+    },
+    "iti-26": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-27": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-28": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-29": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    },
+    "iti-30": {
+      "clockInstant": "2027-02-01T00:00:00Z",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "bindings": {},
+      "factsPath": "facts.json",
+      "factsSha256": "4733133bc4db90f0199d110d799f9faccbf525f465ada6d0f580eba0571344cf",
+      "providerMode": "synthetic"
+    }
+  }
+}
