@@ -7,7 +7,6 @@ import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
 import java.text.Normalizer;
 import java.util.*;
-import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -52,12 +51,23 @@ public class CriteriaExtractionService {
         var extracted=engine.parse(text,deadline,names);
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
-        String pickup=resolve(extracted.pickupBranchName(),candidates),destination=resolve(extracted.returnBranchName(),candidates);
+        var stated=StatedCriteria.from(text,names);
+        String pickup=resolve(stated.getOrDefault(StatedCriteria.PICKUP,extracted.pickupBranchName()),candidates);
+        String destination=resolve(stated.getOrDefault(StatedCriteria.RETURN,extracted.returnBranchName()),candidates);
         String start=explicitDate(extracted.pickupDate(),text),end=explicitDate(extracted.returnDate(),text);
         var missing=new LinkedHashSet<>(extracted.unresolvedFields());missing.remove("transmission");
+        if(stated.containsKey(StatedCriteria.PICKUP)&&pickup!=null)missing.remove(StatedCriteria.PICKUP);
+        if(stated.containsKey(StatedCriteria.RETURN)&&destination!=null)missing.remove(StatedCriteria.RETURN);
+        if(pickup!=null&&pickup.equals(destination)&&names.size()==1&&StatedCriteria.confirmsPair(text,names.get(0))){
+            missing.remove(StatedCriteria.PICKUP);
+            missing.remove(StatedCriteria.RETURN);
+        }
+        if(missing.contains(StatedCriteria.PICKUP))pickup=null;
+        if(missing.contains(StatedCriteria.RETURN))destination=null;
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
         if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
-        if(extracted.passengers()==null)missing.add("passengers");
+        Integer passengers=stated.containsKey(StatedCriteria.PEOPLE)?null:extracted.passengers();
+        if(passengers==null)missing.add("passengers");
         var statedBudget=ExplicitBudget.fromText(text);
         Long budget=statedBudget.fixed()?statedBudget.value():extracted.budgetVndTotal();
         if(statedBudget.fixed() && budget!=null)missing.remove("budgetVndTotal");
@@ -65,7 +75,7 @@ public class CriteriaExtractionService {
         var transmission=TransmissionPreference.fromText(text);
         if(transmission.ambiguous())missing.add("transmission");
         return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
-            new Draft(start,end,pickup,destination,extracted.passengers(),budget,transmission.value()),List.copyOf(missing));
+            new Draft(start,end,pickup,destination,passengers,budget,transmission.value()),List.copyOf(missing));
     }
     private static String explicitDate(String date,String text){
         if(date==null)return null;
@@ -80,19 +90,8 @@ public class CriteriaExtractionService {
         return matches.size()==1?matches.get(0).id():null;
     }
     private static List<RentalBranchCatalog.Item> mentionedBranches(String text,List<RentalBranchCatalog.Item> active){
-        String words=branchWords(text);
-        return active.stream().filter(branch -> {
-            String name=branchWords(branch.name()).replaceFirst("^kdrive\\s*","").strip();
-            if(name.isEmpty())return false;
-            String literal=Arrays.stream(name.split(" ")).map(Pattern::quote)
-                .collect(java.util.stream.Collectors.joining("\\s*"));
-            return Pattern.compile("(?<![a-z0-9])(?:nhantra|nhan|tra)?(?:kdrive\\s*)?"+literal+"(?![a-z0-9])")
-                .matcher(words).find();
-        }).toList();
-    }
-    private static String branchWords(String text){
-        return Normalizer.normalize(text,Normalizer.Form.NFD).replaceAll("\\p{M}","")
-            .toLowerCase(Locale.ROOT).replace('đ','d').replaceAll("[^a-z0-9]+"," ").strip();
+        String words=StatedCriteria.words(text);
+        return active.stream().filter(branch -> StatedCriteria.mentioned(words,branch.name())).toList();
     }
     private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
 }

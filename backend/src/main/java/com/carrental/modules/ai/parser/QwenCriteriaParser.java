@@ -137,6 +137,13 @@ public class QwenCriteriaParser implements CriteriaParser {
             for(String name:List.of("passengers","budgetVndTotal"))properties.put(name,Map.of("type",List.of("integer","null")));
             var unresolvedKeys=new ArrayList<>(ExtractionValidation.DRAFT_FIELDS);
             if(branchNames!=null){
+                for(var field:StatedCriteria.from(text,branchNames).entrySet()){
+                    if(field.getValue()==null)properties.put(field.getKey(),Map.of("type","null"));
+                    else{
+                        properties.put(field.getKey(),Map.of("type","string","enum",List.of(field.getValue())));
+                        unresolvedKeys.remove(field.getKey());
+                    }
+                }
                 var budget=ExplicitBudget.fromText(text);
                 if(budget.fixed()){
                     properties.put("budgetVndTotal",Map.of("type",List.of("integer","null"),"enum",Collections.singletonList(budget.value())));

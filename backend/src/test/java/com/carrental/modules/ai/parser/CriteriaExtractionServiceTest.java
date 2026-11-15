@@ -27,6 +27,69 @@ class CriteriaExtractionServiceTest {
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("a","KDrive Đà Nẵng"),new RentalBranchCatalog.Item("b","Đà Nẵng")));
         var result=service(true).extract(user,"20/10 đến24/10");assertEquals("NEEDS_CLARIFICATION",result.status());assertNull(result.draft().pickupDate());assertNull(result.draft().pickupBranchId());assertNull(result.draft().returnBranchId());
     }
+    @Test void keepOnlyTheUnknownRoleAndUndecidedPartySizeUnresolved(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("b","KDrive Biển")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(new CriteriaParser.Extraction("NEEDS_CLARIFICATION","2027-03-01","2027-03-03",
+                "KDrive Biển","KDrive Biển",3,3_000_000L,null,List.of("pickupBranchName"),List.of()));
+        var result=service(true).extract(user,"Nhận KDrive Biển 01/03/2027, trả KDrive Núi 03/03/2027; đi 3 hoặc 5 người, tổng 3 triệu.");
+        assertEquals("NEEDS_CLARIFICATION",result.status());
+        assertEquals("b",result.draft().pickupBranchId());
+        assertNull(result.draft().returnBranchId());
+        assertNull(result.draft().passengers());
+        assertEquals(java.util.Set.of("returnBranchName","passengers"),java.util.Set.copyOf(result.unresolvedFields()));
+    }
+    @Test void explicitSharedBranchClearsStaleUncertaintyButDuplicateNamesCannotResolve(){
+        var unique=new RentalBranchCatalog.Item("b","KDrive Biển");
+        when(branches.active()).thenReturn(List.of(unique),List.of(unique,new RentalBranchCatalog.Item("b2","Biển")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(new CriteriaParser.Extraction("NEEDS_CLARIFICATION","2027-03-01","2027-03-03",
+                null,null,4,3_000_000L,null,List.of("pickupBranchName","returnBranchName"),List.of()));
+        var service=service(true);
+        String text="KDrive Biển hai đầu từ 01/03/2027 tới 03/03/2027, 4 người, tổng 3 triệu.";
+        var resolved=service.extract(user,text);
+        assertEquals("READY_FOR_REVIEW",resolved.status());
+        assertEquals("b",resolved.draft().pickupBranchId());
+        assertEquals("b",resolved.draft().returnBranchId());
+        var duplicate=service.extract(user,text);
+        assertEquals("NEEDS_CLARIFICATION",duplicate.status());
+        assertNull(duplicate.draft().pickupBranchId());
+        assertNull(duplicate.draft().returnBranchId());
+    }
+    @Test void explicitUncertaintyWinsOverGuessesEvenWhenAlternativesContainAComma(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("b","KDrive Biển"),new RentalBranchCatalog.Item("c","KDrive Cảng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(extraction("2027-03-01","2027-03-03","KDrive Biển","KDrive Cảng"));
+        var service=service(true);
+        String trip=" Trả tại KDrive Cảng 03/03/2027; ngày nhận 01/03/2027; tổng 3 triệu.";
+        var undecided=service.extract(user,"Nhận KDrive Biển, hoặc KDrive Cảng, chưa chọn; ba hoặc năm người."+trip);
+        assertEquals("NEEDS_CLARIFICATION",undecided.status());
+        assertNull(undecided.draft().pickupBranchId());
+        assertEquals("c",undecided.draft().returnBranchId());
+        assertNull(undecided.draft().passengers());
+        assertEquals(java.util.Set.of("pickupBranchName","passengers"),java.util.Set.copyOf(undecided.unresolvedFields()));
+        var unset=service.extract(user,"Điểm nhận chưa chọn. 4 người."+trip);
+        assertEquals(List.of("pickupBranchName"),unset.unresolvedFields());
+        assertNull(unset.draft().pickupBranchId());
+        assertEquals("c",unset.draft().returnBranchId());
+    }
+    @Test void trailingSharedNameConfirmsRolesButCannotInventYearsOrFillAMissingRole(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("b","KDrive Biển")));
+        var complete=new CriteriaParser.Extraction("NEEDS_CLARIFICATION",null,null,"KDrive Biển","KDrive Biển",
+            4,3_000_000L,null,List.of("returnBranchName"),List.of());
+        var absent=new CriteriaParser.Extraction("NEEDS_CLARIFICATION",null,null,null,"KDrive Biển",
+            4,3_000_000L,null,List.of("pickupBranchName"),List.of());
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(complete,absent);
+        String text="Nhận 04/03, trả 07/03, KDrive Biển; 4 người, tổng 3 triệu.";
+        var service=service(true);
+        var known=service.extract(user,text);
+        assertEquals("b",known.draft().pickupBranchId());
+        assertEquals("b",known.draft().returnBranchId());
+        assertEquals(java.util.Set.of("pickupDate","returnDate"),java.util.Set.copyOf(known.unresolvedFields()));
+        var unspecified=service.extract(user,text);
+        assertNull(unspecified.draft().pickupBranchId());
+        assertTrue(unspecified.unresolvedFields().contains("pickupBranchName"));
+    }
     @Test void branchNamesMustBeMentionedAndUniqueBeforeBinding(){
         var active=List.of(new RentalBranchCatalog.Item("dn","Đà Nẵng · mẫu"),
             new RentalBranchCatalog.Item("hn","Hà Nội · mẫu"), new RentalBranchCatalog.Item("h","Huế"));

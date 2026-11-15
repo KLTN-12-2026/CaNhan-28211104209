@@ -1,5 +1,7 @@
 # Trợ lý KDrive — chatbox gợi ý xe
 
+Khách có thể chỉ rõ hai vai trò, ví dụ “nhận tại A, trả tại B”, hoặc nói rõ cùng một chi nhánh cho cả hai đầu. Nếu một điểm chưa chọn, không hoạt động, trùng tên hoặc còn nhiều lựa chọn, draft giữ điểm đã xác định và hỏi lại điểm còn thiếu. Hai số người chưa chọn cũng cần được làm rõ trước khi gửi gợi ý.
+
 Khách có thể ghi “số tay”, “hộp số AUTO” hoặc cho biết cả hai đều được. Với ngân sách, trợ lý dùng tổng tiền thuê mà khách nêu rõ, chẳng hạn “bốn triệu rưỡi đồng cho cả chuyến”. Nếu khách chỉ nêu giá theo ngày hoặc đưa ra hai mức tiền chưa chọn, biểu mẫu yêu cầu bổ sung tổng tiền.
 
 Khi đọc nhu cầu, backend lấy các tên chi nhánh đang hoạt động được nhắc trong câu và giới hạn hai trường nhận/trả của model vào các tên đó hoặc giá trị trống. Tên không xác định hoặc trùng nhiều chi nhánh cần được khách làm rõ. Khách có thể ghi “hộp số AUTO” để nêu lựa chọn số tự động.

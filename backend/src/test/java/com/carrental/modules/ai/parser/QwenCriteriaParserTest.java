@@ -55,7 +55,7 @@ class QwenCriteriaParserTest {
         p.parse("nhận tại Đà Nẵng",AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION),List.of("Đà Nẵng"));
         var schema=json.readTree(requestBody).at("/format/oneOf/1/properties/extraction/properties");
         var expected=json.readTree("[\"Đà Nẵng\",null]");
-        assertEquals(expected,schema.at("/pickupBranchName/enum"));
+        assertEquals(json.readTree("[\"Đà Nẵng\"]"),schema.at("/pickupBranchName/enum"));
         assertEquals(expected,schema.at("/returnBranchName/enum"));
         assertEquals(json.readTree("[null]"),schema.at("/transmission/enum"));
     }
