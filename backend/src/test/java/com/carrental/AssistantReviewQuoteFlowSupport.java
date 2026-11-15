@@ -118,6 +118,18 @@ final class AssistantReviewQuoteFlowSupport {
 
     List<Map<String, Object>> vehicles() { return jdbc.queryForList("select * from vehicles order by id"); }
 
+    /** Business rows that the request chain under test must leave untouched. Capture before the HTTP parse. */
+    record Baseline(Map<String, List<Map<String, Object>>> records, List<Map<String, Object>> vehicles) {}
+
+    Baseline baseline() { return new Baseline(records(), vehicles()); }
+
+    void assertUnchangedSince(Baseline baseline) {
+        var now = records();
+        for (String table : RECORD_TABLES)
+            assertEquals(baseline.records().get(table), now.get(table), table + " changed during the request chain");
+        assertEquals(baseline.vehicles(), vehicles(), "vehicles changed during the request chain");
+    }
+
     static void assertFullDraft(JsonNode body) {
         assertEquals("READY_FOR_REVIEW", body.path("status").asText(), body::toString);
         JsonNode draft = body.path("draft");
@@ -145,11 +157,10 @@ final class AssistantReviewQuoteFlowSupport {
     /**
      * The decisive chain. The parsed draft is dn→dn, 4 people, 3,000,000 VND. The renter changes the
      * return branch to hn and the budget to 4,100,000; the edited values, not the draft, must drive
-     * the recommendation and the quote. Returns the edited criteria.
+     * the recommendation and the quote. {@code beforeParse} must be captured before the HTTP parse so
+     * the final readback covers the parse itself. Returns the edited criteria.
      */
-    Map<String, Object> reviewEditRecommendViewQuote(JsonNode parsed) {
-        var before = records();
-        var vehiclesBefore = vehicles();
+    Map<String, Object> reviewEditRecommendViewQuote(Baseline beforeParse, JsonNode parsed) {
         Map<String, Object> draftCriteria = criteriaFromDraft(parsed.path("draft"));
 
         var unedited = recommend("demo-user", draftCriteria);
@@ -197,14 +208,12 @@ final class AssistantReviewQuoteFlowSupport {
         assertEquals(top.path("rentalTotal").asLong(), quote.getBody().path("rentalTotal").asLong());
 
         assertEquals(401, quote(null, vehicleId, edited).getStatusCode().value());
-        assertEquals(before, records(), "Parse, recommendation, vehicle view and quote must not create records");
-        assertEquals(vehiclesBefore, vehicles(), "The flow must not lock or alter vehicles");
+        assertUnchangedSince(beforeParse);
         return edited;
     }
 
     /** NEEDS_CLARIFICATION draft sent as-is is not searched; once the renter fills the date it is. */
-    void clarifyThenComplete(JsonNode parsed) {
-        var before = records();
+    void clarifyThenComplete(Baseline beforeParse, JsonNode parsed) {
         Map<String, Object> criteria = criteriaFromDraft(parsed.path("draft"));
         assertFalse(criteria.containsKey("returnDate"));
         var incomplete = recommend("demo-user", criteria);
@@ -217,7 +226,7 @@ final class AssistantReviewQuoteFlowSupport {
         var complete = recommend("demo-user", criteria);
         assertEquals("OK", complete.getBody().path("status").asText(), complete.getBody()::toString);
         assertEquals("2026-10-26", complete.getBody().path("criteria").path("returnDate").asText());
-        assertEquals(before, records());
+        assertUnchangedSince(beforeParse);
     }
 
     String toJson(Object value) {

@@ -46,6 +46,8 @@ class AssistantReviewQuoteFlowHttpTest {
     static final Map<String, String> SCRIPT = new HashMap<>();
     static final List<String> PROVIDER_REQUESTS = new CopyOnWriteArrayList<>();
     static HttpServer stub;
+    /** Test-only hook executed inside the provider call, i.e. while the HTTP parse request is in flight. */
+    static volatile Runnable duringParse;
 
     static String rental(String pickupDate, String returnDate, Integer passengers, List<String> unresolved) {
         String r = returnDate == null ? "null" : "\"" + returnDate + "\"";
@@ -71,6 +73,8 @@ class AssistantReviewQuoteFlowHttpTest {
             stub.createContext("/api/chat", exchange -> {
                 String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 PROVIDER_REQUESTS.add(request);
+                var hook = duringParse;
+                if (hook != null) hook.run();
                 var body = mapper.readTree(request);
                 String text = body.path("messages").get(1).path("content").asText();
                 String content = SCRIPT.get(text);
@@ -102,14 +106,17 @@ class AssistantReviewQuoteFlowHttpTest {
         flow = new AssistantReviewQuoteFlowSupport(http, jdbc, tokens, accounts);
         flow.resetFixture(licenses, user);
         PROVIDER_REQUESTS.clear();
+        duringParse = null;
     }
+    @AfterEach void clearHook() { duringParse = null; }
 
     @Test void editedCriteriaDriveRecommendationVehicleViewAndQuoteWithoutRecords() {
+        var beforeParse = flow.baseline();
         var parsed = flow.parse("demo-user", FULL_TEXT);
         assertEquals(200, parsed.getStatusCode().value());
         assertFullDraft(parsed.getBody());
         assertEquals(1, PROVIDER_REQUESTS.size());
-        flow.reviewEditRecommendViewQuote(parsed.getBody());
+        flow.reviewEditRecommendViewQuote(beforeParse, parsed.getBody());
         assertEquals(1, PROVIDER_REQUESTS.size(), "Recommendation and quote must not call the model again");
         String sent = PROVIDER_REQUESTS.get(0);
         for (String forbidden : List.of("demo-user", "Bearer", "FLOW-123", "Flow fixture"))
@@ -117,14 +124,48 @@ class AssistantReviewQuoteFlowHttpTest {
     }
 
     @Test void clarificationDraftIsNotSearchedUntilRenterCompletesIt() {
+        var beforeParse = flow.baseline();
         var parsed = flow.parse("demo-user", MISSING_RETURN_TEXT);
         assertEquals(200, parsed.getStatusCode().value());
         assertMissingReturnDraft(parsed.getBody());
-        flow.clarifyThenComplete(parsed.getBody());
+        assertEquals(1, PROVIDER_REQUESTS.size());
+        flow.clarifyThenComplete(beforeParse, parsed.getBody());
+        assertEquals(1, PROVIDER_REQUESTS.size(), "Completing the draft must not call the model again");
+    }
+
+    /**
+     * Sensitivity of the no-mutation readback (G5-M3-R1): a write made while the successful parse
+     * request is in flight must fail the comparison against the pre-parse baseline, for vehicles and
+     * for bookings. A baseline taken after parse (the earlier ordering) does not see it.
+     */
+    @Test void noMutationReadbackDetectsWritesMadeDuringSuccessfulParse() {
+        var beforeVehicleProbe = flow.baseline();
+        duringParse = () -> jdbc.update("update vehicles set daily_price=daily_price+1 where id='v1'");
+        var parsed = flow.parse("demo-user", FULL_TEXT);
+        duringParse = null;
+        assertFullDraft(parsed.getBody());
+        var afterParse = flow.baseline();
+        var vehicleMiss = assertThrows(org.opentest4j.AssertionFailedError.class, () -> flow.assertUnchangedSince(beforeVehicleProbe));
+        assertTrue(vehicleMiss.getMessage().contains("vehicles changed"), vehicleMiss::getMessage);
+        flow.assertUnchangedSince(afterParse); // a post-parse baseline is blind to the parse-time write
+        jdbc.update("update vehicles set daily_price=650000 where id='v1'");
+
+        var pickup = LocalDate.parse("2026-10-22");
+        var returns = LocalDate.parse("2026-10-26");
+        long total = bookings.quote(user, new BookingService.Input("v2", "hn", "hn", null, null, null, pickup, returns)).total();
+        var beforeBookingProbe = flow.baseline();
+        duringParse = () -> bookings.create(user, new BookingService.Input("v2", "hn", "hn", null, null, total, pickup, returns));
+        parsed = flow.parse("demo-user", FULL_TEXT);
+        duringParse = null;
+        assertFullDraft(parsed.getBody());
+        var bookingMiss = assertThrows(org.opentest4j.AssertionFailedError.class, () -> flow.assertUnchangedSince(beforeBookingProbe));
+        assertTrue(bookingMiss.getMessage().contains("bookings changed"), bookingMiss::getMessage);
+        assertEquals(1, jdbc.queryForObject("select count(*) from bookings", Integer.class));
+        assertEquals(2, PROVIDER_REQUESTS.size());
     }
 
     @Test void parseRolesPrivacyOutOfScopeAndConflictNeverYieldADraft() {
-        var before = flow.records();
+        var before = flow.baseline();
         assertEquals(401, flow.parse(null, FULL_TEXT).getStatusCode().value());
         assertEquals(403, flow.parse("demo-staff-dn", FULL_TEXT).getStatusCode().value());
         assertEquals(403, flow.parse("demo-admin", FULL_TEXT).getStatusCode().value());
@@ -141,10 +182,11 @@ class AssistantReviewQuoteFlowHttpTest {
         assertEquals(List.of("conflicts"), List.of(conflict.path("unresolvedFields").get(0).asText()));
         var broken = flow.parse("demo-user", "Câu không có trong kịch bản; provider trả 500.");
         assertEquals(503, broken.getStatusCode().value(), "Provider failure must not become an invented draft");
-        assertEquals(before, flow.records());
+        flow.assertUnchangedSince(before);
     }
 
     @Test void quoteAfterEditedRecommendationUsesCurrentPrice() {
+        var beforeParse = flow.baseline();
         var parsed = flow.parse("demo-user", FULL_TEXT).getBody();
         assertFullDraft(parsed);
         var edited = flow.criteriaFromDraft(parsed.path("draft"));
@@ -152,32 +194,38 @@ class AssistantReviewQuoteFlowHttpTest {
         edited.put("budgetVndTotal", 4_100_000L);
         var top = flow.recommend("demo-user", edited).getBody().path("results").get(0);
         String vehicleId = top.path("vehicleId").asText();
+        flow.assertUnchangedSince(beforeParse); // parse + recommendation wrote nothing
         long original = jdbc.queryForObject("select daily_price from vehicles where id=?", Long.class, vehicleId);
+        // Deliberate fixture mutation (not caused by the request under test): the price changes after recommendation.
         jdbc.update("update vehicles set daily_price=? where id=?", original + 50_000, vehicleId);
-        var before = flow.records();
+        var afterFixtureMutation = flow.baseline();
         var quote = flow.quote("demo-user", vehicleId, edited);
         assertEquals(200, quote.getStatusCode().value());
         assertEquals(original + 50_000, quote.getBody().path("dailyPrice").asLong());
         assertEquals((original + 50_000) * 4 + ONE_WAY_FEE, quote.getBody().path("total").asLong());
         assertNotEquals(top.path("total").asLong(), quote.getBody().path("total").asLong());
-        assertEquals(before, flow.records());
+        flow.assertUnchangedSince(afterFixtureMutation);
     }
 
     @Test void quoteAfterEditedRecommendationRejectsNewScheduleConflict() {
+        var beforeParse = flow.baseline();
         var parsed = flow.parse("demo-user", FULL_TEXT).getBody();
+        assertFullDraft(parsed);
         var edited = flow.criteriaFromDraft(parsed.path("draft"));
         edited.put("returnBranchId", "hn");
         edited.put("budgetVndTotal", 4_100_000L);
         var top = flow.recommend("demo-user", edited).getBody().path("results").get(0);
         String vehicleId = top.path("vehicleId").asText();
+        flow.assertUnchangedSince(beforeParse); // parse + recommendation wrote nothing
         var pickup = LocalDate.parse("2026-10-22");
         var returns = LocalDate.parse("2026-10-26");
+        // Deliberate fixture mutation (not caused by the request under test): another rental takes the slot.
         long fresh = bookings.quote(user, new BookingService.Input(vehicleId, "dn", "dn", null, null, null, pickup, returns)).total();
         assertNotNull(bookings.create(user, new BookingService.Input(vehicleId, "dn", "dn", null, null, fresh, pickup, returns)).id());
-        var before = flow.records();
+        var afterFixtureMutation = flow.baseline();
         var quote = flow.quote("demo-user", vehicleId, edited);
         assertEquals(409, quote.getStatusCode().value());
         assertTrue(quote.getBody().toString().contains("Xe đã có đơn trùng khoảng thuê."));
-        assertEquals(before, flow.records());
+        flow.assertUnchangedSince(afterFixtureMutation);
     }
 }

@@ -56,23 +56,25 @@ class AssistantReviewQuoteLiveIT {
     }
 
     @Test void a_liveDraftEditedByRenterDrivesRecommendationVehicleAndQuote() {
+        var beforeParse = flow.baseline();
         long started = System.nanoTime();
         var parsed = flow.parse("demo-user", FULL_TEXT);
         long elapsedMs = (System.nanoTime() - started) / 1_000_000;
         System.out.println("LIVE_PARSE case=full status=" + parsed.getStatusCode().value() + " elapsedMs=" + elapsedMs + " body=" + parsed.getBody());
         assertEquals(200, parsed.getStatusCode().value());
         assertFullDraft(parsed.getBody());
-        var edited = flow.reviewEditRecommendViewQuote(parsed.getBody());
+        var edited = flow.reviewEditRecommendViewQuote(beforeParse, parsed.getBody());
         System.out.println("LIVE_FLOW case=full editedCriteria=" + flow.toJson(edited) + " result=PASS");
     }
 
     @Test void b_liveMissingReturnDateIsNotFilledAndStillRequiresRenter() {
+        var beforeParse = flow.baseline();
         long started = System.nanoTime();
         var parsed = flow.parse("demo-user", MISSING_RETURN_TEXT);
         long elapsedMs = (System.nanoTime() - started) / 1_000_000;
         System.out.println("LIVE_PARSE case=missing-return status=" + parsed.getStatusCode().value() + " elapsedMs=" + elapsedMs + " body=" + parsed.getBody());
         assertEquals(200, parsed.getStatusCode().value());
         assertMissingReturnDraft(parsed.getBody());
-        flow.clarifyThenComplete(parsed.getBody());
+        flow.clarifyThenComplete(beforeParse, parsed.getBody());
     }
 }
