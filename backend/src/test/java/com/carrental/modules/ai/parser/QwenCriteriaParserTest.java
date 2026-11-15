@@ -42,6 +42,9 @@ class QwenCriteriaParserTest {
         assertEquals(1,calls.get());assertNull(requestKey);
         assertEquals(AiDiagnostics.Cause.SUCCESS,diagnostics.snapshot().get(0).cause());
         var body=json.readTree(requestBody);assertFalse(body.has("tools"));assertFalse(body.path("think").asBoolean());assertFalse(body.path("stream").asBoolean());assertEquals("qwen3:8b",body.path("model").asText());assertTrue(body.path("format").isObject());
+        var unresolved=body.at("/format/properties/unresolvedFields");
+        assertEquals(7,unresolved.path("maxItems").intValue());
+        assertEquals(json.readTree("[\"pickupDate\",\"returnDate\",\"pickupBranchName\",\"returnBranchName\",\"passengers\",\"budgetVndTotal\",\"transmission\"]"),unresolved.at("/items/enum"));
     }
     @Test void invalidInputDoesNotCallProvider()throws Exception{
         var p=parser(200,envelope(valid()),Duration.ofSeconds(2));for(String text:Arrays.asList(null," ","x".repeat(1001)))assertEquals(400,assertThrows(DomainException.class,()->p.parse(text)).status.value());assertEquals(0,calls.get());

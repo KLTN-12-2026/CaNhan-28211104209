@@ -6,7 +6,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 final class ExtractionValidation {
-    private static final Set<String> FIELDS=Set.of("pickupDate","returnDate","pickupBranchName","returnBranchName","passengers","budgetVndTotal","transmission");
+    static final List<String> DRAFT_FIELDS=List.of("pickupDate","returnDate","pickupBranchName","returnBranchName","passengers","budgetVndTotal","transmission");
     static void validate(CriteriaParser.Extraction x){
         if(invalidField(x)!=SchemaField.NONE)throw unavailable();
     }
@@ -14,7 +14,7 @@ final class ExtractionValidation {
         if(x==null)return SchemaField.EXTRACTION;
         if(x.intent()==null||!Set.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION","OUT_OF_SCOPE").contains(x.intent()))return SchemaField.INTENT;
         if(x.unresolvedFields()==null||x.unresolvedFields().size()>7
-                ||x.unresolvedFields().stream().anyMatch(f->f==null||!FIELDS.contains(f)))return SchemaField.UNRESOLVED_FIELDS;
+                ||x.unresolvedFields().stream().anyMatch(f->f==null||!DRAFT_FIELDS.contains(f)))return SchemaField.UNRESOLVED_FIELDS;
         if(x.conflicts()==null||x.conflicts().size()>7
                 ||x.conflicts().stream().anyMatch(f->f==null||f.isBlank()||f.length()>160))return SchemaField.CONFLICTS;
         if(x.passengers()!=null&&(x.passengers()<2||x.passengers()>9))return SchemaField.PASSENGERS;
