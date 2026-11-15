@@ -85,8 +85,10 @@ class AiLiveSmokeIT {
     void runsOneParserAndOnePlannerRequestAgainstLiveQwenSequentially() throws Exception {
         Path repo = Path.of("..").toAbsolutePath().normalize();
         Path output = Path.of(System.getProperty(OUTPUT_PROPERTY, "")).toAbsolutePath().normalize();
-        Path evidenceRoot = repo.resolve(".runtime/coordination-ai-g4-smoke-copilot-20261103-01/evidence");
+        Path evidenceRoot = repo.resolve(System.getProperty("ai.eval.evidenceRoot",
+            ".runtime/coordination-ai-g4-smoke-copilot-20261103-01/evidence")).toAbsolutePath().normalize();
         Path preflightPath = Path.of(System.getProperty(PREFLIGHT_PROPERTY, "")).toAbsolutePath().normalize();
+        boolean parserOnly = Boolean.getBoolean("ai.eval.parserOnly");
         assertEquals("true", System.getProperty("ai.eval.liveSmoke"), "Explicit one-off live smoke opt-in required.");
         assertTrue(output.startsWith(evidenceRoot), "Evidence must stay within this smoke task.");
         assertTrue(preflightPath.startsWith(evidenceRoot), "Runtime preflight must stay within this smoke task.");
@@ -96,8 +98,8 @@ class AiLiveSmokeIT {
         var fixtureSteps = new ArrayList<Map<String, Object>>();
         var attempts = new ArrayList<Map<String, Object>>();
         var run = new LinkedHashMap<String, Object>();
-        run.put("caseCountPlanned", 2);
-        run.put("caseIdsInOrder", List.of(PARSER_CASE, PLANNER_CASE));
+        run.put("caseCountPlanned", parserOnly ? 1 : 2);
+        run.put("caseIdsInOrder", parserOnly ? List.of(PARSER_CASE) : List.of(PARSER_CASE, PLANNER_CASE));
         run.put("plannedAttemptsPerCase", 1);
         run.put("backendProcessPid", ProcessHandle.current().pid());
         run.put("backendPort", port);
@@ -109,18 +111,18 @@ class AiLiveSmokeIT {
         run.put("settings", Map.of(
             "model", "qwen3:8b",
             "parserEnabled", true,
-            "plannerEnabled", true,
-            "plannerRouteDependency", "synthetic OSRM stub; conclusions limited to Qwen/backend itinerary contract",
+            "plannerEnabled", !parserOnly,
+            "plannerRouteDependency", parserOnly ? "not exercised" : "synthetic OSRM stub; conclusions limited to Qwen/backend itinerary contract",
             "qwenOptionsFromProductionSource", Map.of("num_ctx", 4096, "num_predict", 512, "temperature", 0.1)
         ));
+        var plannedCases = new ArrayList<Map<String, Object>>();
+        plannedCases.add(Map.of("caseId", PARSER_CASE, "endpoint", "/api/v1/ai/criteria/parse", "attempts", 1,
+            "expectedStatus", "READY_FOR_REVIEW"));
+        if (!parserOnly) plannedCases.add(Map.of("caseId", PLANNER_CASE, "endpoint", "/api/v1/ai/itineraries/preview", "attempts", 1,
+            "expectedStatus", "VALIDATED", "routeDependency", "synthetic OSRM stub"));
         writeJsonNew(output.resolve("planned-cases.json"), Map.of(
-            "caseCountPlanned", 2,
-            "casesInExecutionOrder", List.of(
-                Map.of("caseId", PARSER_CASE, "endpoint", "/api/v1/ai/criteria/parse", "attempts", 1,
-                    "expectedStatus", "READY_FOR_REVIEW"),
-                Map.of("caseId", PLANNER_CASE, "endpoint", "/api/v1/ai/itineraries/preview", "attempts", 1,
-                    "expectedStatus", "VALIDATED", "routeDependency", "synthetic OSRM stub")
-            )
+            "caseCountPlanned", plannedCases.size(),
+            "casesInExecutionOrder", plannedCases
         ));
         boolean noMutation = false;
         try {
@@ -128,7 +130,7 @@ class AiLiveSmokeIT {
             String modelDigest = preflight.path("targetTag").path("digest").asText();
             assertEquals(preflight.path("manifestSha256").asText(), modelDigest,
                 "The local model manifest and Ollama tag must match before inference.");
-            assertEquals("0.34.2", preflight.path("responses").path("/api/version")
+            assertEquals(System.getProperty("ai.eval.expectedOllamaVersion", "0.34.2"), preflight.path("responses").path("/api/version")
                 .path("payload").path("version").asText());
             for (JsonNode blob : preflight.path("blobReadback")) {
                 assertTrue(blob.path("exists").asBoolean());
@@ -171,14 +173,15 @@ class AiLiveSmokeIT {
             );
             Map<String, Object> beforeInference = databaseSnapshot();
 
-            LocalDate pickup = LocalDate.now().plusDays(10);
-            LocalDate returned = pickup.plusDays(2);
+            LocalDate pickup = LocalDate.of(2026, 11, 13);
+            LocalDate returned = LocalDate.of(2026, 11, 15);
             String parserText = "Yêu cầu thử nghiệm tổng hợp G4: thuê xe 5 chỗ, "
                 + "hộp số tự động; nhận tại chi nhánh Đà Nẵng · mẫu ngày "
                 + pickup.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                 + ", trả tại chi nhánh Hà Nội · mẫu ngày "
                 + returned.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                 + "; ngân sách tổng 2.000.000 VND.";
+            run.put("parserInputSha256", sha256(parserText));
             Map<String, Object> parserExpected = Map.of(
                 "status", "READY_FOR_REVIEW",
                 "pickupDate", pickup.toString(),
@@ -195,34 +198,37 @@ class AiLiveSmokeIT {
             );
             attempts.add(parserAttempt);
 
-            LocalDate itineraryDate = LocalDate.now().plusDays(10);
-            Map<String, Object> plannerExpected = Map.of(
-                "status", "VALIDATED",
-                "orderedLocationIds", List.of(locationA, locationB),
-                "routeDependency", "synthetic OSRM stub"
-            );
-            Map<String, Object> plannerAttempt = attempt(
-                base, "/api/v1/ai/itineraries/preview", userToken,
-                Map.of(
-                    "tripDate", itineraryDate.toString(),
-                    "startTime", "08:00",
-                    "endTime", "13:00",
-                    "startLocationId", locationA,
-                    "preferredCategoryId", categoryId
-                ),
-                PLANNER_CASE, AiRequestDeadline.Operation.ITINERARY_PREVIEW, plannerExpected, output
-            );
-            attempts.add(plannerAttempt);
+            Map<String, Object> plannerAttempt = null;
+            if (!parserOnly) {
+                LocalDate itineraryDate = LocalDate.now().plusDays(10);
+                Map<String, Object> plannerExpected = Map.of(
+                    "status", "VALIDATED",
+                    "orderedLocationIds", List.of(locationA, locationB),
+                    "routeDependency", "synthetic OSRM stub"
+                );
+                plannerAttempt = attempt(
+                    base, "/api/v1/ai/itineraries/preview", userToken,
+                    Map.of(
+                        "tripDate", itineraryDate.toString(),
+                        "startTime", "08:00",
+                        "endTime", "13:00",
+                        "startLocationId", locationA,
+                        "preferredCategoryId", categoryId
+                    ),
+                    PLANNER_CASE, AiRequestDeadline.Operation.ITINERARY_PREVIEW, plannerExpected, output
+                );
+                attempts.add(plannerAttempt);
+            }
 
             Map<String, Object> afterInference = databaseSnapshot();
             noMutation = beforeInference.equals(afterInference);
             run.put("databaseBeforeInference", beforeInference);
             run.put("databaseAfterInference", afterInference);
             run.put("noMutationOutsideFixtureSetup", noMutation);
-            run.put("qualityMatch", Map.of(
-                PARSER_CASE, parserAttempt.get("qualityMatch"),
-                PLANNER_CASE, plannerAttempt.get("qualityMatch")
-            ));
+            Map<String, Object> qualityMatch = new LinkedHashMap<>();
+            qualityMatch.put(PARSER_CASE, parserAttempt.get("qualityMatch"));
+            if (plannerAttempt != null) qualityMatch.put(PLANNER_CASE, plannerAttempt.get("qualityMatch"));
+            run.put("qualityMatch", qualityMatch);
         } catch (Exception | AssertionError error) {
             run.put("harnessFailureClass", error.getClass().getName());
             throw error;
@@ -234,15 +240,17 @@ class AiLiveSmokeIT {
             writeJsonNew(output.resolve("smoke-summary.json"), run);
         }
 
-        assertEquals(2, attempts.size(), "Both preselected inference attempts must be recorded.");
+        assertEquals(parserOnly ? 1 : 2, attempts.size(), "All preselected inference attempts must be recorded.");
         assertEquals(Boolean.TRUE, attempts.get(0).get("providerCallObserved"),
             "No Qwen parser diagnostic was observed for the parser case.");
-        assertEquals(Boolean.TRUE, attempts.get(1).get("providerCallObserved"),
-            "No Qwen planner diagnostic was observed for the planner case.");
         assertEquals(Boolean.TRUE, parserAttemptQuality(attempts.get(0)),
             "Parser result did not match the preselected synthetic expected output; inspect smoke evidence.");
-        assertEquals(Boolean.TRUE, plannerAttemptQuality(attempts.get(1)),
-            "Planner result did not match the preselected synthetic expected output; inspect smoke evidence.");
+        if (!parserOnly) {
+            assertEquals(Boolean.TRUE, attempts.get(1).get("providerCallObserved"),
+                "No Qwen planner diagnostic was observed for the planner case.");
+            assertEquals(Boolean.TRUE, plannerAttemptQuality(attempts.get(1)),
+                "Planner result did not match the preselected synthetic expected output; inspect smoke evidence.");
+        }
         assertTrue(noMutation, "The backend preview/parse calls must not mutate persisted fixture data.");
     }
 
@@ -257,6 +265,7 @@ class AiLiveSmokeIT {
             Path output
     ) throws Exception {
         Map<String, Long> before = qwenCauseCounts(operation);
+        Map<String, Long> schemaBefore = qwenSchemaCounts(operation);
         long start = System.nanoTime();
         Integer status = null;
         Long backendHttpDurationMs = null;
@@ -276,10 +285,16 @@ class AiLiveSmokeIT {
         }
         long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
         Map<String, Long> after = qwenCauseCounts(operation);
+        Map<String, Long> schemaAfter = qwenSchemaCounts(operation);
         Map<String, Long> causeDeltas = new TreeMap<>();
         after.forEach((cause, count) -> {
             long delta = count - before.getOrDefault(cause, 0L);
             if (delta > 0) causeDeltas.put(cause, delta);
+        });
+        Map<String, Long> schemaDeltas = new TreeMap<>();
+        schemaAfter.forEach((detail, count) -> {
+            long delta = count - schemaBefore.getOrDefault(detail, 0L);
+            if (delta > 0) schemaDeltas.put(detail, delta);
         });
         String causeCode = causeDeltas.size() == 1
             ? causeDeltas.keySet().iterator().next()
@@ -295,6 +310,7 @@ class AiLiveSmokeIT {
         result.put("backendHttpDurationMs", backendHttpDurationMs);
         result.put("causeCode", causeCode);
         result.put("diagnosticsCauseDeltas", causeDeltas);
+        result.put("schemaDiagnosticDeltas", schemaDeltas);
         result.put("providerCallObserved", !causeDeltas.isEmpty());
         result.put("errorClass", errorClass);
         result.put("expected", expected);
@@ -438,7 +454,19 @@ class AiLiveSmokeIT {
         Map<String, Long> counts = new TreeMap<>();
         for (AiDiagnostics.Event event : diagnostics.snapshot()) {
             if (event.operation() == operation && event.provider() == AiDiagnostics.Provider.QWEN) {
-                counts.put(event.cause().name(), event.count());
+                counts.merge(event.cause().name(), event.count(), Long::sum);
+            }
+        }
+        return counts;
+    }
+
+    private Map<String, Long> qwenSchemaCounts(AiRequestDeadline.Operation operation) {
+        Map<String, Long> counts = new TreeMap<>();
+        for (AiDiagnostics.Event event : diagnostics.snapshot()) {
+            if (event.operation() == operation && event.provider() == AiDiagnostics.Provider.QWEN
+                    && event.schemaStage() != AiDiagnostics.SchemaStage.NONE) {
+                String key = event.schemaStage().name() + ":" + event.schemaField().name();
+                counts.merge(key, event.count(), Long::sum);
             }
         }
         return counts;

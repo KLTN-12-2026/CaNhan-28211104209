@@ -44,12 +44,38 @@ public final class AiDiagnostics {
         UNKNOWN
     }
 
+    public enum SchemaStage {
+        NONE,
+        JSON_PARSE,
+        NUMERIC_TYPE,
+        DTO_BIND,
+        EXTRACTION_VALIDATION
+    }
+
+    public enum SchemaField {
+        NONE,
+        EXTRACTION,
+        INTENT,
+        UNRESOLVED_FIELDS,
+        CONFLICTS,
+        PASSENGERS,
+        BUDGET_VND_TOTAL,
+        TRANSMISSION,
+        PICKUP_BRANCH_NAME,
+        RETURN_BRANCH_NAME,
+        PICKUP_DATE,
+        RETURN_DATE,
+        DATE_ORDER
+    }
+
     public record Event(
         AiRequestDeadline.Operation operation,
         Provider provider,
         Model model,
         String version,
         Cause cause,
+        SchemaStage schemaStage,
+        SchemaField schemaField,
         long elapsedMillis,
         long count
     ) {}
@@ -58,7 +84,9 @@ public final class AiDiagnostics {
         AiRequestDeadline.Operation operation,
         Provider provider,
         Model model,
-        Cause cause
+        Cause cause,
+        SchemaStage schemaStage,
+        SchemaField schemaField
     ) {}
 
     private static final String VERSION_NOT_CHECKED = "NOT_CHECKED";
@@ -71,18 +99,29 @@ public final class AiDiagnostics {
             String configuredModel,
             Cause cause,
             long elapsedNanos) {
+        return record(operation, provider, configuredModel, cause, SchemaStage.NONE, SchemaField.NONE, elapsedNanos);
+    }
+
+    public Event record(
+            AiRequestDeadline.Operation operation,
+            Provider provider,
+            String configuredModel,
+            Cause cause,
+            SchemaStage schemaStage,
+            SchemaField schemaField,
+            long elapsedNanos) {
         Model model = modelLabel(configuredModel);
-        Key key = new Key(operation, provider, model, cause);
+        Key key = new Key(operation, provider, model, cause, schemaStage, schemaField);
         LongAdder counter = counts.computeIfAbsent(key, ignored -> new LongAdder());
         counter.increment();
         Event event = new Event(
-            operation, provider, model, VERSION_NOT_CHECKED, cause,
+            operation, provider, model, VERSION_NOT_CHECKED, cause, schemaStage, schemaField,
             Math.max(0, elapsedNanos) / 1_000_000, counter.sum()
         );
         LOGGER.info(
-            "ai_provider_result operation={} provider={} model={} version={} cause={} elapsed_ms={} count={}",
+            "ai_provider_result operation={} provider={} model={} version={} cause={} schema_stage={} schema_field={} elapsed_ms={} count={}",
             event.operation(), event.provider(), event.model(), event.version(),
-            event.cause(), event.elapsedMillis(), event.count()
+            event.cause(), event.schemaStage(), event.schemaField(), event.elapsedMillis(), event.count()
         );
         return event;
     }
@@ -91,12 +130,14 @@ public final class AiDiagnostics {
         List<Event> events = new ArrayList<>();
         counts.forEach((key, counter) -> events.add(new Event(
             key.operation(), key.provider(), key.model(), VERSION_NOT_CHECKED,
-            key.cause(), 0, counter.sum()
+            key.cause(), key.schemaStage(), key.schemaField(), 0, counter.sum()
         )));
         events.sort(Comparator.comparing(Event::operation)
             .thenComparing(Event::provider)
             .thenComparing(Event::model)
-            .thenComparing(Event::cause));
+            .thenComparing(Event::cause)
+            .thenComparing(Event::schemaStage)
+            .thenComparing(Event::schemaField));
         return List.copyOf(events);
     }
 

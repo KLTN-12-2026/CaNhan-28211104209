@@ -51,4 +51,64 @@ class CriteriaExtractionServiceTest {
         var invented=service(true).extract(user,"Chưa chọn ngày, ngân sách2026 đồng");assertNull(invented.draft().pickupDate());
         assertEquals("AUTO",service(true).extract(user,"20/10/2026 đến24/10/2026 xe tự động").draft().transmission());
     }
+    @Test void unrelatedNegationDoesNotEraseTransmissionAndDirectNegationIsNotInverted(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"MANUAL",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()));
+
+        var unrelated=service(true).extract(user,"Không cần xe màu đỏ nhưng vẫn muốn xe số tự động.");
+        assertEquals("AUTO",unrelated.draft().transmission());
+        var directlyNegated=service(true).extract(user,"Không muốn xe số sàn.");
+        assertNull(directlyNegated.draft().transmission());
+        assertTrue(directlyNegated.unresolvedFields().contains("transmission"));
+        var explicitAlternative=service(true).extract(user,"Không muốn xe số sàn, ưu tiên xe tự động.");
+        assertEquals("AUTO",explicitAlternative.draft().transmission());
+        var englishNegation=service(true).extract(user,"not automatic");
+        assertNull(englishNegation.draft().transmission());
+        assertTrue(englishNegation.unresolvedFields().contains("transmission"));
+    }
+    @Test void ambiguousTransmissionCannotProduceReadyDraft(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"))
+            .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"));
+        var negative=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhậntrảĐàNẵng, không muốn xe số sàn.");
+        assertEquals("NEEDS_CLARIFICATION",negative.status());
+        assertEquals(List.of("transmission"),negative.unresolvedFields());
+        assertNull(negative.draft().transmission());
+
+        var conflicting=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhậntrảĐàNẵng, xe số sàn và xe số tự động.");
+        assertEquals("NEEDS_CLARIFICATION",conflicting.status());
+        assertEquals(List.of("transmission"),conflicting.unresolvedFields());
+        assertNull(conflicting.draft().transmission());
+    }
+    @Test void longTransmissionNegationCannotSelectAnOppositeGearbox(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"MANUAL",List.of(),List.of()));
+
+        var automatic=service(true).extract(user,"Tôi không muốn thuê loại xe có hộp số tự động");
+        var manual=service(true).extract(user,"Tôi không muốn thuê loại xe có hộp số sàn");
+        assertAll(
+            () -> {assertNull(automatic.draft().transmission());assertTrue(automatic.unresolvedFields().contains("transmission"));},
+            () -> {assertNull(manual.draft().transmission());assertTrue(manual.unresolvedFields().contains("transmission"));}
+        );
+    }
+    @Test void unrelatedNegationDoesNotEraseAutomaticChoiceAcrossConjunction(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()));
+
+        var vietnamese=service(true).extract(user,"Tôi không hút thuốc và muốn xe tự động");
+        var english=service(true).extract(user,"I do not smoke and want an automatic car");
+        assertAll(
+            () -> {assertEquals("AUTO",vietnamese.draft().transmission());assertFalse(vietnamese.unresolvedFields().contains("transmission"));},
+            () -> {assertEquals("AUTO",english.draft().transmission());assertFalse(english.unresolvedFields().contains("transmission"));}
+        );
+    }
 }

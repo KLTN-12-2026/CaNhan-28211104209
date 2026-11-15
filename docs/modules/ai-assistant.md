@@ -6,7 +6,7 @@ Chatbox mở theo thao tác người dùng, có thu nhỏ/đóng, Escape và tr�
 
 Biểu mẫu kết nối [API AI1](ai-recommendation.md): ngày nhận/trả, chi nhánh, số người gồm tài xế, tổng ngân sách và ưu tiên hộp số/tiện nghi. Ô Mô tả nhu cầu gọi Qwen cục bộ qua backend để điền bản nháp; khách phải kiểm tra rồi chủ động bấm Gợi ý xe phù hợp. Không tự gửi yêu cầu gợi ý sau khi đọc câu. Nếu mở lần đầu từ URL có thông tin chuyến đi, biểu mẫu nhận các ngày và chi nhánh đó; chuyển trang sau đó không ghi đè nhu cầu đang nhập.
 
-API mode tải chi nhánh và tiện nghi từ backend; lỗi danh mục có nút thử lại, không dùng seed/demo thay thế. Kết quả trả tối đa3 xe đầu theo thứ tự server, hiển thị tổng tiền gồm phí tuyến và lý do dựa trên facts. Xem xe chuyển tiếp ngày nhận/trả, chi nhánh và ngân sách vào trang xe. Không áp dụng ưu tiên mềm thành bộ lọc cứng khi chuyển tiếp. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
+API mode tải chi nhánh và tiện nghi từ backend; lỗi danh mục có nút thử lại, không dùng seed/demo thay thế. Kết quả trả tối đa3 xe đầu theo thứ tự server, hiển thị tổng tiền gồm phí tuyến và lý do dựa trên facts. Xem xe chuyển tiếp ngày nhận/trả, chi nhánh và ngân sách vào trang xe. Không áp dụng ưu tiên mềm thành bộ lọc cứng khi chuyển tiếp. Phủ định về thuộc tính khác không xóa hộp số đã nêu; phủ định trực tiếp hoặc lựa chọn hộp số mâu thuẫn cần làm rõ, không được đảo thành lựa chọn ngược. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
 
 Không có xe thì báo rõ để người dùng tự sửa tiêu chí. Backend chưa bật hoặc lỗi thì giữ biểu mẫu, hiển thị lỗi và đường dẫn Tìm xe. Phản hồi sai requestId/schema bị từ chối. Demo mode chỉ thông báo chưa kết nối, không gọi API hoặc tạo gợi ý giả.
 

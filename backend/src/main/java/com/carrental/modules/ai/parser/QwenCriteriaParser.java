@@ -88,6 +88,8 @@ public class QwenCriteriaParser implements CriteriaParser {
             throw new DomainException(HttpStatus.TOO_MANY_REQUESTS,"Trợ lý đang xử lý yêu cầu khác; vui lòng thử lại.");
         }
         AiDiagnostics.Cause cause = AiDiagnostics.Cause.UNKNOWN;
+        AiDiagnostics.SchemaStage schemaStage = AiDiagnostics.SchemaStage.NONE;
+        AiDiagnostics.SchemaField schemaField = AiDiagnostics.SchemaField.NONE;
         try (permit) {
             var properties=new LinkedHashMap<String,Object>();
             properties.put("intent", Map.of("type","string","enum",List.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION","OUT_OF_SCOPE")));
@@ -116,9 +118,21 @@ public class QwenCriteriaParser implements CriteriaParser {
                 || !message.path("content").isTextual())throw unavailable();
             String content=message.path("content").textValue();if(content.length()>4096)throw unavailable();
             cause=AiDiagnostics.Cause.SCHEMA_INVALID;
+            schemaStage=AiDiagnostics.SchemaStage.JSON_PARSE;
             var node=json.readTree(content);
-            for(String field:List.of("passengers","budgetVndTotal"))if(node.hasNonNull(field)&&!node.get(field).isIntegralNumber())throw unavailable();
-            var result=json.treeToValue(node,Extraction.class);ExtractionValidation.validate(result);deadline.requireRemaining();
+            for(String field:List.of("passengers","budgetVndTotal"))if(node.hasNonNull(field)&&!node.get(field).isIntegralNumber()){
+                schemaStage=AiDiagnostics.SchemaStage.NUMERIC_TYPE;
+                schemaField=field.equals("passengers")
+                    ?AiDiagnostics.SchemaField.PASSENGERS:AiDiagnostics.SchemaField.BUDGET_VND_TOTAL;
+                throw unavailable();
+            }
+            schemaStage=AiDiagnostics.SchemaStage.DTO_BIND;
+            var result=json.treeToValue(node,Extraction.class);
+            schemaStage=AiDiagnostics.SchemaStage.EXTRACTION_VALIDATION;
+            schemaField=ExtractionValidation.invalidField(result);
+            if(schemaField!=AiDiagnostics.SchemaField.NONE)ExtractionValidation.validate(result);
+            schemaStage=AiDiagnostics.SchemaStage.NONE;
+            deadline.requireRemaining();
             cause=AiDiagnostics.Cause.SUCCESS;
             return result;
         } catch(DomainException error){throw error;}
@@ -128,7 +142,8 @@ public class QwenCriteriaParser implements CriteriaParser {
             if(transportCause!=AiDiagnostics.Cause.UNKNOWN)cause=transportCause;
             throw unavailable();
         } finally {
-            diagnostics.record(deadline.operation(), AiDiagnostics.Provider.QWEN, model, cause, deadline.elapsedNanos());
+            diagnostics.record(deadline.operation(), AiDiagnostics.Provider.QWEN, model, cause,
+                schemaStage, schemaField, deadline.elapsedNanos());
         }
     }
     private static DomainException unavailable(){return new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa đọc được nhu cầu bằng Qwen; hãy dùng biểu mẫu.");}

@@ -5,12 +5,16 @@ import com.carrental.modules.ai.AiDiagnostics;
 import com.carrental.modules.ai.AiProviderCapacity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.*;
+import org.slf4j.LoggerFactory;
 import static org.junit.jupiter.api.Assertions.*;
 
 class QwenCriteriaParserTest {
@@ -58,12 +62,42 @@ class QwenCriteriaParserTest {
     }
     @Test void unknownFieldsAndInvalidNumbersCannotBecomeCriteria()throws Exception{
         var p=parser(200,envelope(valid().replace("\"passengers\":4","\"passengers\":4,\"total\":1")),Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+        var event=diagnostics.snapshot().get(0);assertEquals(AiDiagnostics.SchemaStage.DTO_BIND,event.schemaStage());assertEquals(AiDiagnostics.SchemaField.NONE,event.schemaField());
     }
     @Test void fractionalBudgetRejected()throws Exception{
         var p=parser(200,envelope(valid().replace("3000000","3.5")),Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+        var event=diagnostics.snapshot().get(0);assertEquals(AiDiagnostics.SchemaStage.NUMERIC_TYPE,event.schemaStage());assertEquals(AiDiagnostics.SchemaField.BUDGET_VND_TOTAL,event.schemaField());
     }
     @Test void malformedDateRejected()throws Exception{
-        var p=parser(200,envelope(valid().replace("\"passengers\":4","\"pickupDate\":\"2026-02-30\",\"passengers\":4")),Duration.ofSeconds(2));assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+        var p=parser(200,envelope(valid().replace("\"passengers\":4","\"pickupDate\":\"2026-02-30\",\"passengers\":4")),Duration.ofSeconds(2));
+        var error=assertThrows(DomainException.class,()->p.parse("tìm xe"));assertEquals(503,error.status.value());
+        assertEquals("Kết quả đọc nhu cầu không hợp lệ; hãy dùng biểu mẫu.",error.getMessage());
+        var event=diagnostics.snapshot().get(0);assertEquals(AiDiagnostics.SchemaStage.EXTRACTION_VALIDATION,event.schemaStage());assertEquals(AiDiagnostics.SchemaField.PICKUP_DATE,event.schemaField());
+    }
+    @Test void malformedJsonIsClassifiedWithoutEchoingProviderContent()throws Exception{
+        var logger=(Logger)LoggerFactory.getLogger(AiDiagnostics.class);var appender=new ListAppender<ILoggingEvent>();
+        appender.setContext(logger.getLoggerContext());appender.start();logger.addAppender(appender);
+        try{
+            var p=parser(200,envelope("{malformed-provider-content-sentinel"),Duration.ofSeconds(2));
+            assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+            var event=diagnostics.snapshot().get(0);assertEquals(AiDiagnostics.SchemaStage.JSON_PARSE,event.schemaStage());assertEquals(AiDiagnostics.SchemaField.NONE,event.schemaField());
+            String log=appender.list.stream().map(ILoggingEvent::getFormattedMessage).reduce("",(a,b)->a+"\n"+b);
+            assertTrue(log.contains("schema_stage=JSON_PARSE"));assertFalse(log.contains("malformed-provider-content-sentinel"));
+        }finally{logger.detachAppender(appender);appender.stop();}
+    }
+    @Test void schemaDiagnosticsContainOnlyAllowlistedLabels()throws Exception{
+        var logger=(Logger)LoggerFactory.getLogger(AiDiagnostics.class);var appender=new ListAppender<ILoggingEvent>();
+        appender.setContext(logger.getLoggerContext());appender.start();logger.addAppender(appender);
+        try{
+            String secret="schema-value-sentinel";
+            var p=parser(200,envelope(valid().replace("3000000","\""+secret+"\"")),Duration.ofSeconds(2));
+            assertEquals(503,assertThrows(DomainException.class,()->p.parse("tìm xe")).status.value());
+            var event=diagnostics.snapshot().get(0);
+            assertEquals(AiDiagnostics.SchemaStage.NUMERIC_TYPE,event.schemaStage());
+            assertEquals(AiDiagnostics.SchemaField.BUDGET_VND_TOTAL,event.schemaField());
+            String log=appender.list.stream().map(ILoggingEvent::getFormattedMessage).reduce("",(a,b)->a+"\n"+b);
+            assertTrue(log.contains("schema_field=BUDGET_VND_TOTAL"));assertFalse(log.contains(secret));
+        }finally{logger.detachAppender(appender);appender.stop();}
     }
     @Test void configRejectsRemoteEndpoint(){
         assertThrows(IllegalArgumentException.class,()->new QwenCriteriaParser(json,URI.create("http://example.com/api/chat"),Duration.ofSeconds(1)));

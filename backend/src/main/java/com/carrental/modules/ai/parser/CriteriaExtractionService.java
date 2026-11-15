@@ -7,6 +7,8 @@ import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,6 +18,11 @@ import org.springframework.stereotype.Service;
 /** Extract a draft only. A customer must review it before requesting authoritative recommendations. */
 @Service
 public class CriteriaExtractionService {
+    private static final Pattern AUTOMATIC_TERMS=Pattern.compile("\\b(?:tu\\s*dong|automatic)\\b");
+    private static final Pattern MANUAL_TERMS=Pattern.compile("\\b(?:so\\s*san|so\\s*tay|manual)\\b");
+    private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not)\\b.*$");
+    private static final Pattern REQUEST_AFTER_CONJUNCTION=Pattern.compile(
+        "\\b(?:va|and)\\s+(?=(?:toi\\s+)?(?:muon|can|thich|chon|uu\\s+tien|want|need|prefer)\\b)");
     private final ObjectProvider<QwenCriteriaParser> parser;
     private final RentalBranchCatalog branches;
     private final AiDiagnostics diagnostics;
@@ -56,8 +63,10 @@ public class CriteriaExtractionService {
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
         if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
         if(extracted.passengers()==null)missing.add("passengers");if(extracted.budgetVndTotal()==null)missing.add("budgetVndTotal");
+        var transmission=explicitTransmission(extracted.transmission(),text);
+        if(transmission.ambiguous())missing.add("transmission");
         return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
-            new Draft(start,end,pickup,destination,extracted.passengers(),extracted.budgetVndTotal(),explicitTransmission(extracted.transmission(),text)),List.copyOf(missing));
+            new Draft(start,end,pickup,destination,extracted.passengers(),extracted.budgetVndTotal(),transmission.value()),List.copyOf(missing));
     }
     private static String explicitDate(String date,String text){
         if(date==null)return null;
@@ -66,11 +75,36 @@ public class CriteriaExtractionService {
         String form="(?<![0-9])(?:"+java.util.regex.Pattern.quote(date)+"|"+d+"\\s*[/.-]\\s*"+m+"\\s*[/.-]\\s*"+day.getYear()+")(?![0-9])";
         return java.util.regex.Pattern.compile(form).matcher(text).find()?date:null;
     }
-    private static String explicitTransmission(String selected,String text){
-        String normalized=normalize(text);
-        boolean automatic=normalized.contains("tudong")||normalized.contains("automatic"),manual=normalized.contains("sosan")||normalized.contains("sotay")||normalized.contains("manual");
-        if(normalized.contains("khong")||automatic==manual)return null;
-        return Objects.equals(selected,automatic?"AUTO":"MANUAL")?selected:null;
+    private record TransmissionDecision(String value,boolean ambiguous) {}
+    private static TransmissionDecision explicitTransmission(String selected,String text){
+        String normalized=normalizeWords(text);
+        boolean automatic=containsUnnegated(AUTOMATIC_TERMS,normalized);
+        boolean manual=containsUnnegated(MANUAL_TERMS,normalized);
+        boolean automaticNegated=containsNegated(AUTOMATIC_TERMS,normalized);
+        boolean manualNegated=containsNegated(MANUAL_TERMS,normalized);
+        if((automatic&&manual)||(automatic&&automaticNegated)||(manual&&manualNegated))
+            return new TransmissionDecision(null,true);
+        if(!automatic&&!manual)
+            return new TransmissionDecision(null,automaticNegated||manualNegated);
+        String explicit=automatic?"AUTO":"MANUAL";
+        return Objects.equals(selected,explicit)
+            ?new TransmissionDecision(selected,false):new TransmissionDecision(null,true);
+    }
+    private static boolean containsUnnegated(Pattern terms,String text){
+        Matcher matcher=terms.matcher(text);
+        while(matcher.find()){
+            int clauseStart=text.lastIndexOf('|',Math.max(0,matcher.start()-1))+1;
+            if(!NEGATION_SUFFIX.matcher(text.substring(clauseStart,matcher.start())).find())return true;
+        }
+        return false;
+    }
+    private static boolean containsNegated(Pattern terms,String text){
+        Matcher matcher=terms.matcher(text);
+        while(matcher.find()){
+            int clauseStart=text.lastIndexOf('|',Math.max(0,matcher.start()-1))+1;
+            if(NEGATION_SUFFIX.matcher(text.substring(clauseStart,matcher.start())).find())return true;
+        }
+        return false;
     }
     private static String resolve(String name,List<RentalBranchCatalog.Item> active){
         if(name==null)return null;
@@ -78,4 +112,11 @@ public class CriteriaExtractionService {
         return matches.size()==1?matches.get(0).id():null;
     }
     private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
+    private static String normalizeWords(String text){
+        String normalized=Normalizer.normalize(text,Normalizer.Form.NFD).replaceAll("\\p{M}","")
+            .toLowerCase(Locale.ROOT).replace('đ','d').replaceAll("[,.!?;:]+"," | ")
+            .replaceAll("\\b(?:nhung|ma|tuy nhien)\\b"," | ");
+        normalized=REQUEST_AFTER_CONJUNCTION.matcher(normalized).replaceAll(" | ");
+        return normalized.replaceAll("[^a-z0-9|]+"," ").trim();
+    }
 }
