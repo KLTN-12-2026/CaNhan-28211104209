@@ -5,6 +5,7 @@ import { useApiData } from '../../hooks/useApiData';
 import { money, Notice, Page, dateTime } from '../common/PageKit';
 import { getErrorMessage } from '../../utils/roles';
 import { vietnamDay } from '../../utils/bookingQueue';
+import { qrReconciliationStageLabel, qrReconciliationWarnings } from '../../utils/qrReconciliation';
 import QrReceiptForm from './QrReceiptForm';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
@@ -68,6 +69,12 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const missingAmount = deposit?.missingAmount ?? 0;
   const excessAmount = deposit?.excessAmount ?? 0;
   const depositMode = deposit?.mode ?? 'FULL';
+  const reconciliation = data?.qrReconciliation ?? booking.qrReconciliation;
+  const showStaffReconciliation = role === 'STAFF' && assignedPickup && isQr;
+  const hasReceivedAmount = Number.isFinite(reconciliation?.receivedAmount);
+  const hasAppliedAmount = Number.isFinite(reconciliation?.appliedAmount);
+  const reconciliationWarnings = qrReconciliationWarnings(reconciliation);
+  const terminalReconciliationStage = ['APPLIED', 'EXPIRED', 'CLOSED'].includes(reconciliation?.stage);
 
   return <section className="panel mb-5">
     <h2 className="mb-3 text-lg font-semibold">
@@ -84,6 +91,22 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
         <div><dt>Hạn giữ lịch gốc</dt><dd>{date(deposit.originalHoldUntil)}</dd></div>
       </>}
     </dl>
+    {showStaffReconciliation && <section className="mt-4 border-t pt-3 text-sm" aria-label="Chi tiết đối soát cọc QR">
+      <h3 className="font-medium">Đối soát cọc QR</h3>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div><dt className="text-slate-500">Trạng thái đối soát</dt><dd>{qrReconciliationStageLabel(reconciliation)}</dd></div>
+        {Number.isFinite(deposit?.amount) && <div><dt className="text-slate-500">Cọc yêu cầu</dt><dd>{money(deposit.amount)}</dd></div>}
+        {hasReceivedAmount && <div><dt className="text-slate-500">Tổng đã nhận (lịch sử)</dt><dd>{money(reconciliation.receivedAmount)}</dd></div>}
+        {hasAppliedAmount && <div><dt className="text-slate-500">Đã áp dụng vào đơn</dt><dd>{money(reconciliation.appliedAmount)}</dd></div>}
+        {depositDue && <div><dt className="text-slate-500">Hạn đóng cọc</dt><dd>{date(depositDue)}</dd></div>}
+        {reconciliation?.reviewDueAt && <div><dt className="text-slate-500">Hạn đối soát</dt><dd>{date(reconciliation.reviewDueAt)}</dd></div>}
+      </dl>
+      {hasReceivedAmount && <p className="mt-2 text-slate-600">Tổng đã nhận là số liệu lịch sử, không phải số tiền hiện đang giữ.</p>}
+      {reconciliation?.stage === 'RECEIVED_INCOMPLETE' && <p className="mt-1 text-slate-600">Giai đoạn này có thể gồm khoản nhận chưa đủ điều kiện; không đồng nghĩa khách chắc chắn đã chuyển thiếu.</p>}
+      {reconciliation?.stage === 'AWAITING_APPLICATION' && <p className="mt-1 text-slate-600">Đủ khoản hợp lệ chưa bảo đảm đơn được xác nhận; hệ thống còn kiểm tra điều kiện đơn.</p>}
+      {terminalReconciliationStage && <p className="mt-1 text-slate-600">Không yêu cầu khách đóng thêm từ thông tin đối soát của đơn này.</p>}
+      {reconciliationWarnings.length > 0 && <p className="mt-2 font-medium text-amber-700" role="status" aria-label="Cảnh báo đối soát">{reconciliationWarnings.join(' · ')}</p>}
+    </section>}
     {depositApproved && booking.status === 'PENDING' && <p className="mt-2 text-sm text-slate-600">Chuyển khoản trước hạn đóng cọc. Hạn đối soát dành cho nhân viên kiểm tra, không gia hạn thời gian chuyển khoản. Báo đã chuyển khoản chưa xác nhận đã nhận tiền.</p>}
     <p className="mt-2 text-xs text-muted">Các mốc theo giờ Việt Nam, do hệ thống cung cấp.</p>
 
@@ -167,7 +190,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       </li>)}</ol></details>
     )}
 
-    {depositApproved && booking.status === 'PENDING' && (
+    {depositApproved && booking.status === 'PENDING' && !(role === 'STAFF' && isQr) && (
       <div className="mt-3 p-3 bg-slate-50 rounded text-sm">
         <p><strong>Tóm tắt cọc:</strong> Đã nhận {money(receivedAmount)} · Đã áp dụng {money(appliedAmount)} · Còn thiếu {money(missingAmount)} {excessAmount > 0 ? `· Dư {money(excessAmount)}` : ''} · Trạng thái: {depositMode === 'FULL' ? 'Đủ' : depositMode === 'PARTIAL' ? 'Thiếu' : 'Dư'}</p>
         {reportedAt && <p>Khách đã báo chuyển khoản lúc {date(reportedAt)}</p>}

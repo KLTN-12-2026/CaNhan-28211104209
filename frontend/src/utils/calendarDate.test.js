@@ -14,7 +14,7 @@ test('Vietnam transfer time is explicit UTC+7 across host timezones', () => {
 });
 
 import { visibleBookings } from './bookingQueue.js';
-test('reported deposits filter pending only and prioritize review deadline',()=>{
-  const rows=[{id:'late',status:'PENDING',deposit:{required:true,approvedAt:'x',reportedAt:'x',reviewDueAt:'2026-10-24T04:00Z'}},{id:'early',status:'PENDING',deposit:{required:true,approvedAt:'x',reportedAt:'x',reviewDueAt:'2026-10-24T03:00Z'}},{id:'done',status:'CONFIRMED',deposit:{required:true,reportedAt:'x'}}];
-  assert.deepEqual(visibleBookings(rows,{depositPhase:'review'}).map(b=>b.id),['early','late']);
+test('reported deposits filter pending only and preserve newest-created-first order',()=>{
+  const rows=[{id:'late',status:'PENDING',createdAt:'2026-10-24T05:00Z',deposit:{required:true,approvedAt:'x',reportedAt:'x',reviewDueAt:'2026-10-24T04:00Z'}},{id:'early',status:'PENDING',createdAt:'2026-10-24T04:00Z',deposit:{required:true,approvedAt:'x',reportedAt:'x',reviewDueAt:'2026-10-24T03:00Z'}},{id:'done',status:'CONFIRMED',createdAt:'2026-10-24T06:00Z',deposit:{required:true,reportedAt:'x'}}];
+  assert.deepEqual(visibleBookings(rows,{depositPhase:'review'}).map(b=>b.id),['late','early']);
 });

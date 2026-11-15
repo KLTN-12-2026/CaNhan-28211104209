@@ -26,7 +26,7 @@ export function adminBookingDate(booking, value) {
   return adminDateFormat(value, { withTime: true });
 }
 
-export function visibleBookings(bookings, { query = '', status = '', queue = 'all', date = '', mode = 'all', now = Date.now(), sort = 'createdAt_desc', depositPhase = '', returnDebt = false, scheduleWarning = '' } = {}) {
+export function visibleBookings(bookings, { query = '', status = '', queue = 'all', date = '', mode = 'all', now = Date.now(), sort = 'createdAt_desc', depositPhase = '', qrStage = '', returnDebt = false, scheduleWarning = '' } = {}) {
   const today = vietnamDay(now), field = queueDateField(mode);
   const selectedDay = /^\d{4}-\d{2}-\d{2}$/.test(date) && vietnamDay(date + 'T00:00:00+07:00') === date ? date : '';
   return (Array.isArray(bookings) ? bookings : []).filter(booking =>
@@ -36,11 +36,11 @@ export function visibleBookings(bookings, { query = '', status = '', queue = 'al
     (!returnDebt || (booking.status === "RETURNED" && booking.returnSettlement?.outstandingAmount > 0)) &&
     (!depositPhase || (booking.status==='PENDING' && booking.deposit?.required &&
       (depositPhase==='review' ? Boolean(booking.deposit.reportedAt) : depositPhase==='payment' ? Boolean(booking.deposit.approvedAt) && !booking.deposit.reportedAt : !booking.deposit.approvedAt))) &&
+    (!qrStage || booking.qrReconciliation?.stage === qrStage) &&
     (queue !== 'today' || vietnamDay(booking[field]) === today) &&
     (queue !== 'date' || (selectedDay && vietnamDay(booking[field]) === selectedDay)) &&
     `${booking.id} ${booking.vehicleName} ${booking.customerName || ''}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'))
   ).sort((a, b) => {
-    if(depositPhase==='review') return Date.parse(a.deposit.reviewDueAt)-Date.parse(b.deposit.reviewDueAt) || String(a.id).localeCompare(String(b.id));
     if (sort === 'createdAt_asc') {
       const first = Date.parse(a.createdAt), second = Date.parse(b.createdAt);
       const firstValid = Number.isFinite(first), secondValid = Number.isFinite(second);

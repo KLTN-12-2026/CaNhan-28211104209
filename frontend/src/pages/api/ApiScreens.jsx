@@ -7,6 +7,7 @@ import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
+import { qrReconciliationStageLabel, qrReconciliationStages, qrReconciliationWarnings } from "../../utils/qrReconciliation";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -68,6 +69,28 @@ import { useAuth } from "../../context/AuthContext";
 import { getStoredToken } from "../../utils/storage";
 import { useApiData } from "../../hooks/useApiData";
 import useNow from "../../hooks/useNow";
+
+function StaffQrReconciliationSummary({ booking }) {
+  const summary = booking.qrReconciliation;
+  const hasRequiredAmount = Number.isFinite(booking.deposit?.amount);
+  const hasReceivedAmount = Number.isFinite(summary.receivedAmount);
+  const warnings = qrReconciliationWarnings(summary);
+
+  return (
+    <div className="mt-2 space-y-1 text-sm" aria-label="Đối soát cọc QR">
+      <p className="font-medium">Tình trạng cọc: {qrReconciliationStageLabel(summary)}</p>
+      {hasRequiredAmount || hasReceivedAmount ? (
+        <p>
+          {hasRequiredAmount ? <>Cọc yêu cầu: {money(booking.deposit.amount)}</> : null}
+          {hasRequiredAmount && hasReceivedAmount ? ' · ' : null}
+          {hasReceivedAmount ? <>Tổng nhận (lịch sử): {money(summary.receivedAmount)}</> : null}
+        </p>
+      ) : null}
+      {summary.reviewDueAt ? <p>Hạn đối soát: {dateTime(summary.reviewDueAt)}</p> : null}
+      {warnings.length ? <p className="font-medium text-amber-700" role="status" aria-label="Cảnh báo đối soát">{warnings.join(' · ')}</p> : null}
+    </div>
+  );
+}
 
 function RequestState({ loading, error, onRetry, children }) {
   if (loading) return <LoadingSkeleton rows={3} />;
@@ -1251,6 +1274,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   );
   const [queue, setQueue] = useState("all");
   const [depositPhase,setDepositPhase]=useState("");
+  const [qrStage, setQrStage] = useState("");
   const [returnDebt,setReturnDebt]=useState(false);
   const [scheduleWarning, setScheduleWarning] = useState('');
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
@@ -1270,6 +1294,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     now,
     sort: isFilterActive ? sort : "createdAt_desc",
     depositPhase,
+    qrStage,
     returnDebt,
     scheduleWarning: area === 'user' ? '' : scheduleWarning,
   });
@@ -1278,7 +1303,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const activePage = Math.min(Math.max(1, page), totalPages);
 
-  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${returnDebt}|${scheduleWarning}`;
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}|${qrStage}|${returnDebt}|${scheduleWarning}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -1366,6 +1391,10 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
         {area === 'staff' && mode === 'all' ? <Field label="Giai đoạn cọc"><select value={depositPhase} onChange={e=>setDepositPhase(e.target.value)}>
           <option value="">Tất cả giai đoạn</option><option value="profile">Chờ kiểm tra hồ sơ</option><option value="payment">Chờ đóng cọc</option><option value="review">Khách đã báo · Chờ đối soát</option>
         </select></Field> : null}
+        {area === 'staff' && mode === 'all' ? <Field label="Tình trạng cọc"><select value={qrStage} onChange={e=>setQrStage(e.target.value)}>
+          <option value="">Tất cả</option>
+          {qrReconciliationStages.map(stage => <option key={stage} value={stage}>{qrReconciliationStageLabel({ stage })}</option>)}
+        </select></Field> : null}
         {isFilterActive ? (
           <Field label="Sắp xếp">
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
@@ -1386,7 +1415,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             ? "Chưa tải được danh sách"
             : isFilterActive
               ? `Hiển thị ${pagedRows.length}/${rows.length} đơn · Trang ${activePage}/${totalPages} · ${bookingSortLabels[sort] || "Mới tạo trước"}`
-              : `${rows.length} đơn phù hợp · ${depositPhase === "review" ? "Hạn đối soát gần trước" : "Mới tạo trước"}`}
+                : `${rows.length} đơn phù hợp · Mới tạo trước`}
       </p>
       <RequestState
         loading={request.loading}
@@ -1442,7 +1471,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       </span>
                     )}
                     <Status status={booking.status} />
-                    {booking.status === 'PENDING' && booking.deposit?.required ? <span className="text-sm">{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
+                    {booking.status === 'PENDING' && booking.deposit?.required && !(area === 'staff' && mode === 'all' && booking.qrReconciliation) ? <span className="text-sm">{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
                   </div>
                   {area === "admin" ? (
                     <div className="mb-1">
@@ -1476,6 +1505,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                     </p>
                   ) : null}
                   <ScheduleWarnings booking={booking} area={area} />
+                  {area === 'staff' && mode === 'all' && booking.qrReconciliation ? <StaffQrReconciliationSummary booking={booking} /> : null}
                 </div>
                 <div className="flex items-center gap-4">
                   <strong>{money(booking.total)}</strong>

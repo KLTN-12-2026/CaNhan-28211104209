@@ -83,6 +83,60 @@ test('panel shows deposit and remaining total without promising payment', () => 
   assert.doesNotMatch(text, /Đã ghi nhận cọc cho đơn/);
 });
 
+test('Staff pickup QR detail shows backend amounts/deadlines and careful reconciliation guidance only', () => {
+  const booking = {
+    ...baseBooking,
+    deposit: {
+      ...baseBooking.deposit,
+      method: 'DEMO_QR_MANUAL',
+      amount: 600000,
+      approvedAt: '2026-10-24T03:00:00Z',
+      paymentDueAt: '2026-10-24T03:30:00Z',
+      reviewDueAt: '2026-10-24T04:00:00Z',
+    },
+    qrReconciliation: {
+      stage: 'RECEIVED_INCOMPLETE',
+      urgency: 'DUE_SOON',
+      receivedAmount: 750000,
+      appliedAmount: 250000,
+      eligibleAmount: 0,
+      shortfallAmount: 600000,
+      reviewDueAt: '2026-10-24T04:00:00Z',
+      processingIssue: 'RETRY_REQUIRED',
+      timingIssues: ['TRANSFER_LATE', 'VERIFICATION_LATE'],
+    },
+  };
+  const render = (role, assignedPickup) => renderToStaticMarkup(React.createElement(Deposit, { booking, role, assignedPickup, reload() {} }));
+  const staffText = render('STAFF', true);
+  const staffVisibleText = staffText.replace(/<[^>]*>/g, '').replaceAll('\u00a0', ' ');
+  assert.match(staffVisibleText, /Trạng thái đối soát\s*Cần đối soát khoản nhận/);
+  assert.match(staffVisibleText, /Cọc yêu cầu\s*600\.000/);
+  assert.match(staffVisibleText, /Tổng đã nhận \(lịch sử\)\s*750\.000/);
+  assert.match(staffVisibleText, /Đã áp dụng vào đơn\s*250\.000/);
+  assert.match(staffVisibleText, /Hạn đóng cọc\s*10:30 24\/10\/2026/);
+  assert.match(staffVisibleText, /Hạn đối soát\s*11:00 24\/10\/2026/);
+  assert.match(staffVisibleText, /không phải số tiền hiện đang giữ/);
+  assert.match(staffVisibleText, /không đồng nghĩa khách chắc chắn đã chuyển thiếu/);
+  assert.match(staffVisibleText, /Sắp đến hạn đối soát/);
+  assert.match(staffVisibleText, /Có khoản chuyển từ hạn đóng cọc trở đi/);
+  assert.match(staffVisibleText, /Xác minh từ hạn đối soát trở đi/);
+  assert.doesNotMatch(staffVisibleText, /Còn thiếu|Cần chuyển thêm|Yêu cầu khách đóng thêm/);
+  for (const [role, assignedPickup] of [['USER', true], ['ADMIN', true], ['STAFF', false]]) {
+    assert.doesNotMatch(render(role, assignedPickup), /aria-label="Chi tiết đối soát cọc QR"/);
+  }
+
+  const applied = { ...booking, status: 'CONFIRMED', qrReconciliation: { ...booking.qrReconciliation, stage: 'APPLIED' } };
+  const appliedText = renderToStaticMarkup(React.createElement(Deposit, { booking: applied, role: 'STAFF', assignedPickup: true, reload() {} }));
+  assert.match(appliedText, /Không yêu cầu khách đóng thêm từ thông tin đối soát/);
+});
+
+test('Staff detail renders neutral fallback when QR reconciliation summary is missing', () => {
+  const booking = { ...baseBooking, deposit: { ...baseBooking.deposit, method: 'DEMO_QR_MANUAL' } };
+  const text = renderToStaticMarkup(React.createElement(Deposit, { booking, role: 'STAFF', assignedPickup: true, reload() {} }));
+  assert.match(text, /Chưa có thông tin đối soát/);
+  assert.doesNotMatch(text, /Chưa chuyển cọc|Chưa thanh toán/);
+});
+
 test('redirect success parameters never assert paid or call a payment mutation', () => {
   const text = renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: ['/user/payment-return?vnp_ResponseCode=00&vnp_TxnRef=synthetic'] }, React.createElement(ReturnPage)));
   assert.match(text, /Đang xác minh/);
