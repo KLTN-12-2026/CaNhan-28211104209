@@ -38,6 +38,13 @@ public class QwenCriteriaParser implements CriteriaParser {
         List only genuinely missing or ambiguous required field keys in unresolvedFields; use [] when complete.
         Never invent dates, branches, prices or availability.
         """;
+    private static final String DECISION_PROMPT = """
+        Trước tiên chọn decision cho toàn bộ câu. CONFLICT nếu cùng một tiêu chí của cùng chuyến
+        bị bắt buộc nhận hai giá trị khác nhau đồng thời. Tuyệt đối không chọn thay khách một trong hai.
+        RENTAL nếu tìm xe hoặc mô tả tiêu chí thuê, kể cả thiếu thông tin, lựa chọn linh hoạt,
+        phủ định hoặc đã sửa yêu cầu cũ. OUT_OF_SCOPE nếu mục tiêu không liên quan tới tìm xe thuê.
+        Với CONFLICT và OUT_OF_SCOPE chỉ trả decision. Với RENTAL mới điền extraction.
+        """;
     private final ObjectMapper json;
     private final URI endpoint;
     private final Duration timeout;
@@ -132,9 +139,9 @@ public class QwenCriteriaParser implements CriteriaParser {
             properties.put("conflicts",Map.of("type","array","maxItems",7,
                 "items",Map.of("type","string","minLength",1,"maxLength",160)));
             var schema=Map.of("type","object","properties",properties,"additionalProperties",false,"required",properties.keySet());
-            var body=Map.of("model",model,"think",false,"stream",false,"keep_alive","2m","format",schema,
+            var body=Map.of("model",model,"think",false,"stream",false,"keep_alive","2m","format",branchNames==null?schema:decisionSchema(schema),
                 "options",Map.of("num_ctx",4096,"num_predict",512,"temperature",0.1),
-                "messages",List.of(Map.of("role","system","content",SYSTEM_PROMPT),Map.of("role","user","content",text)));
+                "messages",List.of(Map.of("role","system","content",branchNames==null?SYSTEM_PROMPT:DECISION_PROMPT+SYSTEM_PROMPT),Map.of("role","user","content",text)));
             Duration callTimeout=deadline.timeoutFor(timeout);
             var request=HttpRequest.newBuilder(endpoint).timeout(callTimeout).header("Content-Type","application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
@@ -153,6 +160,25 @@ public class QwenCriteriaParser implements CriteriaParser {
             cause=AiDiagnostics.Cause.SCHEMA_INVALID;
             schemaStage=AiDiagnostics.SchemaStage.JSON_PARSE;
             var node=json.readTree(content);
+            if(branchNames!=null){
+                schemaStage=AiDiagnostics.SchemaStage.DTO_BIND;
+                if(node==null||!node.isObject()||!node.path("decision").isTextual())throw unavailable();
+                String decision=node.get("decision").textValue();
+                if(Set.of("CONFLICT","OUT_OF_SCOPE").contains(decision)){
+                    if(node.size()!=1)throw unavailable();
+                    boolean conflict="CONFLICT".equals(decision);
+                    var result=new Extraction(conflict?"NEEDS_CLARIFICATION":"OUT_OF_SCOPE",null,null,null,null,
+                        null,null,null,List.of(),conflict?List.of("conflicts"):List.of());
+                    ExtractionValidation.validate(result);
+                    deadline.requireRemaining();
+                    schemaStage=AiDiagnostics.SchemaStage.NONE;
+                    cause=AiDiagnostics.Cause.SUCCESS;
+                    return result;
+                }
+                if(!"RENTAL".equals(decision)||node.size()!=2||!node.path("extraction").isObject())throw unavailable();
+                node=node.get("extraction");
+                if(!Set.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION").contains(node.path("intent").asText()))throw unavailable();
+            }
             for(String field:List.of("passengers","budgetVndTotal"))if(node.hasNonNull(field)&&!node.get(field).isIntegralNumber()){
                 schemaStage=AiDiagnostics.SchemaStage.NUMERIC_TYPE;
                 schemaField=field.equals("passengers")
@@ -178,6 +204,15 @@ public class QwenCriteriaParser implements CriteriaParser {
             diagnostics.record(deadline.operation(), AiDiagnostics.Provider.QWEN, model, cause,
                 schemaStage, schemaField, deadline.elapsedNanos());
         }
+    }
+    private static Map<String,Object> decisionSchema(Map<String,?> extraction){
+        var rental=new LinkedHashMap<String,Object>();
+        rental.put("decision",Map.of("type","string","enum",List.of("RENTAL")));
+        rental.put("extraction",extraction);
+        return Map.of("oneOf",List.of(
+            Map.of("type","object","properties",Map.of("decision",Map.of("type","string","enum",List.of("CONFLICT","OUT_OF_SCOPE"))),
+                "required",List.of("decision"),"additionalProperties",false),
+            Map.of("type","object","properties",rental,"required",List.of("decision","extraction"),"additionalProperties",false)));
     }
     private static DomainException unavailable(){return new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa đọc được nhu cầu bằng Qwen; hãy dùng biểu mẫu.");}
 }

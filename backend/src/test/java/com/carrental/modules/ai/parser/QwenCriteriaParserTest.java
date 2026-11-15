@@ -51,13 +51,24 @@ class QwenCriteriaParserTest {
         var p=parser(200,envelope(valid()),Duration.ofSeconds(2));for(String text:Arrays.asList(null," ","x".repeat(1001)))assertEquals(400,assertThrows(DomainException.class,()->p.parse(text)).status.value());assertEquals(0,calls.get());
     }
     @Test void requestSchemaAllowsOnlyMentionedBranchNamesOrNull()throws Exception{
-        var p=parser(200,envelope(valid()),Duration.ofSeconds(2));
+        var p=parser(200,envelope("{\"decision\":\"RENTAL\",\"extraction\":"+valid()+"}"),Duration.ofSeconds(2));
         p.parse("nhận tại Đà Nẵng",AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION),List.of("Đà Nẵng"));
-        var schema=json.readTree(requestBody).at("/format/properties");
+        var schema=json.readTree(requestBody).at("/format/oneOf/1/properties/extraction/properties");
         var expected=json.readTree("[\"Đà Nẵng\",null]");
         assertEquals(expected,schema.at("/pickupBranchName/enum"));
         assertEquals(expected,schema.at("/returnBranchName/enum"));
         assertEquals(json.readTree("[\"AUTO\",\"MANUAL\",null]"),schema.at("/transmission/enum"));
+    }
+    @Test void conflictDecisionNeedsNoSecondCallOrInventedDraft()throws Exception{
+        var p=parser(200,envelope("{\"decision\":\"CONFLICT\"}"),Duration.ofSeconds(2));
+        var result=p.parse("Deux exigences",AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION),List.of());
+        assertTrue(!result.conflicts().isEmpty());
+        assertNull(result.passengers());assertNull(result.pickupBranchName());
+        assertEquals(1,calls.get());
+    }
+    @Test void conflictDecisionCannotSmuggleAnExtraction()throws Exception{
+        var p=parser(200,envelope("{\"decision\":\"CONFLICT\",\"extraction\":"+valid()+"}"),Duration.ofSeconds(2));
+        assertEquals(503,assertThrows(DomainException.class,()->p.parse("synthetic",AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION),List.of())).status.value());
     }
     @Test void errorsAreSanitizedAndNeverRetried()throws Exception{
         var p=parser(429,"raw-provider-error synthetic-test-key",Duration.ofSeconds(2));var error=assertThrows(DomainException.class,()->p.parse("tìm xe"));assertEquals(503,error.status.value());assertFalse(error.getMessage().contains("synthetic-test-key"));assertEquals(1,calls.get());

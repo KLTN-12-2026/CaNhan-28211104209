@@ -69,7 +69,9 @@ class EvaluationTests(unittest.TestCase):
     def test_parser_wrong_value_is_semantic_not_provider(self):
         c=deepcopy(self.parsers[0]);v=c['expected']['variants'][0];b={k:deepcopy(v[k]) for k in ('status','draft','unresolvedFields')}
         b['draft']['passengers']=5
-        self.assertEqual(scoring.score(c,response(b),{})['outcome'],'SEMANTIC_FAIL')
+        result=scoring.score(c,response(b),{})
+        self.assertEqual(result['outcome'],'SEMANTIC_FAIL')
+        self.assertEqual(result['mismatchedFields'],[['draft.passengers']])
 
     def test_parser_wrong_types_unknown_missing_fields(self):
         c=self.parsers[0];v=c['expected']['variants'][0]

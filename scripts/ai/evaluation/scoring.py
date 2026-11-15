@@ -190,7 +190,20 @@ def score(case,obs,facts):
         outcome='TIMEOUT' if cause in ('TIMEOUT','QWEN_TIMEOUT') else 'MODEL_OUTPUT_INVALID' if cause in ('MODEL_OUTPUT_INVALID','QWEN_INVALID_IDS') else 'PROVIDER_ERROR'
         return finish(outcome,'PROVEN_'+cause)
     try:
-        if case['suite']=='parser': matched=parser_score(case,body)
+        if case['suite']=='parser':
+            matched=parser_score(case,body)
+            if not matched:
+                # Compare each acceptable variant without retaining values or changing the score.
+                result['mismatchedFields']=[]
+                for variant in expected['variants']:
+                    differences=[key for key in ('status','draft','unresolvedFields')
+                                 if (set(body[key])!=set(variant[key]) if key=='unresolvedFields'
+                                     else not same(body[key],variant[key]))]
+                    if 'draft' in differences and isinstance(body['draft'],dict) and isinstance(variant['draft'],dict):
+                        differences.remove('draft')
+                        differences.extend('draft.'+key for key in sorted(FIELDS)
+                                           if not same(body['draft'][key],variant['draft'][key]))
+                    result['mismatchedFields'].append(differences)
         elif case['suite']=='recommendation': matched=recommendation_score(case,body,facts)
         else: matched=itinerary_score(case,body,facts)
     except (ValueError,TypeError,KeyError,IndexError,AttributeError,ZeroDivisionError):
