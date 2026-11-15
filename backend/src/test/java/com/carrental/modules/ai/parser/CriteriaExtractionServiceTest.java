@@ -249,4 +249,48 @@ class CriteriaExtractionServiceTest {
             () -> {assertEquals("AUTO",english.draft().transmission());assertFalse(english.unresolvedFields().contains("transmission"));}
         );
     }
+
+    /** G5-M4 regression (dev clear-13/27): the model flags dates the text states fully and unambiguously. */
+    CriteriaExtractionService.Result withDateFlags(String text,String start,String end){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("hue","KDrive Huế"),new RentalBranchCatalog.Item("tt","KDrive Trung Tâm")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(new CriteriaParser.Extraction(
+            "NEEDS_CLARIFICATION",start,end,"KDrive Huế","KDrive Huế",6,5_500_000L,"MANUAL",List.of("pickupDate","returnDate"),List.of()));
+        return service(true).extract(user,text);
+    }
+    @Test void statedDatePairOverridesModelDateFlags(){
+        var iso=withDateFlags("Gia đình 6 người kể cả tôi lái muốn thuê từ 2027-02-10 đến 2027-02-14. KDrive Huế là nơi nhận lẫn trả; chi tổng tối đa 5500000 đồng, chọn số sàn.","2027-02-10","2027-02-14");
+        assertEquals("READY_FOR_REVIEW",iso.status(),iso::toString);
+        assertEquals(List.of(),iso.unresolvedFields());
+        assertEquals("2027-02-10",iso.draft().pickupDate());assertEquals("2027-02-14",iso.draft().returnDate());
+        var slash=withDateFlags("Nhận 10/2/2027, trả 14/02/2027 tại KDrive Huế cho cả hai đầu; 6 người, tổng 5500000 đồng, số sàn.","2027-02-10","2027-02-14");
+        assertFalse(slash.unresolvedFields().contains("pickupDate"),slash::toString);
+        assertFalse(slash.unresolvedFields().contains("returnDate"),slash::toString);
+        var eight=withDateFlags("Tám người? Không, 6 người; nhận 2027-02-10 trả 2027-02-14 ở KDrive Huế cho cả hai đầu, tổng 5500000 đồng, số sàn.","2027-02-10","2027-02-14");
+        assertFalse(eight.unresolvedFields().contains("pickupDate"),"'tám' is not a hedge: "+eight);
+    }
+    @Test void dateFlagsStayWhenTheTextIsNotAFirmPair(){
+        for(String text:List.of(
+                "Nhận 2027-02-10 hoặc 2027-02-11, trả 2027-02-14 tại KDrive Huế; 6 người, tổng 5500000 đồng.",
+                "Nhận 2027-02-10, trả 2027-02-14 nhưng chưa chắc ngày trả; KDrive Huế, 6 người, tổng 5500000 đồng.",
+                "Khoảng 2027-02-10 đến 2027-02-14 tại KDrive Huế; 6 người, tổng 5500000 đồng.",
+                "Nhận 2027-02-10, trả 2027-02-14 có thể đổi; KDrive Huế, 6 người, tổng 5500000 đồng.",
+                "Nhận 2027-02-10, trả 2027-02-14, lần trước thuê 2026-12-01; KDrive Huế, 6 người, tổng 5500000 đồng.")){
+            var result=withDateFlags(text,"2027-02-10","2027-02-14");
+            assertEquals("NEEDS_CLARIFICATION",result.status(),text);
+            assertTrue(result.unresolvedFields().containsAll(List.of("pickupDate","returnDate")),text+" -> "+result);
+        }
+        var swapped=withDateFlags("Trả 2027-02-14, nhận 2027-02-10 tại KDrive Huế; 6 người, tổng 5500000 đồng.","2027-02-10","2027-02-14");
+        assertTrue(swapped.unresolvedFields().contains("pickupDate"),"Order must follow the text: "+swapped);
+        var noYear=withDateFlags("Nhận 10/02, trả 14/02 tại KDrive Huế; 6 người, tổng 5500000 đồng.","2027-02-10","2027-02-14");
+        assertTrue(noYear.unresolvedFields().containsAll(List.of("pickupDate","returnDate")),noYear::toString);
+        assertNull(noYear.draft().pickupDate());
+        var oneDate=withDateFlags("Nhận 2027-02-10 tại KDrive Huế, chưa biết ngày trả; 6 người, tổng 5500000 đồng.","2027-02-10",null);
+        assertTrue(oneDate.unresolvedFields().contains("returnDate"),oneDate::toString);
+        assertTrue(oneDate.unresolvedFields().contains("pickupDate"),"model flag kept when the pair is not firm: "+oneDate);
+    }
+    @Test void firmDatePairRejectsInvalidCalendarDates(){
+        assertFalse(CriteriaExtractionService.firmDatePair("Nhận 2027-02-10, trả 31/02/2027.","2027-02-10","2027-02-28"));
+        assertFalse(CriteriaExtractionService.firmDatePair("Nhận 2027-02-14, trả 2027-02-14.","2027-02-14","2027-02-14"));
+        assertTrue(CriteriaExtractionService.firmDatePair("Nhận 2027-02-10, trả 2027-02-14.","2027-02-10","2027-02-14"));
+    }
 }

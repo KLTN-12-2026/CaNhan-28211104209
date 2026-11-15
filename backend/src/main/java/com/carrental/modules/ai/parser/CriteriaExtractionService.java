@@ -64,6 +64,7 @@ public class CriteriaExtractionService {
         }
         if(missing.contains(StatedCriteria.PICKUP))pickup=null;
         if(missing.contains(StatedCriteria.RETURN))destination=null;
+        if(firmDatePair(text,start,end)){missing.remove("pickupDate");missing.remove("returnDate");}
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
         if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
         Integer passengers=stated.containsKey(StatedCriteria.PEOPLE)?null:extracted.passengers();
@@ -76,6 +77,28 @@ public class CriteriaExtractionService {
         if(transmission.ambiguous())missing.add("transmission");
         return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
             new Draft(start,end,pickup,destination,passengers,budget,transmission.value()),List.copyOf(missing));
+    }
+    private static final java.util.regex.Pattern FULL_DATE=java.util.regex.Pattern.compile(
+        "(?<![0-9])(?:([0-9]{4})-([0-9]{2})-([0-9]{2})|([0-9]{1,2})\\s*[/.-]\\s*([0-9]{1,2})\\s*[/.-]\\s*([0-9]{4}))(?![0-9])");
+    private static final java.util.regex.Pattern DATE_HEDGE=java.util.regex.Pattern.compile(
+        "\\b(?:chua|hoac|hay|khoang|co the|du kien)\\b");
+    /**
+     * The text itself settles both dates: exactly two full dates, in pickup-then-return order, matching the
+     * verified values, with no hedging or alternatives. Then a model "unresolved" flag on the dates is overridden.
+     */
+    static boolean firmDatePair(String text,String start,String end){
+        if(start==null||end==null||start.compareTo(end)>=0)return false;
+        if(DATE_HEDGE.matcher(StatedCriteria.words(text)).find())return false;
+        var found=new ArrayList<String>();
+        var m=FULL_DATE.matcher(text);
+        while(m.find()){
+            try{
+                found.add(m.group(1)!=null
+                    ?java.time.LocalDate.of(Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2)),Integer.parseInt(m.group(3))).toString()
+                    :java.time.LocalDate.of(Integer.parseInt(m.group(6)),Integer.parseInt(m.group(5)),Integer.parseInt(m.group(4))).toString());
+            }catch(java.time.DateTimeException invalid){return false;}
+        }
+        return found.size()==2&&found.get(0).equals(start)&&found.get(1).equals(end);
     }
     private static String explicitDate(String date,String text){
         if(date==null)return null;
