@@ -46,18 +46,59 @@ public class CriteriaExtractionService {
                 AiDiagnostics.Cause.DISABLED, deadline.elapsedNanos());
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
         }
-        var extracted=engine.parse(text,deadline);
+        var candidates=mentionedBranches(text,branches.active());
+        var names=candidates.stream().map(RentalBranchCatalog.Item::name).distinct().sorted().toList();
+        var extracted=engine.parse(text,deadline,names);
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
-        var active=branches.active();
-        String pickup=resolve(extracted.pickupBranchName(),active),destination=resolve(extracted.returnBranchName(),active);
+        var stated=StatedCriteria.from(text,names);
+        String pickup=resolve(stated.getOrDefault(StatedCriteria.PICKUP,extracted.pickupBranchName()),candidates);
+        String destination=resolve(stated.getOrDefault(StatedCriteria.RETURN,extracted.returnBranchName()),candidates);
         String start=explicitDate(extracted.pickupDate(),text),end=explicitDate(extracted.returnDate(),text);
         var missing=new LinkedHashSet<>(extracted.unresolvedFields());missing.remove("transmission");
+        if(stated.containsKey(StatedCriteria.PICKUP)&&pickup!=null)missing.remove(StatedCriteria.PICKUP);
+        if(stated.containsKey(StatedCriteria.RETURN)&&destination!=null)missing.remove(StatedCriteria.RETURN);
+        if(pickup!=null&&pickup.equals(destination)&&names.size()==1&&StatedCriteria.confirmsPair(text,names.get(0))){
+            missing.remove(StatedCriteria.PICKUP);
+            missing.remove(StatedCriteria.RETURN);
+        }
+        if(missing.contains(StatedCriteria.PICKUP))pickup=null;
+        if(missing.contains(StatedCriteria.RETURN))destination=null;
+        if(firmDatePair(text,start,end)){missing.remove("pickupDate");missing.remove("returnDate");}
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
         if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
-        if(extracted.passengers()==null)missing.add("passengers");if(extracted.budgetVndTotal()==null)missing.add("budgetVndTotal");
+        Integer passengers=stated.containsKey(StatedCriteria.PEOPLE)?null:extracted.passengers();
+        if(passengers==null)missing.add("passengers");
+        var statedBudget=ExplicitBudget.fromText(text);
+        Long budget=statedBudget.fixed()?statedBudget.value():extracted.budgetVndTotal();
+        if(statedBudget.fixed() && budget!=null)missing.remove("budgetVndTotal");
+        if(budget==null)missing.add("budgetVndTotal");
+        var transmission=TransmissionPreference.fromText(text);
+        if(transmission.ambiguous())missing.add("transmission");
         return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
-            new Draft(start,end,pickup,destination,extracted.passengers(),extracted.budgetVndTotal(),explicitTransmission(extracted.transmission(),text)),List.copyOf(missing));
+            new Draft(start,end,pickup,destination,passengers,budget,transmission.value()),List.copyOf(missing));
+    }
+    private static final java.util.regex.Pattern FULL_DATE=java.util.regex.Pattern.compile(
+        "(?<![0-9])(?:([0-9]{4})-([0-9]{2})-([0-9]{2})|([0-9]{1,2})\\s*[/.-]\\s*([0-9]{1,2})\\s*[/.-]\\s*([0-9]{4}))(?![0-9])");
+    private static final java.util.regex.Pattern DATE_HEDGE=java.util.regex.Pattern.compile(
+        "\\b(?:chua|hoac|hay|khoang|co the|du kien)\\b");
+    /**
+     * The text itself settles both dates: exactly two full dates, in pickup-then-return order, matching the
+     * verified values, with no hedging or alternatives. Then a model "unresolved" flag on the dates is overridden.
+     */
+    static boolean firmDatePair(String text,String start,String end){
+        if(start==null||end==null||start.compareTo(end)>=0)return false;
+        if(DATE_HEDGE.matcher(StatedCriteria.words(text)).find())return false;
+        var found=new ArrayList<String>();
+        var m=FULL_DATE.matcher(text);
+        while(m.find()){
+            try{
+                found.add(m.group(1)!=null
+                    ?java.time.LocalDate.of(Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2)),Integer.parseInt(m.group(3))).toString()
+                    :java.time.LocalDate.of(Integer.parseInt(m.group(6)),Integer.parseInt(m.group(5)),Integer.parseInt(m.group(4))).toString());
+            }catch(java.time.DateTimeException invalid){return false;}
+        }
+        return found.size()==2&&found.get(0).equals(start)&&found.get(1).equals(end);
     }
     private static String explicitDate(String date,String text){
         if(date==null)return null;
@@ -66,16 +107,14 @@ public class CriteriaExtractionService {
         String form="(?<![0-9])(?:"+java.util.regex.Pattern.quote(date)+"|"+d+"\\s*[/.-]\\s*"+m+"\\s*[/.-]\\s*"+day.getYear()+")(?![0-9])";
         return java.util.regex.Pattern.compile(form).matcher(text).find()?date:null;
     }
-    private static String explicitTransmission(String selected,String text){
-        String normalized=normalize(text);
-        boolean automatic=normalized.contains("tudong")||normalized.contains("automatic"),manual=normalized.contains("sosan")||normalized.contains("sotay")||normalized.contains("manual");
-        if(normalized.contains("khong")||automatic==manual)return null;
-        return Objects.equals(selected,automatic?"AUTO":"MANUAL")?selected:null;
-    }
     private static String resolve(String name,List<RentalBranchCatalog.Item> active){
         if(name==null)return null;
         var matches=active.stream().filter(b->normalize(b.name()).equals(normalize(name))).toList();
         return matches.size()==1?matches.get(0).id():null;
+    }
+    private static List<RentalBranchCatalog.Item> mentionedBranches(String text,List<RentalBranchCatalog.Item> active){
+        String words=StatedCriteria.words(text);
+        return active.stream().filter(branch -> StatedCriteria.mentioned(words,branch.name())).toList();
     }
     private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
 }
