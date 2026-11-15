@@ -16,14 +16,28 @@ final class StatedCriteria {
     private static final String NUMBER="(?:[0-9]+|hai|ba|bon|tu|nam|sau|bay|tam|chin)";
     private static final Pattern CHOICE=Pattern.compile("\\b"+NUMBER+"(?:\\s*nguoi)? (?:hoac|hay) "+NUMBER+"\\s*nguoi\\b");
     private static final Pattern UNCERTAIN_COUNT=Pattern.compile("\\bchua (?:biet|chot|quyet) (?:co )?(?:bao nhieu nguoi|so (?:luong )?nguoi)\\b");
-    private static final Pattern NEGATED=Pattern.compile("\\b(?:khong|thay doi|doi y|thay vi)\\b");
-    private static final String BOTH="(?:hai dau|hai chieu|nhan (?:lan |va )?tra)";
+    private static final Pattern NEGATED=Pattern.compile("\\b(?:khong|tranh|loai tru|thay doi|doi y|thay vi)\\b");
+    private static final String BOTH="(?:(?:ca )?hai (?:dau|chieu)|nhan (?:lan |va )?tra)";
 
     static Map<String,String> from(String text,List<String> mentionedNames){
         Map<String,String> fields=new LinkedHashMap<>();
         if(words(text).matches(".*\\b(?:doi y|thay doi|thay vi|dinh chinh|da chot|chot lai)\\b.*"))return fields;
         for(String part:text.split("(?iuU)[;!?\\n]|,(?!\\s*(?:hoặc|hoac|hay)\\b)|\\.(?=\\s|$)")){
-            String clause=words(part);
+            // Keep Vietnamese "đừng" (don't) distinct from "dùng" (use) before accent folding.
+            String clause=words(Normalizer.normalize(part,Normalizer.Form.NFC).replaceAll("(?iuU)\\bđừng\\b","không"));
+            if(mentionedNames.size()==1){
+                String literal=namePattern(mentionedNames.get(0),clause.contains("kdrive "));
+                String rejection="(?:toi )?(?:khong(?: muon)?|tranh|loai tru)(?: chon)? ";
+                if(clause.matches(rejection+"(?:"+literal+" (?:cho )?"+BOTH+"|"+BOTH+" (?:xe )?(?:tai |o )?"+literal+")")){
+                    merge(fields,PICKUP,null);
+                    merge(fields,RETURN,null);
+                    continue;
+                }
+                for(String role:List.of("nhan","tra")){
+                    if(clause.matches(rejection+role+" (?:xe )?(?:tai |o )?(?:chi nhanh )?"+literal+"(?: ngay "+DATE+")?"))
+                        merge(fields,key(role),null);
+                }
+            }
             if(NEGATED.matcher(clause).find())continue;
             var unknown=UNKNOWN.matcher(clause);
             while(unknown.find())merge(fields,key(unknown.group(1)),null);
@@ -43,7 +57,7 @@ final class StatedCriteria {
             if(mentionedNames.size()==1 && !clause.matches(".*\\b(?:hoac|hay)\\b.*")){
                 String name=mentionedNames.get(0);
                 String literal=namePattern(name,clause.contains("kdrive "));
-                if(clause.matches(".*\\b"+literal+" (?:la noi )?"+BOTH+"\\b.*") ||
+                if(clause.matches(".*\\b"+literal+" (?:(?:la noi|cho) )?"+BOTH+"\\b.*") ||
                     clause.matches(".*\\b"+literal+" nhan (?:ngay )?"+DATE+" tra (?:ngay )?"+DATE+"(?: |$).*") ||
                     clause.matches("(?:toi )?"+BOTH+" (?:xe )?(?:tai |o )?(?:chi nhanh )?"+literal+"(?: (?:tu|ngay) .*)?")){
                     merge(fields,PICKUP,name);

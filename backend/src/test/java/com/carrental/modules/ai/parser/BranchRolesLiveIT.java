@@ -51,4 +51,8 @@ class BranchRolesLiveIT {
         check("Nhận "+START+" ở KDrive Biển hoặc KDrive Cảng, chưa chọn; trả KDrive Cảng "+END+
             ". Đi 3 hoặc 5 người, tổng 3 triệu.",null,"port",null,Set.of("pickupBranchName","passengers"));
     }
+    @Test void rejectedCommonEndpointIsNotOfferedForEitherRole(){
+        check("Thuê cho 4 người từ "+START+" tới "+END+", tổng 3 triệu. Đừng chọn KDrive Biển cho cả hai đầu.",
+            null,null,4,Set.of("pickupBranchName","returnBranchName"));
+    }
 }
