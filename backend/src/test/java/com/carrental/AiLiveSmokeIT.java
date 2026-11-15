@@ -2,6 +2,8 @@ package com.carrental;
 
 import com.carrental.modules.ai.AiDiagnostics;
 import com.carrental.modules.ai.AiRequestDeadline;
+import com.carrental.modules.ai.parser.CriteriaParser;
+import com.carrental.modules.ai.parser.QwenCriteriaParser;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -75,6 +78,11 @@ class AiLiveSmokeIT {
     @Autowired AiDiagnostics diagnostics;
     @LocalServerPort int port;
     @MockBean OsrmRoutingClient osrm;
+    @MockitoSpyBean QwenCriteriaParser liveParser;
+    private static Map<String,Object> branchShape(String value, String city, boolean unresolved) {
+        return Map.of("present",value != null,"equalsFixtureName",(city+" · mẫu").equals(value),
+            "cityOnly",city.equals(value),"markedUnresolved",unresolved);
+    }
 
     private final HttpClient http = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(3))
@@ -192,11 +200,23 @@ class AiLiveSmokeIT {
                 "budgetVndTotal", 2_000_000L,
                 "transmission", "AUTO"
             );
+            var extracted = new java.util.concurrent.atomic.AtomicReference<CriteriaParser.Extraction>();
+            org.mockito.Mockito.doAnswer(call -> {
+                CriteriaParser.Extraction value = (CriteriaParser.Extraction) call.callRealMethod();
+                extracted.set(value);
+                return value;
+            }).when(liveParser).parse(any(String.class), any(AiRequestDeadline.class), anyList());
             Map<String, Object> parserAttempt = attempt(
                 base, "/api/v1/ai/criteria/parse", userToken, Map.of("text", parserText),
                 PARSER_CASE, AiRequestDeadline.Operation.CRITERIA_EXTRACTION, parserExpected, output
             );
             attempts.add(parserAttempt);
+            if (extracted.get() != null) {
+                var fields = extracted.get();
+                run.put("syntheticBranchDiagnosis", Map.of(
+                    "pickup", branchShape(fields.pickupBranchName(), "Đà Nẵng", fields.unresolvedFields().contains("pickupBranchName")),
+                    "destination", branchShape(fields.returnBranchName(), "Hà Nội", fields.unresolvedFields().contains("returnBranchName"))));
+            }
 
             Map<String, Object> plannerAttempt = null;
             if (!parserOnly) {

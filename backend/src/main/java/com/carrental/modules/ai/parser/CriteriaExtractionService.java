@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 /** Extract a draft only. A customer must review it before requesting authoritative recommendations. */
 @Service
 public class CriteriaExtractionService {
-    private static final Pattern AUTOMATIC_TERMS=Pattern.compile("\\b(?:tu\\s*dong|automatic)\\b");
+    private static final Pattern AUTOMATIC_TERMS=Pattern.compile("\\b(?:tu\\s*dong|automatic|auto)\\b");
     private static final Pattern MANUAL_TERMS=Pattern.compile("\\b(?:so\\s*san|so\\s*tay|manual)\\b");
     private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not)\\b.*$");
     private static final Pattern REQUEST_AFTER_CONJUNCTION=Pattern.compile(
@@ -53,11 +53,12 @@ public class CriteriaExtractionService {
                 AiDiagnostics.Cause.DISABLED, deadline.elapsedNanos());
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
         }
-        var extracted=engine.parse(text,deadline);
+        var candidates=mentionedBranches(text,branches.active());
+        var names=candidates.stream().map(RentalBranchCatalog.Item::name).distinct().sorted().toList();
+        var extracted=engine.parse(text,deadline,names);
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
-        var active=branches.active();
-        String pickup=resolve(extracted.pickupBranchName(),active),destination=resolve(extracted.returnBranchName(),active);
+        String pickup=resolve(extracted.pickupBranchName(),candidates),destination=resolve(extracted.returnBranchName(),candidates);
         String start=explicitDate(extracted.pickupDate(),text),end=explicitDate(extracted.returnDate(),text);
         var missing=new LinkedHashSet<>(extracted.unresolvedFields());missing.remove("transmission");
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
@@ -110,6 +111,21 @@ public class CriteriaExtractionService {
         if(name==null)return null;
         var matches=active.stream().filter(b->normalize(b.name()).equals(normalize(name))).toList();
         return matches.size()==1?matches.get(0).id():null;
+    }
+    private static List<RentalBranchCatalog.Item> mentionedBranches(String text,List<RentalBranchCatalog.Item> active){
+        String words=branchWords(text);
+        return active.stream().filter(branch -> {
+            String name=branchWords(branch.name()).replaceFirst("^kdrive\\s*","").strip();
+            if(name.isEmpty())return false;
+            String literal=Arrays.stream(name.split(" ")).map(Pattern::quote)
+                .collect(java.util.stream.Collectors.joining("\\s*"));
+            return Pattern.compile("(?<![a-z0-9])(?:nhantra|nhan|tra)?(?:kdrive\\s*)?"+literal+"(?![a-z0-9])")
+                .matcher(words).find();
+        }).toList();
+    }
+    private static String branchWords(String text){
+        return Normalizer.normalize(text,Normalizer.Form.NFD).replaceAll("\\p{M}","")
+            .toLowerCase(Locale.ROOT).replace('đ','d').replaceAll("[^a-z0-9]+"," ").strip();
     }
     private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
     private static String normalizeWords(String text){

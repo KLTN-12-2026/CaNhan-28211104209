@@ -17,15 +17,32 @@ class CriteriaExtractionServiceTest {
     CriteriaExtractionService service(boolean enabled){var beans=new StaticListableBeanFactory();if(enabled)beans.addBean("qwen",parser);return new CriteriaExtractionService(beans.getBeanProvider(QwenCriteriaParser.class),branches);}
     CriteriaParser.Extraction extraction(String start,String end,String pickup,String destination){return new CriteriaParser.Extraction("RECOMMEND_VEHICLE",start,end,pickup,destination,4,3000000L,"AUTO",List.of(),List.of());}
     @Test void resolvesActiveNamesOnlyAndReturnsReviewableDraft(){
-        when(parser.parse(anyString(),any(AiRequestDeadline.class))).thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","KDrive Hà Nội"));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","KDrive Hà Nội"));
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng"),new RentalBranchCatalog.Item("hn","KDrive Hà Nội")));
-        var result=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu");
+        var result=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhận tại Đà Nẵng, trả tại Hà Nội");
         assertEquals("READY_FOR_REVIEW",result.status());assertEquals("dn",result.draft().pickupBranchId());assertEquals("hn",result.draft().returnBranchId());assertEquals(3000000,result.draft().budgetVndTotal());
     }
     @Test void ambiguousInactiveAndInventedYearCannotResolve(){
-        when(parser.parse(anyString(),any(AiRequestDeadline.class))).thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Huế"));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Huế"));
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("a","KDrive Đà Nẵng"),new RentalBranchCatalog.Item("b","Đà Nẵng")));
         var result=service(true).extract(user,"20/10 đến24/10");assertEquals("NEEDS_CLARIFICATION",result.status());assertNull(result.draft().pickupDate());assertNull(result.draft().pickupBranchId());assertNull(result.draft().returnBranchId());
+    }
+    @Test void branchNamesMustBeMentionedAndUniqueBeforeBinding(){
+        var active=List.of(new RentalBranchCatalog.Item("dn","Đà Nẵng · mẫu"),
+            new RentalBranchCatalog.Item("hn","Hà Nội · mẫu"), new RentalBranchCatalog.Item("h","Huế"));
+        when(branches.active()).thenReturn(active);
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(extraction(null,null,"Hà Nội · mẫu","Đà Nẵng · mẫu"))
+            .thenReturn(extraction(null,null,"Huế","Hà Nội · mẫu"));
+        var service=service(true);
+        String request="Nhận tại Hà Nội · mẫu, trả tại Đà Nẵng · mẫu";
+        var draft=service.extract(user,request).draft();
+        assertEquals("hn",draft.pickupBranchId());
+        assertEquals("dn",draft.returnBranchId());
+        verify(parser).parse(eq(request),any(AiRequestDeadline.class),eq(List.of("Hà Nội · mẫu","Đà Nẵng · mẫu")));
+        var absent=service.extract(user,"Xe HuếX nhận tại một nơi chưa biết").draft();
+        assertNull(absent.pickupBranchId());
+        assertNull(absent.returnBranchId());
     }
     @Test void permissionsDisabledAndSensitiveIdentifiersNeverInvokeModel(){
         assertEquals(403,assertThrows(DomainException.class,()->service(true).extract(new Actor("s","STAFF","Staff"),"xe")).status.value());
@@ -38,22 +55,36 @@ class CriteriaExtractionServiceTest {
         verifyNoInteractions(parser,branches);
     }
     @Test void conflictsAndUnrelatedIntentCannotBecomeDraft(){
-        when(parser.parse(anyString(),any(AiRequestDeadline.class))).thenReturn(new CriteriaParser.Extraction("OUT_OF_SCOPE",null,null,null,null,null,null,null,List.of(),List.of()));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(new CriteriaParser.Extraction("OUT_OF_SCOPE",null,null,null,null,null,null,null,List.of(),List.of()));
         assertNull(service(true).extract(user,"viết thơ").draft());
-        when(parser.parse(anyString(),any(AiRequestDeadline.class))).thenReturn(new CriteriaParser.Extraction("NEEDS_CLARIFICATION",null,null,null,null,null,null,null,List.of(),List.of("dates")));
-        assertNull(service(true).extract(user,"ngày mâu thuẫn").draft());verifyNoInteractions(branches);
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(new CriteriaParser.Extraction("NEEDS_CLARIFICATION",null,null,null,null,null,null,null,List.of(),List.of("dates")));
+        assertNull(service(true).extract(user,"ngày mâu thuẫn").draft());verify(branches,times(2)).active();verifyNoMoreInteractions(branches);
     }
     @Test void modelCannotInventDatesOrOptionalTransmissionFromUnstatedInput(){
-        when(parser.parse(anyString(),any(AiRequestDeadline.class))).thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE","2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of("transmission"),List.of()));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE","2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of("transmission"),List.of()));
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
         var complete=service(true).extract(user,"20/10/2026 đến24/10/2026,4người,3triệu,nhậntrảĐàNẵng");
         assertEquals("READY_FOR_REVIEW",complete.status());assertNull(complete.draft().transmission());
         var invented=service(true).extract(user,"Chưa chọn ngày, ngân sách2026 đồng");assertNull(invented.draft().pickupDate());
         assertEquals("AUTO",service(true).extract(user,"20/10/2026 đến24/10/2026 xe tự động").draft().transmission());
     }
+    @Test void canonicalAutoIsRecognizedOnlyAsAnExplicitPositiveTerm(){
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(extraction(null,null,null,null));
+        var service=service(true);
+        assertEquals("AUTO",service.extract(user,"Muốn hộp số AUTO").draft().transmission());
+        var negative=service.extract(user,"Không muốn hộp số AUTO");
+        assertNull(negative.draft().transmission());
+        assertTrue(negative.unresolvedFields().contains("transmission"));
+        for(String text:List.of("Muốn xe 5 chỗ","Có Android AutoPlay không?")){
+            var optional=service.extract(user,text);
+            assertNull(optional.draft().transmission());
+            assertFalse(optional.unresolvedFields().contains("transmission"));
+        }
+    }
     @Test void unrelatedNegationDoesNotEraseTransmissionAndDirectNegationIsNotInverted(){
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
-        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"MANUAL",List.of(),List.of()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
@@ -72,7 +103,7 @@ class CriteriaExtractionServiceTest {
     }
     @Test void ambiguousTransmissionCannotProduceReadyDraft(){
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
-        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
             .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"))
             .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"));
         var negative=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhậntrảĐàNẵng, không muốn xe số sàn.");
@@ -87,7 +118,7 @@ class CriteriaExtractionServiceTest {
     }
     @Test void longTransmissionNegationCannotSelectAnOppositeGearbox(){
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
-        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"MANUAL",List.of(),List.of()));
 
@@ -100,7 +131,7 @@ class CriteriaExtractionServiceTest {
     }
     @Test void unrelatedNegationDoesNotEraseAutomaticChoiceAcrossConjunction(){
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
-        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
             .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()));
 
