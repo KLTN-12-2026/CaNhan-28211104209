@@ -82,6 +82,35 @@ class CriteriaExtractionServiceTest {
             assertFalse(optional.unresolvedFields().contains("transmission"));
         }
     }
+    @Test void bindsOnlyAStatedTripTotalAndExplicitTransmission(){
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,null,null,4,4_000_000L,
+                "AUTO",List.of("budgetVndTotal"),List.of()));
+        var service=service(true);
+        var positive=service.extract(user,"Tôi dành bốn triệu rưỡi đồng cho cả chuyến, chọn số tay.");
+        assertEquals(4_500_000L,positive.draft().budgetVndTotal());
+        assertFalse(positive.unresolvedFields().contains("budgetVndTotal"));
+        assertEquals("MANUAL",positive.draft().transmission());
+        var mixed=service.extract(user,"500.000 đồng mỗi ngày; ngân sách tổng 3.200.000 đồng.");
+        assertEquals(3_200_000L,mixed.draft().budgetVndTotal());
+        assertFalse(mixed.unresolvedFields().contains("budgetVndTotal"));
+        for(String text:List.of("500.000 đồng mỗi ngày","500k/ngày","Ngân sách 2 triệu hoặc 4 triệu, chưa chọn.","Tổng 2 triệu, hoặc 4 triệu.",
+                "Tổng tiền 2 hoặc 4 triệu.","Ngân sách tôi chưa chốt.")){
+            var ambiguous=service.extract(user,text);
+            assertNull(ambiguous.draft().budgetVndTotal());
+            assertTrue(ambiguous.unresolvedFields().contains("budgetVndTotal"));
+        }
+        assertNull(service.extract(user,"Xe có Android Auto").draft().transmission());
+        for(String text:List.of("Đừng chọn số sàn.","Không muốn hộp số: AUTO")){
+            var refused=service.extract(user,text);
+            assertNull(refused.draft().transmission());
+            assertTrue(refused.unresolvedFields().contains("transmission"));
+        }
+        assertEquals("MANUAL",service.extract(user,"Dùng xe số sàn.").draft().transmission());
+        var flexible=service.extract(user,"Số sàn hoặc tự động đều được.");
+        assertNull(flexible.draft().transmission());
+        assertFalse(flexible.unresolvedFields().contains("transmission"));
+    }
     @Test void unrelatedNegationDoesNotEraseTransmissionAndDirectNegationIsNotInverted(){
         when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
         when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))

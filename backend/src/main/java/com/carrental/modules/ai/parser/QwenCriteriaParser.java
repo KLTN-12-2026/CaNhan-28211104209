@@ -123,8 +123,9 @@ public class QwenCriteriaParser implements CriteriaParser {
             properties.put("intent", Map.of("type","string","enum",List.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION","OUT_OF_SCOPE")));
             for(String name:List.of("pickupDate","returnDate","pickupBranchName","returnBranchName","transmission"))
                 properties.put(name,Map.of("type",List.of("string","null")));
+            var gearbox=TransmissionPreference.fromText(text);
             properties.put("transmission",Map.of("type",List.of("string","null"),
-                "enum",Arrays.asList("AUTO","MANUAL",null)));
+                "enum",branchNames==null?Arrays.asList("AUTO","MANUAL",null):Collections.singletonList(gearbox.value())));
             if(branchNames!=null){
                 var allowed=new ArrayList<Object>(branchNames);
                 allowed.add(null);
@@ -134,8 +135,17 @@ public class QwenCriteriaParser implements CriteriaParser {
             }
             for(String name:List.of("pickupDate","returnDate"))properties.put(name,Map.of("type",List.of("string","null"),"pattern","^[0-9]{4}-[0-9]{2}-[0-9]{2}$"));
             for(String name:List.of("passengers","budgetVndTotal"))properties.put(name,Map.of("type",List.of("integer","null")));
+            var unresolvedKeys=new ArrayList<>(ExtractionValidation.DRAFT_FIELDS);
+            if(branchNames!=null){
+                var budget=ExplicitBudget.fromText(text);
+                if(budget.fixed()){
+                    properties.put("budgetVndTotal",Map.of("type",List.of("integer","null"),"enum",Collections.singletonList(budget.value())));
+                    if(budget.value()!=null)unresolvedKeys.remove("budgetVndTotal");
+                }
+                if(gearbox.value()!=null)unresolvedKeys.remove("transmission");
+            }
             properties.put("unresolvedFields",Map.of("type","array","maxItems",7,
-                "items",Map.of("type","string","enum",ExtractionValidation.DRAFT_FIELDS)));
+                "items",Map.of("type","string","enum",unresolvedKeys)));
             properties.put("conflicts",Map.of("type","array","maxItems",7,
                 "items",Map.of("type","string","minLength",1,"maxLength",160)));
             var schema=Map.of("type","object","properties",properties,"additionalProperties",false,"required",properties.keySet());

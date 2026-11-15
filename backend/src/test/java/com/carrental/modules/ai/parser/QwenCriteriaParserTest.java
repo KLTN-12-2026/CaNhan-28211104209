@@ -57,7 +57,7 @@ class QwenCriteriaParserTest {
         var expected=json.readTree("[\"Đà Nẵng\",null]");
         assertEquals(expected,schema.at("/pickupBranchName/enum"));
         assertEquals(expected,schema.at("/returnBranchName/enum"));
-        assertEquals(json.readTree("[\"AUTO\",\"MANUAL\",null]"),schema.at("/transmission/enum"));
+        assertEquals(json.readTree("[null]"),schema.at("/transmission/enum"));
     }
     @Test void conflictDecisionNeedsNoSecondCallOrInventedDraft()throws Exception{
         var p=parser(200,envelope("{\"decision\":\"CONFLICT\"}"),Duration.ofSeconds(2));
@@ -65,6 +65,14 @@ class QwenCriteriaParserTest {
         assertTrue(!result.conflicts().isEmpty());
         assertNull(result.passengers());assertNull(result.pickupBranchName());
         assertEquals(1,calls.get());
+    }
+    @Test void typedRentalRequestRestrictsExplicitGearboxAndTotal()throws Exception{
+        var p=parser(200,envelope("{\"decision\":\"RENTAL\",\"extraction\":"+valid()+"}"),Duration.ofSeconds(2));
+        p.parse("Xe số tay, ngân sách tổng 3.200.000 đồng",AiRequestDeadline.start(AiRequestDeadline.Operation.CRITERIA_EXTRACTION),List.of());
+        var schema=json.readTree(requestBody).at("/format/oneOf/1/properties/extraction/properties");
+        assertEquals(json.readTree("[\"MANUAL\"]"),schema.at("/transmission/enum"));
+        assertEquals(json.readTree("[3200000]"),schema.at("/budgetVndTotal/enum"));
+        assertFalse(schema.at("/unresolvedFields/items/enum").toString().contains("budgetVndTotal"));
     }
     @Test void conflictDecisionCannotSmuggleAnExtraction()throws Exception{
         var p=parser(200,envelope("{\"decision\":\"CONFLICT\",\"extraction\":"+valid()+"}"),Duration.ofSeconds(2));
