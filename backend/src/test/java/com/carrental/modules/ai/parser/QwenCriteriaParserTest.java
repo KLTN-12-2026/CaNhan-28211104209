@@ -57,6 +57,7 @@ class QwenCriteriaParserTest {
         var expected=json.readTree("[\"Đà Nẵng\",null]");
         assertEquals(expected,schema.at("/pickupBranchName/enum"));
         assertEquals(expected,schema.at("/returnBranchName/enum"));
+        assertEquals(json.readTree("[\"AUTO\",\"MANUAL\",null]"),schema.at("/transmission/enum"));
     }
     @Test void errorsAreSanitizedAndNeverRetried()throws Exception{
         var p=parser(429,"raw-provider-error synthetic-test-key",Duration.ofSeconds(2));var error=assertThrows(DomainException.class,()->p.parse("tìm xe"));assertEquals(503,error.status.value());assertFalse(error.getMessage().contains("synthetic-test-key"));assertEquals(1,calls.get());
