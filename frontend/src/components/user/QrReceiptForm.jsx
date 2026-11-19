@@ -8,7 +8,9 @@ import { getErrorMessage } from '../../utils/roles';
 const emptyForm = () => ({ transactionRef: '', amountVnd: '', transferTime: '', sourceAccount: '' });
 
 // Mounted with booking.id as key so pending receipts never move between bookings.
-export default function QrReceiptForm({ booking, onRefresh }) {
+const lateWarning = 'Đơn đã hết hạn giữ chỗ. Chỉ ghi nhận khoản tiền đến muộn đã thực nhận: khoản này không xác nhận đơn, không giành lại lịch và được đưa vào hoàn theo chính sách.';
+
+export default function QrReceiptForm({ booking, onRefresh, late = false }) {
   const [form, setForm] = useState(emptyForm);
   const [verified, setVerified] = useState(false);
   const [phase, setPhase] = useState('idle');
@@ -110,6 +112,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
   return <section className="mt-4 space-y-3 border-t pt-3" aria-label="Ghi nhận cọc QR DEMO">
     <h3 className="font-medium">Xác minh khoản cọc (Staff chi nhánh nhận)</h3>
     <p className="text-sm">Chỉ ghi nhận khoản DEMO đã đối chiếu. Không chuyển tiền thật.</p>
+    {late && <p className="text-sm font-medium text-amber-700" role="note" aria-label="Cảnh báo đơn hết hạn">{lateWarning}</p>}
     <fieldset disabled={phase !== 'idle'} className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="field"><span>Mã tham chiếu giao dịch</span><input maxLength={30} value={form.transactionRef} onChange={e => edit('transactionRef', e.target.value)} /></label>
@@ -128,6 +131,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
       <p>Số tiền: {money(candidate.amountVnd)} · Tham chiếu: {candidate.transactionRef}</p>
       <p>Thời điểm chuyển (giờ Việt Nam): {candidate.transferTime && new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23' }).format(new Date(candidate.transferTime))}</p>
       <p>Tài khoản nguồn giả lập: {candidate.sourceAccount} · Bên nhận DEMO theo yêu cầu cọc của đơn.</p>
+      {late && <p className="font-medium text-amber-700">{lateWarning}</p>}
       <button className="btn" onClick={submitConfirmed}>Xác nhận ghi nhận DEMO</button>
       <button className="btn-secondary" onClick={() => { setCandidate(null); setPhase('idle'); }}>Quay lại chỉnh sửa</button>
     </div>}

@@ -293,3 +293,20 @@ test('G4.4 Admin never inherits Staff pickup actions, even when marked as assign
   assert.match(render(pending, 'STAFF'), /Duyệt hồ sơ và tạo mã QR cọc/);
   assert.match(render(confirmed, 'STAFF'), /Ghi nhận khách không đến nhận/);
 });
+
+test('G5-F01 pickup Staff can record late money on an expired QR booking, with an explicit refund warning', () => {
+  const approved = { ...baseBooking, deposit: { ...baseBooking.deposit, method: 'DEMO_QR_MANUAL', approvedAt: '2026-10-24T03:00:00Z', paymentDueAt: '2026-10-24T03:30:00Z', reviewDueAt: '2026-10-24T04:00:00Z' }, qrReconciliation: { stage: 'EXPIRED', urgency: 'EXPIRED', receivedAmount: 0, appliedAmount: 0, timingIssues: [] } };
+  const render = (status, role = 'STAFF', assignedPickup = true, booking = approved) => renderToStaticMarkup(React.createElement(Deposit, { booking: { ...booking, status }, role, assignedPickup, reload() {} }));
+  const expired = render('EXPIRED');
+  assert.match(expired, /aria-label="Ghi nhận cọc QR DEMO"/);
+  assert.match(expired, /Đơn đã hết hạn giữ chỗ\. Chỉ ghi nhận khoản tiền đến muộn đã thực nhận: khoản này không xác nhận đơn, không giành lại lịch và được đưa vào hoàn theo chính sách\./);
+  const pending = render('PENDING');
+  assert.match(pending, /aria-label="Ghi nhận cọc QR DEMO"/);
+  assert.doesNotMatch(pending, /Cảnh báo đơn hết hạn/);
+  for (const status of ['CONFIRMED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED']) assert.doesNotMatch(render(status), /Ghi nhận cọc QR DEMO/, status);
+  for (const [role, assigned] of [['STAFF', false], ['ADMIN', true], ['USER', true]]) assert.doesNotMatch(render('EXPIRED', role, assigned), /Ghi nhận cọc QR DEMO/, `${role}/${assigned}`);
+  const notApproved = { ...approved, deposit: { ...approved.deposit, approvedAt: null } };
+  assert.doesNotMatch(render('EXPIRED', 'STAFF', true, notApproved), /Ghi nhận cọc QR DEMO/);
+  const vnpay = { ...approved, deposit: { ...approved.deposit, method: 'VNPAY_SANDBOX' } };
+  assert.doesNotMatch(render('EXPIRED', 'STAFF', true, vnpay), /Ghi nhận cọc QR DEMO/);
+});

@@ -282,8 +282,9 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       </div>
     )}
 
-    {isQr && depositApproved && role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && (
-      <QrReceiptForm key={booking.id} booking={booking} onRefresh={() => { request.reload(); reload(); }} />
+    {isQr && depositApproved && role === 'STAFF' && assignedPickup && ['PENDING', 'EXPIRED'].includes(booking.status) && (
+      // EXPIRED (PENDING quá hạn): vẫn ghi nhận tiền đến muộn để backend đưa vào hoàn; không xác nhận đơn.
+      <QrReceiptForm key={booking.id} booking={booking} late={booking.status === 'EXPIRED'} onRefresh={() => { request.reload(); reload(); }} />
     )}
 
     {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && deposit?.required && !depositApproved && (

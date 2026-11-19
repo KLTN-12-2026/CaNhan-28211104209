@@ -149,3 +149,18 @@ for (const [status, stage, missing] of [
   else assert.match(container.textContent,/kiểm tra tình trạng đối soát/);
   assert.equal(refreshes,1);
 });
+test('G5-F01 late receipt form shows the refund warning in form and review, and posts the unchanged payload shape',async()=>{
+  await mount();
+  await act(async()=>root.render(createElement(Form,{key:'late-'+booking.id,booking,late:true,onRefresh:()=>{refreshes++;}})));
+  assert.match(container.querySelector('[aria-label="Cảnh báo đơn hết hạn"]').textContent,/không xác nhận đơn, không giành lại lịch và được đưa vào hoàn/);
+  await ready();
+  assert.match(container.querySelector('[role="dialog"]').textContent,/Đơn đã hết hạn giữ chỗ\..*được đưa vào hoàn theo chính sách/);
+  await click('Xác nhận ghi nhận DEMO');
+  const posts=requests.filter(r=>r.method==='post');
+  assert.equal(posts.length,1);
+  assert.deepEqual(Object.keys(posts[0].body).sort(),['amountVnd','expectedVersion','idempotencyKey','sourceAccount','transactionRef','transferNote','transferTime','verified']);
+  await mount();
+  assert.ok(!container.querySelector('[aria-label="Cảnh báo đơn hết hạn"]'),'no warning without late');
+  await ready();
+  assert.doesNotMatch(container.querySelector('[role="dialog"]').textContent,/hết hạn giữ chỗ/);
+});
