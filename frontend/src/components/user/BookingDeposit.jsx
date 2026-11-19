@@ -13,15 +13,36 @@ export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED
 const eventLabels = { PAYMENT_CREATED: 'Tạo phiên thanh toán', DEPOSIT_APPROVED: 'Duyệt hồ sơ, yêu cầu cọc', DEPOSIT_APPROVED_QR: 'Duyệt hồ sơ, tạo mã QR cọc', PAYMENT_RECEIVED: 'Xác minh đã nhận cọc', PAYMENT_FAILED: 'Thanh toán thất bại', PAYMENT_UNKNOWN: 'Thanh toán cần đối soát', DEPOSIT_APPLIED: 'Xác nhận đơn từ cọc', REFUND_REQUESTED: 'Tạo yêu cầu hoàn', REFUND_DECIDED: 'Duyệt khoản hoàn', REFUND_RECONCILED: 'Đối soát khoản hoàn' };
 const date = dateTime;
 
+class QrDataError extends Error {}
+
+function qrLoadError(error) {
+  if (error instanceof QrDataError) return error.message;
+  const status = error?.response?.status;
+  if (status === 401 || status === 403 || status === 404) return 'Không mở được mã QR của đơn này. Đăng nhập đúng tài khoản đặt đơn rồi tải lại trang.';
+  if (status >= 400 && status < 500 && typeof error.response.data?.message === 'string') return `${error.response.data.message} Tải lại đơn để xem trạng thái mới nhất.`;
+  return 'Không tải được mã QR. Kiểm tra kết nối rồi thử tải lại; chưa chuyển tiền khi chưa thấy mã QR.';
+}
+
 export default function BookingDeposit({ booking, role, assignedPickup, reload, now }) {
   const request = useApiData(`/bookings/${encodeURIComponent(booking.id)}/deposit`);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [contacted, setContacted] = useState(false), [notDelivered, setNotDelivered] = useState(false), [reason, setReason] = useState('');
   const [showQr, setShowQr] = useState(false);
-  const [qrData, setQrData] = useState(null);
-  const [qrUrl,setQrUrl]=useState('');
-  const objectUrl=useRef(null);
-  useEffect(() => () => { if(objectUrl.current) window.URL.revokeObjectURL(objectUrl.current); }, []);
+  // Kết quả QR gắn với booking.id lúc gửi; chỉ hiển thị khi khớp đơn đang xem.
+  const [qr, setQr] = useState({ bookingId: null, status: 'idle', data: null, url: '', error: '' });
+  const [copyStatus, setCopyStatus] = useState({ bookingId: null, text: '', failed: false });
+  const objectUrl = useRef(null), qrTicket = useRef(0), qrLoadingFor = useRef(null), mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false; qrTicket.current += 1;
+      if (objectUrl.current) window.URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = null;
+    };
+  }, []);
+  const qrView = qr.bookingId === booking.id ? qr : { status: 'idle', data: null, url: '', error: '' };
+  const qrData = qrView.status === 'ready' ? qrView.data : null;
+  const copyText = copyStatus.bookingId === booking.id ? copyStatus : null;
   const data = request.data;
 
   async function action(path, body = {}) {
@@ -36,14 +57,44 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   }
 
   async function loadQr() {
+    const bookingId = booking.id;
+    if (qrLoadingFor.current === bookingId) return;
+    const ticket = ++qrTicket.current;
+    qrLoadingFor.current = bookingId;
+    setShowQr(true); setCopyStatus({ bookingId: null, text: '', failed: false });
+    setQr({ bookingId, status: 'loading', data: null, url: '', error: '' });
+    const current = () => mounted.current && ticket === qrTicket.current;
     try {
-      const res = await apiClient.get(`/bookings/${encodeURIComponent(booking.id)}/deposit/qr-payload`);
-      const png=await apiClient.get(`/bookings/${encodeURIComponent(booking.id)}/deposit/qr`,{responseType:'blob'});
-      if(objectUrl.current) window.URL.revokeObjectURL(objectUrl.current);
-      objectUrl.current=window.URL.createObjectURL(png.data);setQrUrl(objectUrl.current);
-      setQrData(res.data);
-      setShowQr(true);
-    } catch (e) { setError(getErrorMessage(e, 'Không tải được mã QR.')); }
+      const res = await apiClient.get(`/bookings/${encodeURIComponent(bookingId)}/deposit/qr-payload`);
+      const payload = res.data;
+      if (!payload || typeof payload.requestCode !== 'string' || !payload.requestCode.trim() || !Number.isSafeInteger(payload.amount) || payload.amount <= 0) {
+        throw new QrDataError('Dữ liệu mã QR không hợp lệ. Tải lại đơn rồi thử lại; không chuyển tiền theo dữ liệu này.');
+      }
+      if (Number.isFinite(deposit?.amount) && payload.amount !== deposit.amount) {
+        throw new QrDataError('Số tiền trên mã QR khác số cọc của đơn đang xem. Tải lại đơn trước khi chuyển tiền.');
+      }
+      const png = await apiClient.get(`/bookings/${encodeURIComponent(bookingId)}/deposit/qr`, { responseType: 'blob' });
+      if (!current()) return;
+      if (objectUrl.current) window.URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = window.URL.createObjectURL(png.data);
+      setQr({ bookingId, status: 'ready', data: payload, url: objectUrl.current, error: '' });
+    } catch (e) {
+      if (!current()) return;
+      setQr({ bookingId, status: 'error', data: null, url: '', error: qrLoadError(e) });
+    } finally {
+      if (ticket === qrTicket.current) qrLoadingFor.current = null;
+    }
+  }
+
+  async function copyValue(value, label) {
+    const bookingId = booking.id;
+    try {
+      if (!window.navigator?.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await window.navigator.clipboard.writeText(String(value));
+      if (mounted.current) setCopyStatus({ bookingId, text: `Đã sao chép ${label}.`, failed: false });
+    } catch {
+      if (mounted.current) setCopyStatus({ bookingId, text: `Không sao chép được ${label}. Hãy chép thủ công: ${value}`, failed: true });
+    }
   }
 
   async function handleReport() {
@@ -130,23 +181,33 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
 
     {isQr && depositApproved && role === 'USER' && booking.status === 'PENDING' && userTransferOpen && (
       <div className="mt-4 space-y-3">
-        <button className="btn" disabled={busy} onClick={()=>showQr?setShowQr(false):loadQr()}>
-          {showQr ? 'Ẩn mã QR' : 'Hiển thị mã QR cọc'}
+        <button className="btn" disabled={busy || qrView.status === 'loading'} onClick={() => showQr && qrView.status === 'ready' ? setShowQr(false) : loadQr()}>
+          {qrView.status === 'loading' ? 'Đang tải mã QR…' : showQr && qrView.status === 'ready' ? 'Ẩn mã QR' : 'Hiển thị mã QR cọc'}
         </button>
+        {showQr && qrView.status === 'error' && <Notice error>{qrView.error} <button className="btn-secondary" onClick={loadQr}>Thử tải lại mã QR</button></Notice>}
         {showQr && qrData && (
-          <div className="space-y-3 border-t pt-3">
-            <p className="text-sm text-amber-700"><strong>Mã yêu cầu:</strong> {qrData.requestCode}</p>
-            <button className="btn-secondary" onClick={()=>navigator.clipboard.writeText(`${qrData.amount} ${qrData.requestCode}`)}>Sao chép số tiền và nội dung</button>
-            <p className="text-sm text-amber-700"><strong>Số tiền:</strong> {money(qrData.amount)}</p>
-            <p className="text-sm text-amber-700"><strong>Hạn thanh toán:</strong> {date(qrData.paymentDueAt)}</p>
-            <p className="text-sm text-amber-700"><strong>Hạn đối soát:</strong> {date(qrData.reviewDueAt)}</p>
-            <img src={qrUrl} alt="Mã QR cọc giả lập" style={{maxWidth: '200px'}} />
-            <p className="text-xs text-red-600"><strong>{qrData.warning}</strong></p>
+          <div className="space-y-3 border-t pt-3" aria-label="Mã QR cọc DEMO">
+            <p className="font-medium text-amber-700">Mã QR DEMO — không chuyển tiền thật. Chỉ dùng để thử quy trình đối soát.</p>
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <div><dt className="text-slate-500">Số tiền cọc</dt><dd className="font-semibold">{money(qrData.amount)}</dd></div>
+              <div><dt className="text-slate-500">Nội dung chuyển khoản (mã yêu cầu)</dt><dd className="font-semibold">{qrData.requestCode}</dd></div>
+              <div><dt className="text-slate-500">Hạn đóng cọc (giờ Việt Nam)</dt><dd>{date(qrData.paymentDueAt)}</dd></div>
+              <div><dt className="text-slate-500">Hạn nhân viên đối soát (giờ Việt Nam)</dt><dd>{date(qrData.reviewDueAt)}</dd></div>
+            </dl>
+            <p className="text-xs text-slate-600">Hạn đối soát dành cho nhân viên, không kéo dài thời gian chuyển khoản.</p>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary" onClick={() => copyValue(qrData.requestCode, 'nội dung chuyển khoản')}>Sao chép nội dung chuyển khoản</button>
+              <button className="btn-secondary" onClick={() => copyValue(qrData.amount, 'số tiền')}>Sao chép số tiền</button>
+            </div>
+            {copyText?.text ? <p className={copyText.failed ? 'text-sm text-red-700' : 'text-sm text-slate-600'} role="status">{copyText.text}</p> : null}
+            <img src={qrView.url} alt="Mã QR cọc giả lập" style={{maxWidth: '200px'}} />
+            {qrData.warning ? <p className="text-xs text-red-600"><strong>{qrData.warning}</strong></p> : null}
             <details className="text-sm">
               <summary>Thông tin tài khoản nhận (giả lập)</summary>
               <pre className="mt-2 whitespace-pre-wrap bg-slate-50 p-3 rounded">{qrData.receiverSnapshot}</pre>
             </details>
             <hr />
+            <p className="text-sm"><strong>Bước tiếp theo:</strong> chuyển đúng số tiền và nội dung trước hạn đóng cọc, rồi gửi báo đã chuyển khoản. Báo đã chuyển chưa xác nhận đã nhận tiền.</p>
             <p className="font-medium">Tôi đã chuyển khoản (báo cho nhân viên đối soát)</p>
             {!reportedAt ? <button className="btn mt-2" disabled={busy} onClick={handleReport}>Gửi báo đã chuyển khoản</button> : <p>Đã gửi báo; chưa xác nhận tiền cho đến khi nhân viên đối soát.</p>}
           </div>

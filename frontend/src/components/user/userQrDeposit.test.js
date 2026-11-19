@@ -80,3 +80,122 @@ test('G3.1 USER ledger row shows verification time but never the verifier identi
   await mount(makeBooking('booking-a', 'AWAITING_APPLICATION'), custom, 'ADMIN');
   assert.match(text(), /Xác minh bởi: staff-secret-id/);
 });
+
+function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
+const button = name => [...container.querySelectorAll('button')].find(e => e.textContent.trim() === name);
+async function click(name) { const b = button(name); assert.ok(b, `missing button ${name}`); await act(async () => b.click()); await settle(); }
+const qrRequests = () => requests.filter(r => /\/deposit\/qr(-payload)?$/.test(r.url));
+
+test('G3.2 QR block shows amount, request code, VN deadline, DEMO warning and next step; image uses authenticated blob', async () => {
+  await mount();
+  await click('Hiển thị mã QR cọc');
+  const qr = container.querySelector('[aria-label="Mã QR cọc DEMO"]');
+  assert.ok(qr, 'QR block rendered');
+  const t = qr.textContent.replaceAll(' ', ' ');
+  assert.match(t, /Mã QR DEMO — không chuyển tiền thật/);
+  assert.match(t, /Số tiền cọc600\.000 ₫/);
+  assert.match(t, /Nội dung chuyển khoản \(mã yêu cầu\)REQ-booking-a/);
+  assert.match(t, /Hạn đóng cọc \(giờ Việt Nam\)10:30 24\/10\/2026/);
+  assert.match(t, /Hạn nhân viên đối soát \(giờ Việt Nam\)11:00 24\/10\/2026/);
+  assert.match(t, /không kéo dài thời gian chuyển khoản/);
+  assert.match(t, /Bước tiếp theo: chuyển đúng số tiền và nội dung trước hạn đóng cọc, rồi gửi báo đã chuyển khoản/);
+  assert.equal(qr.querySelector('img').getAttribute('src'), 'blob:fixture-1');
+  const image = requests.find(r => r.url.endsWith('/deposit/qr'));
+  assert.equal(image.responseType, 'blob');
+  assert.doesNotMatch(image.url, /token|Bearer/i);
+  assert.ok(button('Gửi báo đã chuyển khoản'));
+  await click('Ẩn mã QR');
+  assert.ok(!container.querySelector('[aria-label="Mã QR cọc DEMO"]'));
+});
+
+test('G3.2 loading locks the QR button and repeated clicks send no extra GET', async () => {
+  const gate = deferred();
+  await mount(undefined, async c => { if (c.url.endsWith('/deposit/qr-payload')) { await gate.promise; } return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  const loading = button('Đang tải mã QR…');
+  assert.ok(loading); assert.equal(loading.disabled, true);
+  await act(async () => loading.click()); await settle();
+  assert.equal(qrRequests().length, 1);
+  gate.resolve(); await settle();
+  assert.equal(qrRequests().length, 2);
+  assert.ok(container.querySelector('[aria-label="Mã QR cọc DEMO"]'));
+});
+
+test('G3.2 payload or image failure shows a neutral retry without stale QR, and retry succeeds', async () => {
+  for (const failing of ['/deposit/qr-payload', '/deposit/qr']) {
+    let fail = true;
+    await mount(undefined, c => { if (fail && c.url.endsWith(failing)) { const e = Error('Network Error'); e.code = 'ERR_NETWORK'; throw e; } return defaultHandler(c); });
+    await click('Hiển thị mã QR cọc');
+    assert.match(text(), /Không tải được mã QR\. Kiểm tra kết nối rồi thử tải lại/, failing);
+    assert.doesNotMatch(text(), /Network Error|ERR_NETWORK|REQ-booking-a/, failing);
+    assert.ok(!container.querySelector('img'));
+    fail = false;
+    await click('Thử tải lại mã QR');
+    assert.ok(container.querySelector('[aria-label="Mã QR cọc DEMO"]'), failing);
+    assert.doesNotMatch(text(), /Không tải được mã QR/);
+  }
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/qr-payload')) throw Object.assign(Error('x'), { response: { status: 403, data: { message: 'internal detail' } } }); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  assert.match(text(), /Không mở được mã QR của đơn này/);
+  assert.doesNotMatch(text(), /internal detail/);
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/qr-payload')) throw Object.assign(Error('x'), { response: { status: 409, data: { message: 'Đơn chưa được duyệt hồ sơ.' } } }); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  assert.match(text(), /Đơn chưa được duyệt hồ sơ\. Tải lại đơn/);
+});
+
+test('G3.2 invalid or mismatched payload never renders a QR or fetches the image', async () => {
+  for (const bad of [{}, { ...payload('booking-a'), requestCode: '' }, { ...payload('booking-a'), amount: '600000' }, { ...payload('booking-a'), amount: 590000 }]) {
+    await mount(undefined, c => c.url.endsWith('/deposit/qr-payload') ? bad : defaultHandler(c));
+    await click('Hiển thị mã QR cọc');
+    assert.ok(!container.querySelector('[aria-label="Mã QR cọc DEMO"]'));
+    assert.equal(requests.filter(r => r.url.endsWith('/deposit/qr')).length, 0);
+    assert.match(text(), bad.amount === 590000 ? /khác số cọc của đơn đang xem/ : /Dữ liệu mã QR không hợp lệ/);
+  }
+});
+
+test('G3.2 copy buttons give feedback and a manual fallback when clipboard fails', async () => {
+  await mount();
+  await click('Hiển thị mã QR cọc');
+  await click('Sao chép nội dung chuyển khoản');
+  assert.deepEqual(clipboardWrites, ['REQ-booking-a']);
+  assert.equal(container.querySelector('[role="status"]').textContent, 'Đã sao chép nội dung chuyển khoản.');
+  clipboardMode = 'fail';
+  await click('Sao chép số tiền');
+  assert.equal(clipboardWrites[1], '600000');
+  assert.equal(container.querySelector('[role="status"]').textContent, 'Không sao chép được số tiền. Hãy chép thủ công: 600000');
+  const saved = Object.getOwnPropertyDescriptor(dom.window.navigator, 'clipboard');
+  Object.defineProperty(dom.window.navigator, 'clipboard', { configurable: true, value: undefined });
+  try {
+    await click('Sao chép nội dung chuyển khoản');
+    assert.match(container.querySelector('[role="status"]').textContent, /Hãy chép thủ công: REQ-booking-a/);
+  } finally { Object.defineProperty(dom.window.navigator, 'clipboard', saved); }
+});
+
+test('G3.2 a late QR response for booking A never appears on booking B and its object URL is released', async () => {
+  const gate = deferred();
+  await mount(makeBooking('booking-a'), async c => { if (idOf(c.url) === 'booking-a' && c.url.endsWith('/deposit/qr')) await gate.promise; return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  // Cùng instance nhận prop đơn B (không đổi key) trong khi ảnh của A chưa trả về.
+  // Giữ key của lần mount (booking-a) để React tái dùng instance thay vì remount.
+  await act(async () => root.render(createElement(Deposit, { key: 'booking-a', booking: makeBooking('booking-b'), role: 'USER', assignedPickup: false, reload: () => {} })));
+  await settle();
+  gate.resolve(); await settle();
+  assert.equal(requests.filter(r => r.url === '/bookings/booking-a/deposit/qr').length, 1, 'image of A was requested and resolved');
+  assert.doesNotMatch(text(), /REQ-booking-a/);
+  await click('Hiển thị mã QR cọc');
+  assert.match(text(), /REQ-booking-b/);
+  assert.doesNotMatch(text(), /REQ-booking-a/);
+  await act(async () => root.unmount()); root = null;
+  assert.ok(objectUrls.length >= 1);
+  assert.ok(revoked.includes(objectUrls.at(-1)), 'last object URL revoked on unmount');
+});
+
+test('G3.2 no QR request for terminal, unsupported stage or VNPAY bookings', async () => {
+  const vnpay = { ...makeBooking('booking-a'), deposit: deposit({ method: 'VNPAY_SANDBOX' }), qrReconciliation: undefined };
+  for (const booking of [makeBooking('booking-a', 'EXPIRED'), makeBooking('booking-a', 'FUTURE_STAGE'), vnpay]) {
+    // GET /deposit trả cùng summary với đơn (component ưu tiên summary từ GET này).
+    await mount(booking, c => c.url.endsWith('/deposit') ? { deposit: booking.deposit, payments: [], refunds: [], events: [], ...(booking.qrReconciliation ? { qrReconciliation: booking.qrReconciliation } : {}) } : defaultHandler(c));
+    assert.ok(!button('Hiển thị mã QR cọc'), booking.qrReconciliation?.stage || 'VNPAY');
+    assert.equal(qrRequests().length, 0);
+  }
+});
