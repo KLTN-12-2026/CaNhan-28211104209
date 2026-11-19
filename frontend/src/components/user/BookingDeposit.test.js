@@ -202,3 +202,80 @@ test('Admin refund row exposes decision and provider reference without implying 
   assert.match(text, /Cần đối soát/);
   assert.doesNotMatch(text, /Đã hoàn/);
 });
+
+const visible = html => html.replace(/<[^>]*>/g, ' ').replaceAll('\u00a0', ' ').replace(/\s+/g, ' ');
+const qrApproved = (stage, overrides = {}) => ({
+  ...baseBooking,
+  ...overrides,
+  deposit: { ...baseBooking.deposit, method: 'DEMO_QR_MANUAL', approvedAt: '2026-10-24T03:00:00Z', paymentDueAt: '2026-10-24T03:30:00Z', reviewDueAt: '2026-10-24T04:00:00Z', originalHoldUntil: '2026-10-24T05:00:00Z', missingAmount: 600000, ...(overrides.deposit || {}) },
+  qrReconciliation: stage === undefined ? undefined : { stage, urgency: 'NORMAL', receivedAmount: 0, appliedAmount: 0, eligibleAmount: 0, shortfallAmount: 600000, reviewDueAt: '2026-10-24T04:00:00Z', processingIssue: 'NONE', timingIssues: [], ...(overrides.summary || {}) },
+});
+const renderDeposit = (booking, role = 'USER', assignedPickup = false) => visible(renderToStaticMarkup(React.createElement(Deposit, { booking, role, assignedPickup, reload() {} })));
+const renderProgress = (booking, role = 'USER') => visible(renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Progress, { booking, role }))));
+
+test('G3.1 USER QR panel and progress show backend stage content with next action', () => {
+  const cases = {
+    AWAITING_TRANSFER: [/Chờ bạn chuyển cọc/, /Bước tiếp theo: Sau khi chuyển, gửi báo đã chuyển khoản/, true],
+    REPORTED_NO_RECEIPT: [/Đã báo chuyển — chờ nhân viên đối chiếu/, /Không cần báo lại/, true],
+    RECEIVED_INCOMPLETE: [/Đã có khoản nhận — đang đối soát/, /Liên hệ chi nhánh nhận để đối chiếu trước khi chuyển thêm/, true],
+    AWAITING_APPLICATION: [/Đã nhận cọc — chờ hệ thống xác nhận đơn/, /chưa bảo đảm đơn được xác nhận/, false],
+    EXPIRED: [/Đơn đã hết hạn giữ chỗ/, /Không chuyển thêm tiền cho đơn này/, false],
+  };
+  for (const [stage, [label, detail, transferOpen]] of Object.entries(cases)) {
+    const text = renderDeposit(qrApproved(stage));
+    assert.match(text, new RegExp(`Tình trạng cọc: ${label.source}`), stage);
+    assert.match(text, detail, stage);
+    assert.doesNotMatch(text, /Còn thiếu/, stage);
+    assert.doesNotMatch(text, /Chi tiết đối soát cọc QR|Ghi nhận khoản nhận|Duyệt hồ sơ và tạo mã QR/, stage);
+    assert.equal(/Hiển thị mã QR cọc/.test(text), transferOpen, `${stage} QR button`);
+    assert.equal(/Chuyển khoản trước hạn đóng cọc/.test(text), transferOpen, `${stage} transfer note`);
+    const progress = renderProgress(qrApproved(stage));
+    assert.match(progress, new RegExp(`Hiện tại: ${label.source}`), stage);
+  }
+});
+
+test('G3.1 raw PENDING with backend EXPIRED never asks USER to pay, while Staff/Admin keep their content', () => {
+  const booking = qrApproved('EXPIRED', { deposit: { reportedAt: '2026-10-24T03:10:00Z' } });
+  const user = renderDeposit(booking);
+  assert.doesNotMatch(user, /Hiển thị mã QR cọc|Gửi báo đã chuyển khoản|Chuyển khoản trước hạn|Còn thiếu/);
+  assert.match(user, /Bạn đã báo chuyển khoản lúc 10:10 24\/10\/2026/);
+  const admin = renderDeposit(booking, 'ADMIN');
+  assert.match(admin, /Tóm tắt cọc:/);
+  assert.match(admin, /Khách đã báo · Chờ đối soát/);
+  assert.doesNotMatch(admin, /Tình trạng cọc của bạn|Bước tiếp theo/);
+  const staff = renderDeposit(booking, 'STAFF', true);
+  assert.match(staff, /Chi tiết đối soát cọc QR|Trạng thái đối soát/);
+  assert.doesNotMatch(staff, /Bước tiếp theo/);
+  assert.match(renderProgress(booking, 'STAFF'), /Hiện tại: Khách đã báo · Chờ đối soát/);
+});
+
+test('G3.1 USER QR without summary or with unsupported stage stays neutral', () => {
+  const missing = renderDeposit(qrApproved(undefined));
+  assert.match(missing, /Tình trạng cọc: Chờ đóng cọc/);
+  assert.match(missing, /không có nghĩa bạn đã hoặc chưa chuyển tiền/);
+  assert.match(missing, /Hiển thị mã QR cọc/);
+  assert.doesNotMatch(missing, /Chưa chuyển cọc|Chưa thanh toán|Còn thiếu/);
+  const unknown = renderDeposit(qrApproved('FUTURE_STAGE'));
+  assert.match(unknown, /Trạng thái cọc chưa được hỗ trợ/);
+  assert.doesNotMatch(unknown, /Hiển thị mã QR cọc/);
+});
+
+test('G3.1 APPLIED shows applied amount for USER and confirmed booking keeps closed wording', () => {
+  const applied = qrApproved('APPLIED', { summary: { appliedAmount: 600000, receivedAmount: 600000, eligibleAmount: 600000, shortfallAmount: 0 } });
+  const pending = renderDeposit(applied);
+  assert.match(pending, /Đã ghi nhận vào đơn: 600\.000/);
+  assert.match(pending, /Không cần chuyển thêm cọc/);
+  const confirmed = renderDeposit({ ...applied, status: 'CONFIRMED' });
+  assert.match(confirmed, /Tình trạng cọc: Đã ghi nhận cọc vào đơn/);
+  assert.doesNotMatch(confirmed, /Hiển thị mã QR cọc|Còn thiếu/);
+  assert.match(renderProgress({ ...applied, status: 'CONFIRMED' }), /Hiện tại: Đã xác nhận/);
+});
+
+test('G3.1 legacy summary renders excess amount and VNPAY USER keeps legacy content', () => {
+  const vnpay = { ...baseBooking, deposit: { ...baseBooking.deposit, approvedAt: '2026-10-24T03:00:00Z', paymentDueAt: '2026-10-24T03:30:00Z', receivedAmount: 700000, missingAmount: 0, excessAmount: 100000, mode: 'EXCESS' } };
+  const text = renderDeposit(vnpay);
+  assert.match(text, /Còn thiếu 0 ₫ · Dư 100\.000 ₫|Dư 100\.000/);
+  assert.doesNotMatch(text, /\{money\(/);
+  assert.doesNotMatch(text, /Tình trạng cọc của bạn|Bước tiếp theo/);
+  assert.match(text, /Chờ đóng cọc/);
+});

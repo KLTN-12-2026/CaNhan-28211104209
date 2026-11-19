@@ -7,7 +7,7 @@ import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
-import { qrReconciliationStageLabel, qrReconciliationStages, qrReconciliationWarnings } from "../../utils/qrReconciliation";
+import { depositPendingLabel, qrReconciliationStageLabel, qrReconciliationStages, qrReconciliationWarnings } from "../../utils/qrReconciliation";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -1471,7 +1471,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       </span>
                     )}
                     <Status status={booking.status} />
-                    {booking.status === 'PENDING' && booking.deposit?.required && !(area === 'staff' && mode === 'all' && booking.qrReconciliation) ? <span className="text-sm">{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
+                    {booking.status === 'PENDING' && booking.deposit?.required && !(area === 'staff' && mode === 'all' && booking.qrReconciliation) ? <span className="text-sm">{depositPendingLabel(booking, area === 'user' ? 'USER' : area.toUpperCase())}</span> : null}
                   </div>
                   {area === "admin" ? (
                     <div className="mb-1">
@@ -1787,7 +1787,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
-              {booking.status === 'PENDING' && booking.deposit?.required ? <span>{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
+              {booking.status === 'PENDING' && booking.deposit?.required ? <span>{depositPendingLabel(booking, currentUser?.role)}</span> : null}
               {area === "staff" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
             {booking.status === "PENDING" && booking.expiresAt && !booking.deposit?.required ? (
