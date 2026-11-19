@@ -7,6 +7,7 @@ import { getErrorMessage } from '../../utils/roles';
 import { vietnamDay } from '../../utils/bookingQueue';
 import { qrReconciliationStageLabel, qrReconciliationWarnings, userQrDepositStatus } from '../../utils/qrReconciliation';
 import QrReceiptForm from './QrReceiptForm';
+import { userRefundKind, userRefundStatus, userRefundTotals } from '../../utils/userRefund';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
@@ -164,6 +165,15 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const userQrStatus = role === 'USER' && isQr ? userQrDepositStatus(booking, reconciliation) : null;
   // USER QR: chỉ mở hướng dẫn chuyển khi stage backend còn chờ chuyển; thiếu summary giữ hành vi cũ theo trường deposit.
   const userTransferOpen = userQrStatus ? (userQrStatus.transferOpen ?? true) : true;
+  // Giải thích khoản không áp dụng cho USER chỉ từ timingIssues/số liệu backend; không quy lỗi xác minh muộn cho khách.
+  const userTimingIssues = userQrStatus && Array.isArray(reconciliation?.timingIssues) ? reconciliation.timingIssues : [];
+  const userTimingNotes = [
+    userTimingIssues.includes('TRANSFER_LATE') && 'Có khoản chuyển từ hạn đóng cọc trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.',
+    userTimingIssues.includes('VERIFICATION_LATE') && 'Có khoản được xác minh sau hạn đối soát của nhân viên. Đây không phải lỗi của bạn; khoản này không được áp dụng vào đơn, xem tình trạng hoàn bên dưới.',
+  ].filter(Boolean);
+  const userUnapplied = Boolean(userQrStatus) && ['EXPIRED', 'CLOSED'].includes(reconciliation?.stage) && hasReceivedAmount && hasAppliedAmount && reconciliation.receivedAmount > reconciliation.appliedAmount;
+  const refundList = Array.isArray(data?.refunds) ? data.refunds : null;
+  const userRefunds = role === 'USER' && refundList ? userRefundTotals(refundList) : null;
 
   return <section className="panel mb-5">
     <h2 className="mb-3 text-lg font-semibold">
@@ -175,6 +185,12 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       <p className="font-medium" aria-live="polite">Tình trạng cọc: {userQrStatus.label}</p>
       <p className="mt-1 text-sm">{userQrStatus.message}</p>
       <p className="mt-1 text-sm"><strong>Bước tiếp theo:</strong> {userQrStatus.nextAction}</p>
+      {userTimingNotes.map(note => <p key={note} className="mt-1 text-sm text-amber-700">{note}</p>)}
+      {userUnapplied && <div className="mt-2 text-sm" aria-label="Khoản đã nhận chưa áp dụng">
+        <p>Tổng đã nhận (lịch sử): {money(reconciliation.receivedAmount)} · Đã áp dụng vào đơn: {money(reconciliation.appliedAmount)}. Tổng đã nhận không phải số tiền hệ thống đang giữ.</p>
+        {refundList && refundList.length === 0 ? <p className="mt-1">Chưa có yêu cầu hoàn hiển thị cho đơn này. Liên hệ chi nhánh nhận nếu bạn cần hỗ trợ.</p>
+          : refundList ? <p className="mt-1">Xem tình trạng hoàn bên dưới.</p> : null}
+      </div>}
     </section> : <p>{deposit?.txnRef ? 'Đã ghi nhận cọc cho đơn' : booking.status !== 'PENDING' ? 'Đơn không còn chờ đóng cọc. Xem tình trạng thu/hoàn bên dưới.' :
       reportedAt ? 'Khách đã báo · Chờ đối soát' : depositApproved ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</p>}
     <dl className="mt-3 grid gap-2 text-sm" aria-label="Các mốc thời hạn cọc">
@@ -297,7 +313,16 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
         : p.verifierId && <p className="text-sm">Xác minh bởi: {p.verifierId} lúc {date(p.verifiedAt)}</p>}
     </div>)}
 
-    {data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">
+    {userRefunds && refundList.length > 0 && <section className="mt-3 text-sm" aria-label="Tình trạng hoàn của bạn">
+      <h3 className="font-medium">Tình trạng hoàn</h3>
+      <p>Đã hoàn (đã xác minh): {money(userRefunds.refunded)}{userRefunds.pending > 0 ? ` · Đang chờ hoặc xử lý, chưa hoàn: ${money(userRefunds.pending)}` : ''}</p>
+      {refundList.map(r => { const s = userRefundStatus(r.status); return <div key={r.id} className="mt-2 panel">
+        <p className="font-medium">Hoàn {money(r.amount)} · {s.label}</p>
+        <p className="text-sm">{s.detail}</p>
+        <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}{r.reason ? ` · ${r.reason}` : ''}</p>
+      </div>; })}
+    </section>}
+    {role !== 'USER' && data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">
       <p className="font-medium">Hoàn {money(r.amount)} · {refundLabels[r.status] || 'Cần kiểm tra'} · {r.reason}</p>
       <p className="text-sm">Loại: {r.kind} · Duyệt bởi: {r.approvedBy || '—'} · {r.approvedAt ? date(r.approvedAt) : '—'}</p>
     </div>)}

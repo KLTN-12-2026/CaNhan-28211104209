@@ -311,3 +311,53 @@ test('G3.3 no polling or automatic POST after report or error', async () => {
   assert.equal(requests.length, count);
   assert.equal(reportPosts().length, 1);
 });
+
+const ledgerWith = (stage, summaryExtra, refunds, depositExtra = {}) => ({
+  deposit: deposit(depositExtra), payments: [], refunds, events: [], qrReconciliation: summary(stage, summaryExtra),
+});
+const refundRows = [
+  { id: 'r1', paymentId: 'p1', amount: 200000, status: 'APPROVED', kind: 'LATE', reason: 'Khoản đến sau hạn', approvedBy: 'admin-secret', approvedAt: '2026-10-24T05:00:00Z' },
+  { id: 'r2', paymentId: 'p2', amount: 100000, status: 'SUCCEEDED', kind: 'EXCESS', reason: '', approvedBy: 'admin-secret', approvedAt: '2026-10-24T05:10:00Z' },
+  { id: 'r3', paymentId: 'p3', amount: 50000, status: 'PROCESSING', kind: 'FUTURE_KIND', reason: null },
+];
+
+test('G3.4 USER refund lifecycle never treats approval/processing as refunded and hides admin identity', async () => {
+  const booking = { ...makeBooking('booking-a', 'CLOSED'), status: 'CANCELLED' };
+  await mount(booking, c => c.url.endsWith('/deposit') ? ledgerWith('CLOSED', { receivedAmount: 350000, appliedAmount: 0 }, refundRows) : defaultHandler(c));
+  const section = container.querySelector('[aria-label="Tình trạng hoàn của bạn"]').textContent.replaceAll(' ', ' ');
+  assert.match(section, /Đã hoàn \(đã xác minh\): 100\.000 ₫ · Đang chờ hoặc xử lý, chưa hoàn: 250\.000 ₫/);
+  assert.match(section, /Hoàn 200\.000 ₫ · Đã duyệt, chưa hoàn tiền.*Chưa hoàn tiền\..*Nguyên nhân: Khoản nhận không đủ điều kiện thời hạn · Khoản đến sau hạn/);
+  assert.match(section, /Hoàn 100\.000 ₫ · Đã hoàn/);
+  assert.match(section, /Hoàn 50\.000 ₫ · Đang xử lý hoàn.*Chưa xác nhận đã hoàn tiền.*Nguyên nhân: Khác/);
+  assert.doesNotMatch(text(), /admin-secret|Duyệt bởi|Loại: LATE|FUTURE_KIND/);
+  assert.match(text(), /Tình trạng cọc: Đã kết thúc xử lý cọc/);
+  assert.doesNotMatch(text(), /Hiển thị mã QR cọc|Còn thiếu|Chuyển khoản trước hạn/);
+  await mount(booking, c => c.url.endsWith('/deposit') ? ledgerWith('CLOSED', { receivedAmount: 350000 }, refundRows) : defaultHandler(c), 'ADMIN');
+  assert.match(text(), /Duyệt bởi: admin-secret/);
+  assert.ok(!container.querySelector('[aria-label="Tình trạng hoàn của bạn"]'));
+});
+
+test('G3.4 late transfer and late verification are explained without asking for more money or blaming the customer', async () => {
+  const late = ledgerWith('RECEIVED_INCOMPLETE', { receivedAmount: 600000, timingIssues: ['TRANSFER_LATE', 'VERIFICATION_LATE'] }, []);
+  await mount(makeBooking('booking-a', 'RECEIVED_INCOMPLETE'), c => c.url.endsWith('/deposit') ? late : defaultHandler(c));
+  assert.match(text(), /Có khoản chuyển từ hạn đóng cọc trở đi\. Khoản này không được áp dụng vào đơn/);
+  assert.match(text(), /xác minh sau hạn đối soát của nhân viên\. Đây không phải lỗi của bạn/);
+  const expired = ledgerWith('EXPIRED', { receivedAmount: 600000, timingIssues: ['TRANSFER_LATE'], urgency: 'EXPIRED' }, []);
+  await mount(makeBooking('booking-a', 'EXPIRED'), c => c.url.endsWith('/deposit') ? expired : defaultHandler(c));
+  assert.match(text(), /Đơn đã hết hạn giữ chỗ/);
+  assert.match(text(), /Tổng đã nhận \(lịch sử\): 600\.000 ₫ · Đã áp dụng vào đơn: 0 ₫\. Tổng đã nhận không phải số tiền hệ thống đang giữ/);
+  assert.match(text(), /Chưa có yêu cầu hoàn hiển thị cho đơn này\. Liên hệ chi nhánh nhận/);
+  assert.doesNotMatch(text(), /Hiển thị mã QR cọc|Gửi báo đã chuyển khoản|Còn thiếu|chuyển thêm cho đơn này nữa/);
+  assert.equal(requests.filter(r => r.method === 'post').length, 0, 'no automatic cancel/refund mutation');
+});
+
+test('G3.4 expired booking with refunds points to refund status; applied closed booking shows no refund prompt', async () => {
+  await mount(makeBooking('booking-a', 'EXPIRED'), c => c.url.endsWith('/deposit') ? ledgerWith('EXPIRED', { receivedAmount: 200000 }, [refundRows[0]]) : defaultHandler(c));
+  assert.match(text(), /Xem tình trạng hoàn bên dưới\./);
+  assert.doesNotMatch(text(), /Chưa có yêu cầu hoàn hiển thị/);
+  const completed = { ...makeBooking('booking-a', 'CLOSED'), status: 'COMPLETED' };
+  await mount(completed, c => c.url.endsWith('/deposit') ? ledgerWith('CLOSED', { receivedAmount: 600000, appliedAmount: 600000, eligibleAmount: 600000 }, []) : defaultHandler(c));
+  assert.ok(!container.querySelector('[aria-label="Khoản đã nhận chưa áp dụng"]'));
+  assert.ok(!container.querySelector('[aria-label="Tình trạng hoàn của bạn"]'));
+  assert.doesNotMatch(text(), /Chưa có yêu cầu hoàn/);
+});
