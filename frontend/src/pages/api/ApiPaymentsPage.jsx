@@ -7,7 +7,7 @@ import { refundLabels, paymentLabels } from '../../components/user/BookingDeposi
 import { getErrorMessage } from '../../utils/roles';
 import { toVietnamInstant } from '../../utils/calendarDate';
 import { vietnamNowInput } from '../../utils/qrReceipt';
-import { matchesPaymentSearch, refundDate, refundResult, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
+import { matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
 
 const activeRefunds = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'FAILED']);
 const actionLabels = { create: 'Tạo yêu cầu hoàn', decide: 'Duyệt khoản hoàn', process: 'Bắt đầu xử lý hoàn', complete: 'Xác nhận đã hoàn DEMO', reconcile: 'Truy vấn kết quả' };
@@ -166,6 +166,7 @@ export default function ApiPaymentsPage() {
       <section className="panel mb-4 space-y-2" aria-label="Bộ lọc cọc và hoàn">
         <label className="field">Tìm mã đơn, giao dịch hoặc tham chiếu<input value={query} onChange={e => setQuery(e.target.value)} /></label>
         <p>Lọc trong {data.historyLimit || 200} giao dịch và yêu cầu hoàn gần nhất. Mở chi tiết đơn để xem toàn bộ lịch sử của đơn.</p>
+        <p className="text-sm" role="status" aria-label="Phạm vi danh sách đã tải">Hiển thị {filteredPayments.length} / {payments.length} khoản nhận và {filteredRefunds.length} / {refunds.length} yêu cầu hoàn đã tải. Đây không phải tổng toàn hệ thống.</p>
       </section>
       <h2 className="mb-3 text-lg font-semibold">Giao dịch cần đối soát</h2>
       {!data.unresolved.length && <p>Không có giao dịch cần đối soát trong danh sách hiện tại.</p>}
@@ -187,7 +188,14 @@ export default function ApiPaymentsPage() {
         return <section className="panel mb-3 space-y-2" key={p.id} aria-label={`Khoản nhận ${p.id}`}>
           <Link to={`/admin/bookings/${p.bookingId}`}>Đơn {p.bookingId.slice(0, 8)}</Link>
           <p>{p.providerTransaction || p.id.slice(0, 8)} · {money(p.amount)} · {paymentLabels[p.status] || 'Cần kiểm tra'} · {p.depositMethod === 'DEMO_QR_MANUAL' ? 'QR DEMO' : 'VNPAY Sandbox'}</p>
-          <p>Ghi nhận lúc {refundDate(p.verifiedAt || p.createdAt)} · Đã áp dụng {money(p.appliedAmount || 0)}</p>
+          <dl className="grid gap-1 text-sm sm:grid-cols-2">
+            <div><dt className="inline text-slate-500">Thời điểm chuyển: </dt><dd className="inline">{refundDate(p.transferTime)}</dd></div>
+            <div><dt className="inline text-slate-500">Xác minh: </dt><dd className="inline">{p.verifiedAt ? `${refundDate(p.verifiedAt)}${p.verifierId ? ` · mã người xác minh ${p.verifierId}` : ''}` : 'Chưa xác minh'}</dd></div>
+            {p.sourceAccount ? <div><dt className="inline text-slate-500">Nguồn tiền (giả lập): </dt><dd className="inline">{p.sourceAccount}</dd></div> : null}
+            <div><dt className="inline text-slate-500">Tạo lúc: </dt><dd className="inline">{refundDate(p.createdAt)}</dd></div>
+          </dl>
+          <p>Đã áp dụng {money(p.appliedAmount || 0)} / {money(p.amount)}{p.status === 'SUCCEEDED' && p.amount > (p.appliedAmount || 0) ? ` · Chưa áp dụng ${money(p.amount - (p.appliedAmount || 0))} (chưa đồng nghĩa được phép hoàn)` : ''}</p>
+          {(() => { const linked = refundSummary(refunds.filter(r => r.paymentId === p.id)); return linked.count ? <p className="text-sm" aria-label={`Hoàn liên quan ${p.id}`}>Hoàn liên quan trong danh sách đã tải: {linked.count} yêu cầu · Đã hoàn {money(linked.refunded)} · Chưa hoàn (chờ/xử lý) {money(linked.pending)}{linked.closedCount ? ` · Không hoàn/thất bại ${linked.closedCount}` : ''}{linked.unknownCount ? ` · Cần kiểm tra ${linked.unknownCount}` : ''}</p> : <p className="text-sm">Không có yêu cầu hoàn liên quan trong danh sách đã tải; mở chi tiết đơn để xem đủ lịch sử.</p>; })()}
           {p.depositMethod === 'DEMO_QR_MANUAL' && p.status === 'SUCCEEDED' && <>
             <p>Phần chưa áp dụng còn được yêu cầu hoàn: {money(available)} (máy chủ tính).</p>
             {hasManualRequest ? <p>Đã có yêu cầu hoàn thủ công; xem trạng thái trong lịch sử hoàn hoặc chi tiết đơn.</p> : available > 0 && <button className="btn-secondary" disabled={busy} onClick={() => setManualPayment(p.id)}>Tạo yêu cầu hoàn phần chưa áp dụng</button>}

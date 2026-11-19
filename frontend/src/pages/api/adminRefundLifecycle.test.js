@@ -90,3 +90,20 @@ for(const stored of [false,true])test(`completion timeout with server store=${st
   if(stored){await change('Trạng thái hoàn','');assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Đã hoàn/);assert.equal(button('Xác nhận đã hoàn DEMO'),undefined);}
   else {assert.equal(button('Xác nhận đã hoàn DEMO').matches(':disabled'),true);await click('Kiểm tra kết quả thao tác');assert.equal(posts().length,1);assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Đang xử lý/);}
 });
+test('G4.2 payment history shows transfer/verification/source, applied share and linked refunds from the loaded list only',async()=>{
+  await mount(null,d=>{
+    Object.assign(d.payments[0],{appliedAmount:30000,transferTime:'2026-10-25T02:50:00Z',verifiedAt:'2026-10-25T03:05:00Z',verifierId:'staff-dn'});
+    d.refunds=[{...refund,status:'SUCCEEDED',amount:20000},{...refund,id:'refund-2',status:'APPROVED',amount:10000},{...refund,id:'refund-3',status:'DECLINED',amount:0},{...refund,id:'other',paymentId:'pay-other',status:'PROCESSING',amount:999}];
+  });
+  const row=container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent.replaceAll(' ',' ');
+  assert.match(row,/Thời điểm chuyển: 25\/10\/2026, 09:50:00/);
+  assert.match(row,/Xác minh: 25\/10\/2026, 10:05:00 · mã người xác minh staff-dn/);
+  assert.match(row,/Nguồn tiền \(giả lập\): DEMO-SOURCE/);
+  assert.match(row,/Đã áp dụng 30\.000 ₫ \/ 100\.000 ₫ · Chưa áp dụng 70\.000 ₫ \(chưa đồng nghĩa được phép hoàn\)/);
+  assert.match(container.querySelector('[aria-label="Hoàn liên quan pay-1"]').textContent.replaceAll(' ',' '),/3 yêu cầu · Đã hoàn 20\.000 ₫ · Chưa hoàn \(chờ\/xử lý\) 10\.000 ₫ · Không hoàn\/thất bại 1$/);
+  assert.match(container.querySelector('[aria-label="Phạm vi danh sách đã tải"]').textContent,/Hiển thị 1 \/ 1 khoản nhận và 2 \/ 4 yêu cầu hoàn đã tải\. Đây không phải tổng toàn hệ thống\./);
+  assert.equal(requests.length,1,'one list GET, no per-row requests');
+  await mount(null,d=>{d.refunds=[];});
+  assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Không có yêu cầu hoàn liên quan trong danh sách đã tải/);
+  assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Xác minh: Chưa xác minh/);
+});
