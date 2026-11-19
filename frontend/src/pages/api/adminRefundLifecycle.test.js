@@ -124,3 +124,19 @@ test('G4.3 refund rows explain each lifecycle state; only SUCCEEDED is refunded 
   assert.match(container.querySelector('[aria-label="Tóm tắt vòng đời hoàn"]').textContent.replaceAll(' ',' '),/Trong 8 yêu cầu hoàn đã tải: đã hoàn \(đã xác minh\) 5\.000 ₫ · chưa hoàn — chờ\/duyệt\/xử lý\/cần đối soát 10\.000 ₫ \(4 yêu cầu\) · không hoàn\/thất bại 2 · cần kiểm tra 1\./);
   assert.equal(posts().length,0);
 });
+test('G4.4 initial list failure shows an error without stale data or actions, and reload recovers with GET only',async()=>{
+  let fail=true;
+  await mount(()=>{if(fail)throw failure(500);return copy(serverData);});
+  assert.match(container.textContent,/Máy chủ gặp lỗi|HTTP 500/);
+  assert.ok(!container.querySelector('[aria-label="Bộ lọc cọc và hoàn"]'),'no data sections while list failed');
+  assert.equal(button('Duyệt khoản hoàn'),undefined);
+  fail=false;await click('Tải lại');
+  assert.ok(container.querySelector('[aria-label="Khoản nhận pay-1"]'));
+  assert.match(container.querySelector('[role="status"]').textContent,/Đã tải lại dữ liệu từ máy chủ/);
+  assert.equal(posts().length,0);assert.equal(requests.length,2);
+});
+test('G4.4 list loading state shows no actions before data arrives',async()=>{
+  const gate=deferred();await mount(async()=>{await gate.promise;return copy(serverData);});
+  assert.match(container.textContent,/Đang tải…/);assert.equal(button('Duyệt khoản hoàn'),undefined);
+  await act(async()=>gate.resolve());assert.ok(button('Duyệt khoản hoàn'));
+});

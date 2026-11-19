@@ -279,3 +279,17 @@ test('G3.1 legacy summary renders excess amount and VNPAY USER keeps legacy cont
   assert.doesNotMatch(text, /Tình trạng cọc của bạn|Bước tiếp theo/);
   assert.match(text, /Chờ đóng cọc/);
 });
+
+test('G4.4 Admin never inherits Staff pickup actions, even when marked as assigned', () => {
+  const pending = { ...baseBooking, deposit: { ...baseBooking.deposit, method: 'DEMO_QR_MANUAL' } };
+  const approved = { ...pending, deposit: { ...pending.deposit, approvedAt: '2026-10-24T03:00:00Z', paymentDueAt: '2026-10-24T03:30:00Z', reviewDueAt: '2026-10-24T04:00:00Z' }, qrReconciliation: { stage: 'AWAITING_TRANSFER', receivedAmount: 0, appliedAmount: 0, timingIssues: [] } };
+  const confirmed = { ...approved, status: 'CONFIRMED', startAt: '2026-10-25T17:00:00Z' };
+  const render = (booking, role) => renderToStaticMarkup(React.createElement(Deposit, { booking, role, assignedPickup: true, now: Date.parse('2026-10-27T00:00:00Z'), reload() {} }));
+  for (const booking of [pending, approved, confirmed]) {
+    const admin = render(booking, 'ADMIN');
+    assert.doesNotMatch(admin, /Duyệt hồ sơ và tạo mã QR cọc|Xác minh và ghi nhận|Ghi nhận khách không đến nhận|Chi tiết đối soát cọc QR|Hiển thị mã QR cọc|Gửi báo đã chuyển khoản/);
+  }
+  // Đối chứng: Staff chi nhánh nhận vẫn có thao tác tương ứng.
+  assert.match(render(pending, 'STAFF'), /Duyệt hồ sơ và tạo mã QR cọc/);
+  assert.match(render(confirmed, 'STAFF'), /Ghi nhận khách không đến nhận/);
+});
