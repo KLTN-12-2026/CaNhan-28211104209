@@ -23,6 +23,13 @@ function qrLoadError(error) {
   return 'Không tải được mã QR. Kiểm tra kết nối rồi thử tải lại; chưa chuyển tiền khi chưa thấy mã QR.';
 }
 
+function reportFailMessage(error) {
+  const status = error?.response?.status;
+  if (status === 401 || status === 403 || status === 404) return 'Không gửi được báo cho đơn này. Đăng nhập đúng tài khoản đặt đơn rồi tải lại trang.';
+  if (typeof error?.response?.data?.message === 'string') return `${error.response.data.message} Tải lại đơn để xem trạng thái mới nhất.`;
+  return 'Không gửi được báo đã chuyển khoản. Tải lại đơn để xem trạng thái mới nhất.';
+}
+
 export default function BookingDeposit({ booking, role, assignedPickup, reload, now }) {
   const request = useApiData(`/bookings/${encodeURIComponent(booking.id)}/deposit`);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -32,6 +39,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const [qr, setQr] = useState({ bookingId: null, status: 'idle', data: null, url: '', error: '' });
   const [copyStatus, setCopyStatus] = useState({ bookingId: null, text: '', failed: false });
   const objectUrl = useRef(null), qrTicket = useRef(0), qrLoadingFor = useRef(null), mounted = useRef(false);
+  // Báo đã chuyển: trạng thái gắn booking.id và object booking lúc gửi để nhận biết đơn đã được tải lại.
+  const [report, setReport] = useState({ bookingId: null, status: 'idle', at: null, bookingRef: null, error: '' });
+  const reportSending = useRef(null), currentBookingId = useRef(booking.id);
+  useEffect(() => { currentBookingId.current = booking.id; }, [booking.id]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -98,16 +109,34 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   }
 
   async function handleReport() {
-    if (busy) return;
+    const bookingId = booking.id, sentWith = booking;
+    if (busy || reportSending.current === bookingId) return;
+    reportSending.current = bookingId;
     setBusy(true); setError('');
+    setReport({ bookingId, status: 'sending', at: null, bookingRef: sentWith, error: '' });
+    const still = () => mounted.current && currentBookingId.current === bookingId;
     try {
-      await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/report`, {
-        idempotencyKey: `report-${booking.id}`
+      // Khóa cố định theo đơn: gửi lại sau kết quả chưa rõ dùng đúng khóa này; backend không gia hạn khi báo lặp.
+      const response = await apiClient.post(`/bookings/${encodeURIComponent(bookingId)}/deposit/report`, {
+        idempotencyKey: `report-${bookingId}`
       });
-      request.reload(); reload(); setShowQr(false);
-    } catch (e) { setError(getErrorMessage(e, 'Không thể gửi báo chuyển khoản.')); }
-    finally { setBusy(false); }
+      if (!still()) return;
+      const at = typeof response.data?.deposit?.reportedAt === 'string' ? response.data.deposit.reportedAt : null;
+      setReport({ bookingId, status: 'acked', at, bookingRef: sentWith, error: '' });
+      setShowQr(false);
+      request.reload(); reload();
+    } catch (e) {
+      if (!still()) return;
+      const status = e?.response?.status;
+      if (status >= 400 && status < 500) setReport({ bookingId, status: 'failed', at: null, bookingRef: sentWith, error: reportFailMessage(e) });
+      else setReport({ bookingId, status: 'uncertain', at: null, bookingRef: sentWith, error: '' });
+    } finally {
+      if (reportSending.current === bookingId) reportSending.current = null;
+      if (mounted.current) setBusy(false);
+    }
   }
+
+  function recheckReport() { request.reload(); reload(); }
 
   const deposit = booking.deposit;
   const isQr = deposit?.method === 'DEMO_QR_MANUAL';
@@ -115,6 +144,12 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const depositApproved = deposit?.approvedAt;
   const depositDue = deposit?.paymentDueAt;
   const reportedAt = deposit?.reportedAt;
+  const reportView = report.bookingId === booking.id ? report : { status: 'idle', at: null, bookingRef: null, error: '' };
+  const reportAcked = reportView.status === 'acked';
+  const reportUncertain = reportView.status === 'uncertain' && reportView.bookingRef === booking;
+  const reportRechecked = reportView.status === 'uncertain' && reportView.bookingRef !== booking && !reportedAt;
+  const reportedAtShown = reportedAt || (reportAcked ? reportView.at : null);
+  const reportDone = Boolean(reportedAt) || reportAcked;
   const appliedAmount = deposit?.appliedAmount ?? 0;
   const receivedAmount = deposit?.receivedAmount ?? 0;
   const missingAmount = deposit?.missingAmount ?? 0;
@@ -209,9 +244,25 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
             <hr />
             <p className="text-sm"><strong>Bước tiếp theo:</strong> chuyển đúng số tiền và nội dung trước hạn đóng cọc, rồi gửi báo đã chuyển khoản. Báo đã chuyển chưa xác nhận đã nhận tiền.</p>
             <p className="font-medium">Tôi đã chuyển khoản (báo cho nhân viên đối soát)</p>
-            {!reportedAt ? <button className="btn mt-2" disabled={busy} onClick={handleReport}>Gửi báo đã chuyển khoản</button> : <p>Đã gửi báo; chưa xác nhận tiền cho đến khi nhân viên đối soát.</p>}
+            {reportDone ? <p>Đã gửi báo; chưa xác nhận tiền cho đến khi nhân viên đối soát.</p>
+              : reportUncertain || reportView.status === 'sending' ? null
+              : <button className="btn mt-2" disabled={busy} onClick={handleReport}>Gửi báo đã chuyển khoản</button>}
           </div>
         )}
+      </div>
+    )}
+
+    {isQr && role === 'USER' && reportView.status !== 'idle' && !(reportedAt && reportView.status !== 'acked') && (
+      <div className="mt-3 text-sm" role="status" aria-label="Kết quả báo đã chuyển khoản">
+        {reportView.status === 'sending' && <p>Đang gửi báo đã chuyển khoản…</p>}
+        {reportAcked && <p>Máy chủ đã nhận báo đã chuyển khoản{reportView.at ? ` lúc ${date(reportView.at)}` : ''}. Báo chưa xác nhận đã nhận tiền; không cần gửi lại.</p>}
+        {reportAcked && !reportedAt && <p className="mt-1">Đơn chưa cập nhật xong. <button className="btn-secondary" onClick={recheckReport}>Tải lại đơn</button></p>}
+        {reportUncertain && <>
+          <p className="font-medium text-amber-700">Chưa rõ báo đã chuyển khoản đã được ghi nhận hay chưa. Không gửi lại ngay; tải lại đơn để kiểm tra trước.</p>
+          <button className="btn-secondary mt-1" onClick={recheckReport}>Kiểm tra lại tình trạng báo</button>
+        </>}
+        {reportRechecked && <p>Đơn đã được tải lại và chưa ghi nhận báo của bạn. Có thể gửi lại; báo lặp không kéo dài thời hạn.</p>}
+        {reportView.status === 'failed' && <p className="text-red-700">{reportView.error}</p>}
       </div>
     )}
 
@@ -263,7 +314,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       <div className="mt-3 p-3 bg-slate-50 rounded text-sm" aria-label="Tóm tắt cọc của bạn">
         {Number.isFinite(deposit?.amount) && <p>Cọc yêu cầu: {money(deposit.amount)}</p>}
         {hasAppliedAmount && reconciliation.appliedAmount > 0 && <p>Đã ghi nhận vào đơn: {money(reconciliation.appliedAmount)}</p>}
-        {reportedAt && <p>Bạn đã báo chuyển khoản lúc {date(reportedAt)}</p>}
+        {reportedAtShown && <p>Bạn đã báo chuyển khoản lúc {date(reportedAtShown)}</p>}
       </div>
     )}
     {depositApproved && booking.status === 'PENDING' && !(role === 'STAFF' && isQr) && !userQrStatus && (

@@ -199,3 +199,115 @@ test('G3.2 no QR request for terminal, unsupported stage or VNPAY bookings', asy
     assert.equal(qrRequests().length, 0);
   }
 });
+
+const reportPosts = () => requests.filter(r => r.method === 'post' && r.url.endsWith('/deposit/report'));
+const reportStatus = () => container.querySelector('[aria-label="Kết quả báo đã chuyển khoản"]')?.textContent.replaceAll(' ', ' ') || '';
+const networkError = () => Object.assign(Error('Network Error'), { code: 'ERR_NETWORK' });
+
+test('G3.3 report sends exactly one POST with the stable key even under repeated clicks', async () => {
+  const gate = deferred();
+  await mount(undefined, async c => { if (c.url.endsWith('/deposit/report')) { await gate.promise; return { id: 'booking-a', deposit: deposit({ reportedAt: '2026-10-24T03:12:00Z' }) }; } return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  const send = button('Gửi báo đã chuyển khoản');
+  await act(async () => { send.click(); send.click(); }); await settle();
+  assert.ok(!button('Gửi báo đã chuyển khoản'), 'send hidden while sending');
+  assert.match(reportStatus(), /Đang gửi báo đã chuyển khoản/);
+  gate.resolve(); await settle();
+  assert.equal(reportPosts().length, 1);
+  assert.deepEqual(reportPosts()[0].body, { idempotencyKey: 'report-booking-a' });
+});
+
+test('G3.3 acknowledged POST stays reported even when reload GET fails, and never offers a new send', async () => {
+  let reloadsCalled = 0;
+  const custom = c => {
+    if (c.url.endsWith('/deposit/report')) return { id: 'booking-a', deposit: deposit({ reportedAt: '2026-10-24T03:12:00Z' }) };
+    if (c.url.endsWith('/deposit') && reportPosts().length) throw networkError();
+    return defaultHandler(c);
+  };
+  await mount(undefined, custom);
+  const parentReload = () => { reloadsCalled++; };
+  await act(async () => root.render(createElement(Deposit, { key: 'booking-a', booking: makeBooking(), role: 'USER', assignedPickup: false, reload: parentReload })));
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  assert.equal(reloadsCalled, 1, 'parent reload requested once');
+  assert.match(reportStatus(), /Máy chủ đã nhận báo đã chuyển khoản lúc 10:12 24\/10\/2026/);
+  assert.match(reportStatus(), /không cần gửi lại/);
+  assert.match(text(), /Bạn đã báo chuyển khoản lúc 10:12 24\/10\/2026/);
+  assert.ok(!button('Gửi báo đã chuyển khoản'));
+  await click('Hiển thị mã QR cọc');
+  assert.ok(!button('Gửi báo đã chuyển khoản'), 'reopened QR still shows reported');
+  assert.match(text(), /Đã gửi báo; chưa xác nhận tiền/);
+  assert.equal(reportPosts().length, 1);
+});
+
+test('G3.3 uncertain POST blocks blind resend until the booking is reloaded, then resend reuses the same key', async () => {
+  for (const failure of [networkError(), Object.assign(Error('timeout'), { code: 'ECONNABORTED' }), Object.assign(Error('x'), { response: { status: 502, data: {} } })]) {
+    let first = true;
+    await mount(undefined, c => { if (c.url.endsWith('/deposit/report') && first) { first = false; throw failure; } if (c.url.endsWith('/deposit/report')) return { id: 'booking-a', deposit: deposit({ reportedAt: '2026-10-24T03:15:00Z' }) }; return defaultHandler(c); });
+    await click('Hiển thị mã QR cọc');
+    await click('Gửi báo đã chuyển khoản');
+    assert.match(reportStatus(), /Chưa rõ báo đã chuyển khoản đã được ghi nhận hay chưa/);
+    assert.doesNotMatch(text(), /Network Error|timeout|502/);
+    assert.ok(!button('Gửi báo đã chuyển khoản'), 'no blind resend');
+    const before = requests.length;
+    await click('Kiểm tra lại tình trạng báo');
+    assert.ok(requests.slice(before).every(r => r.method === 'get'), 'recheck only GETs');
+    assert.ok(!button('Gửi báo đã chuyển khoản'), 'still blocked until booking prop is refreshed');
+    // Đơn tải lại (object mới) vẫn chưa có reportedAt → cho gửi lại, cùng khóa.
+    await render(makeBooking());
+    assert.match(reportStatus(), /chưa ghi nhận báo của bạn\. Có thể gửi lại; báo lặp không kéo dài thời hạn/);
+    await click('Gửi báo đã chuyển khoản');
+    assert.equal(reportPosts().length, 2);
+    assert.deepEqual(reportPosts().map(r => r.body.idempotencyKey), ['report-booking-a', 'report-booking-a']);
+  }
+});
+
+test('G3.3 uncertain POST resolved by reload showing backend reportedAt needs no resend', async () => {
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/report')) throw networkError(); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  await render(makeBooking('booking-a', 'REPORTED_NO_RECEIPT', { reportedAt: '2026-10-24T03:12:00Z' }));
+  assert.equal(reportStatus(), '');
+  assert.match(text(), /Tình trạng cọc: Chờ bạn chuyển cọc|Đã báo chuyển/);
+  assert.match(text(), /Bạn đã báo chuyển khoản lúc 10:12 24\/10\/2026/);
+  assert.equal(reportPosts().length, 1);
+});
+
+test('G3.3 business rejection is shown as a definite failure, not as uncertain', async () => {
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/report')) throw Object.assign(Error('x'), { response: { status: 409, data: { message: 'Đã hết hạn báo chuyển khoản.' } } }); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  assert.match(reportStatus(), /Đã hết hạn báo chuyển khoản\. Tải lại đơn để xem trạng thái mới nhất/);
+  assert.doesNotMatch(reportStatus(), /Chưa rõ/);
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/report')) throw Object.assign(Error('x'), { response: { status: 404, data: { message: 'NotFound internal' } } }); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  assert.match(reportStatus(), /Không gửi được báo cho đơn này/);
+  assert.doesNotMatch(reportStatus(), /internal/);
+});
+
+test('G3.3 a late report response for booking A does not change booking B or trigger reloads', async () => {
+  const gate = deferred();
+  let reloadsCalled = 0;
+  await mount(undefined, async c => { if (c.url.endsWith('/deposit/report')) { await gate.promise; return { id: 'booking-a', deposit: deposit({ reportedAt: '2026-10-24T03:12:00Z' }) }; } return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  await act(async () => root.render(createElement(Deposit, { key: 'booking-a', booking: makeBooking('booking-b'), role: 'USER', assignedPickup: false, reload: () => { reloadsCalled++; } })));
+  await settle();
+  const getsBefore = requests.filter(r => r.method === 'get').length;
+  gate.resolve(); await settle();
+  assert.equal(reloadsCalled, 0);
+  assert.equal(requests.filter(r => r.method === 'get').length, getsBefore, 'no reload GET for B from A response');
+  assert.equal(reportStatus(), '');
+  assert.doesNotMatch(text(), /Máy chủ đã nhận báo/);
+});
+
+test('G3.3 no polling or automatic POST after report or error', async () => {
+  await mount(undefined, c => { if (c.url.endsWith('/deposit/report')) throw networkError(); return defaultHandler(c); });
+  await click('Hiển thị mã QR cọc');
+  await click('Gửi báo đã chuyển khoản');
+  const count = requests.length;
+  await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+  assert.equal(requests.length, count);
+  assert.equal(reportPosts().length, 1);
+});
