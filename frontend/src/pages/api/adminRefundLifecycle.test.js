@@ -107,3 +107,20 @@ test('G4.2 payment history shows transfer/verification/source, applied share and
   assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Không có yêu cầu hoàn liên quan trong danh sách đã tải/);
   assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Xác minh: Chưa xác minh/);
 });
+test('G4.3 refund rows explain each lifecycle state; only SUCCEEDED is refunded and unknown states stay unconfirmed',async()=>{
+  const rows=[['REQUESTED','LATE_CUSTOMER'],['APPROVED','EXCESS'],['PROCESSING','LATE'],['UNKNOWN','UNAPPLIED'],['SUCCEEDED','MANUAL_EXCESS'],['FAILED','BUSINESS'],['DECLINED','NO_SHOW'],['FUTURE','ODD']];
+  await mount(null,d=>{d.refunds=rows.map(([status,kind],i)=>({...refund,id:`r-${status}`,status,kind,amount:1000*(i+1),providerTransaction:status==='SUCCEEDED'?'REF-OK':null}));});
+  await change('Trạng thái hoàn','');
+  const row=status=>container.querySelector(`[aria-label="Yêu cầu hoàn r-${status}"]`).textContent.replaceAll(' ',' ');
+  assert.match(row('REQUESTED'),/Chờ Admin quyết định.*Nguyên nhân: Khách hủy sát giờ \(LATE_CUSTOMER\)/);
+  assert.match(row('APPROVED'),/Đã duyệt chưa có nghĩa đã hoàn tiền/);
+  for(const status of ['REQUESTED','APPROVED','PROCESSING','UNKNOWN','FAILED','DECLINED','FUTURE'])assert.doesNotMatch(row(status),/Đã hoàn —/,status);
+  assert.match(row('PROCESSING'),/Cần kiểm tra kết quả\. Không gửi lại/);
+  assert.match(row('SUCCEEDED'),/Đã hoàn — kết quả đã xác minh với tham chiếu REF-OK/);
+  assert.match(row('FAILED'),/Hoàn thất bại — chưa hoàn tiền.*không tự gửi lại/);
+  assert.match(row('DECLINED'),/Quyết định không hoàn khoản này/);
+  assert.match(row('FUTURE'),/Cần kiểm tra.*Nguyên nhân: Khác \(ODD\).*Trạng thái hoàn chưa được hỗ trợ — chưa xác nhận đã hoàn/);
+  assert.equal([...container.querySelectorAll('[aria-label="Yêu cầu hoàn r-FUTURE"] button')].length,0,'no action for unsupported state');
+  assert.match(container.querySelector('[aria-label="Tóm tắt vòng đời hoàn"]').textContent.replaceAll(' ',' '),/Trong 8 yêu cầu hoàn đã tải: đã hoàn \(đã xác minh\) 5\.000 ₫ · chưa hoàn — chờ\/duyệt\/xử lý\/cần đối soát 10\.000 ₫ \(4 yêu cầu\) · không hoàn\/thất bại 2 · cần kiểm tra 1\./);
+  assert.equal(posts().length,0);
+});

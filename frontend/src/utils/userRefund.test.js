@@ -30,6 +30,9 @@ test('refund kinds are translated and unknown kinds stay neutral', () => {
   assert.equal(userRefundKind('MANUAL_EXCESS'), 'Tiền nhận vượt số cọc');
   assert.equal(userRefundKind('CANCELLED'), 'Hủy đơn');
   assert.equal(userRefundKind('NO_SHOW'), 'Không đến nhận xe');
+  assert.equal(userRefundKind('EARLY_USER'), 'Khách hủy trước mốc nhận');
+  assert.equal(userRefundKind('BUSINESS'), 'Doanh nghiệp từ chối hoặc không cung cấp xe');
+  assert.equal(userRefundKind('LATE_CUSTOMER'), 'Khách hủy sát giờ');
   for (const kind of [undefined, 'FUTURE', 'constructor']) assert.equal(userRefundKind(kind), 'Khác');
 });
 

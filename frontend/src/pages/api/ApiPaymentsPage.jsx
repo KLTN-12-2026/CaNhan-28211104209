@@ -7,9 +7,11 @@ import { refundLabels, paymentLabels } from '../../components/user/BookingDeposi
 import { getErrorMessage } from '../../utils/roles';
 import { toVietnamInstant } from '../../utils/calendarDate';
 import { vietnamNowInput } from '../../utils/qrReceipt';
+import { userRefundKind } from '../../utils/userRefund';
 import { matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
 
 const activeRefunds = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'FAILED']);
+const knownRefundStatuses = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'SUCCEEDED', 'FAILED', 'DECLINED']);
 const actionLabels = { create: 'Tạo yêu cầu hoàn', decide: 'Duyệt khoản hoàn', process: 'Bắt đầu xử lý hoàn', complete: 'Xác nhận đã hoàn DEMO', reconcile: 'Truy vấn kết quả' };
 
 export function RefundRow({ item, run, busy, depositMethod = item.depositMethod, payment }) {
@@ -30,7 +32,12 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
   return <section className="panel space-y-3" aria-label={`Yêu cầu hoàn ${item.id}`}>
     <Link to={`/admin/bookings/${item.bookingId}`}>Đơn {item.bookingId.slice(0, 8)}</Link>
     <p><strong>{refundLabels[item.status] || 'Cần kiểm tra'}</strong> · {money(item.amount)} · {item.reason}</p>
+    <p>Nguyên nhân: {userRefundKind(item.kind)} ({item.kind || '—'})</p>
     <p>{isQr ? 'QR DEMO · Không chuyển tiền thật' : 'VNPAY Sandbox'} · Tạo lúc {refundDate(item.createdAt)}</p>
+    {item.status === 'SUCCEEDED' && <p>Đã hoàn — kết quả đã xác minh với tham chiếu {item.providerTransaction || '—'}.</p>}
+    {item.status === 'FAILED' && <p>Hoàn thất bại — chưa hoàn tiền. Kiểm tra chứng từ và lịch sử đơn; không tự gửi lại hoặc tạo yêu cầu thay thế.</p>}
+    {item.status === 'DECLINED' && <p>Quyết định không hoàn khoản này; xem lý do quyết định ở trên.</p>}
+    {!knownRefundStatuses.has(item.status) && <p>Trạng thái hoàn chưa được hỗ trợ — chưa xác nhận đã hoàn. Kiểm tra trước khi thao tác.</p>}
     <details><summary>Thông tin đối soát</summary><dl className="mt-2 space-y-2 break-all">
       <div><dt>Mã yêu cầu hoàn</dt><dd>{item.id}</dd></div>
       <div><dt>Tham chiếu thanh toán</dt><dd>{payment?.providerTransaction || item.paymentId}</dd></div>
@@ -176,6 +183,7 @@ export default function ApiPaymentsPage() {
         {p.depositMethod === 'DEMO_QR_MANUAL' ? <p>QR DEMO · Kiểm tra khoản nhận, đơn và lịch sử hoàn trước khi xử lý.</p> : <button className="btn-secondary" disabled={busy} onClick={() => prepare(`/admin/payments/${p.id}/reconcile`, {}, { type: 'reconcile', item: p })}>Đối soát với VNPAY</button>}
       </section>)}
       <h2 className="my-3 text-lg font-semibold">Yêu cầu và lịch sử hoàn tiền</h2>
+      {(() => { const s = refundSummary(refunds); return <p className="mb-3 text-sm" aria-label="Tóm tắt vòng đời hoàn">Trong {s.count} yêu cầu hoàn đã tải: đã hoàn (đã xác minh) {money(s.refunded)} · chưa hoàn — chờ/duyệt/xử lý/cần đối soát {money(s.pending)} ({s.pendingCount} yêu cầu) · không hoàn/thất bại {s.closedCount}{s.unknownCount ? ` · cần kiểm tra ${s.unknownCount}` : ''}.</p>; })()}
       <label className="field mb-3">Trạng thái hoàn<select value={refundStatus} onChange={e => setRefundStatus(e.target.value)}><option value="active">Cần xử lý</option><option value="">Tất cả</option>{Object.entries(refundLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <div className="space-y-3">{filteredRefunds.map(r => <RefundRow key={`${r.id}-${r.version}`} item={r} run={prepare} busy={busy} payment={refundPayments.find(p => p.id === r.paymentId)} />)}</div>
       {!filteredRefunds.length && <p>Không có yêu cầu hoàn phù hợp bộ lọc.</p>}

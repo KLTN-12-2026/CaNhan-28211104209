@@ -334,6 +334,8 @@ test('G3.4 USER refund lifecycle never treats approval/processing as refunded an
   assert.doesNotMatch(text(), /Hiển thị mã QR cọc|Còn thiếu|Chuyển khoản trước hạn/);
   await mount(booking, c => c.url.endsWith('/deposit') ? ledgerWith('CLOSED', { receivedAmount: 350000 }, refundRows) : defaultHandler(c), 'ADMIN');
   assert.match(text(), /Duyệt bởi: admin-secret/);
+  assert.match(text(), /Nguyên nhân: Khoản nhận không đủ điều kiện thời hạn \(LATE\)/);
+  assert.match(text(), /Nguyên nhân: Khác \(FUTURE_KIND\)/);
   assert.ok(!container.querySelector('[aria-label="Tình trạng hoàn của bạn"]'));
 });
 

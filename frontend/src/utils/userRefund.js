@@ -15,6 +15,9 @@ const kindLabels = Object.freeze({
   EXCESS: 'Tiền nhận vượt số cọc',
   MANUAL_EXCESS: 'Tiền nhận vượt số cọc',
   CANCELLED: 'Hủy đơn',
+  EARLY_USER: 'Khách hủy trước mốc nhận',
+  BUSINESS: 'Doanh nghiệp từ chối hoặc không cung cấp xe',
+  LATE_CUSTOMER: 'Khách hủy sát giờ',
   NO_SHOW: 'Không đến nhận xe',
 });
 

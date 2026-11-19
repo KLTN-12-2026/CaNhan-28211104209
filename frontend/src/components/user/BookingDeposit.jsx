@@ -324,7 +324,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     </section>}
     {role !== 'USER' && data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">
       <p className="font-medium">Hoàn {money(r.amount)} · {refundLabels[r.status] || 'Cần kiểm tra'} · {r.reason}</p>
-      <p className="text-sm">Loại: {r.kind} · Duyệt bởi: {r.approvedBy || '—'} · {r.approvedAt ? date(r.approvedAt) : '—'}</p>
+      <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)} ({r.kind || '—'}) · Duyệt bởi: {r.approvedBy || '—'} · {r.approvedAt ? date(r.approvedAt) : '—'}</p>
     </div>)}
 
     {role === 'ADMIN' && data?.events?.length && (
