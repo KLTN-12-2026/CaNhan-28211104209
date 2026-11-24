@@ -90,3 +90,53 @@ for(const stored of [false,true])test(`completion timeout with server store=${st
   if(stored){await change('Trạng thái hoàn','');assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Đã hoàn/);assert.equal(button('Xác nhận đã hoàn DEMO'),undefined);}
   else {assert.equal(button('Xác nhận đã hoàn DEMO').matches(':disabled'),true);await click('Kiểm tra kết quả thao tác');assert.equal(posts().length,1);assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Đang xử lý/);}
 });
+test('G4.2 payment history shows transfer/verification/source, applied share and linked refunds from the loaded list only',async()=>{
+  await mount(null,d=>{
+    Object.assign(d.payments[0],{appliedAmount:30000,transferTime:'2026-10-25T02:50:00Z',verifiedAt:'2026-10-25T03:05:00Z',verifierId:'staff-dn'});
+    d.refunds=[{...refund,status:'SUCCEEDED',amount:20000},{...refund,id:'refund-2',status:'APPROVED',amount:10000},{...refund,id:'refund-3',status:'DECLINED',amount:0},{...refund,id:'other',paymentId:'pay-other',status:'PROCESSING',amount:999}];
+  });
+  const row=container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent.replaceAll(' ',' ');
+  assert.match(row,/Thời điểm chuyển: 25\/10\/2026, 09:50:00/);
+  assert.match(row,/Xác minh: 25\/10\/2026, 10:05:00 · mã người xác minh staff-dn/);
+  assert.match(row,/Nguồn tiền \(giả lập\): DEMO-SOURCE/);
+  assert.match(row,/Đã áp dụng 30\.000 ₫ \/ 100\.000 ₫ · Chưa áp dụng 70\.000 ₫ \(chưa đồng nghĩa được phép hoàn\)/);
+  assert.match(container.querySelector('[aria-label="Hoàn liên quan pay-1"]').textContent.replaceAll(' ',' '),/3 yêu cầu · Đã hoàn 20\.000 ₫ · Chưa hoàn \(chờ\/xử lý\) 10\.000 ₫ · Không hoàn\/thất bại 1$/);
+  assert.match(container.querySelector('[aria-label="Phạm vi danh sách đã tải"]').textContent,/Hiển thị 1 \/ 1 khoản nhận và 2 \/ 4 yêu cầu hoàn đã tải\. Đây không phải tổng toàn hệ thống\./);
+  assert.equal(requests.length,1,'one list GET, no per-row requests');
+  await mount(null,d=>{d.refunds=[];});
+  assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Không có yêu cầu hoàn liên quan trong danh sách đã tải/);
+  assert.match(container.querySelector('[aria-label="Khoản nhận pay-1"]').textContent,/Xác minh: Chưa xác minh/);
+});
+test('G4.3 refund rows explain each lifecycle state; only SUCCEEDED is refunded and unknown states stay unconfirmed',async()=>{
+  const rows=[['REQUESTED','LATE_CUSTOMER'],['APPROVED','EXCESS'],['PROCESSING','LATE'],['UNKNOWN','UNAPPLIED'],['SUCCEEDED','MANUAL_EXCESS'],['FAILED','BUSINESS'],['DECLINED','NO_SHOW'],['FUTURE','ODD']];
+  await mount(null,d=>{d.refunds=rows.map(([status,kind],i)=>({...refund,id:`r-${status}`,status,kind,amount:1000*(i+1),providerTransaction:status==='SUCCEEDED'?'REF-OK':null}));});
+  await change('Trạng thái hoàn','');
+  const row=status=>container.querySelector(`[aria-label="Yêu cầu hoàn r-${status}"]`).textContent.replaceAll(' ',' ');
+  assert.match(row('REQUESTED'),/Chờ Admin quyết định.*Nguyên nhân: Khách hủy sát giờ \(LATE_CUSTOMER\)/);
+  assert.match(row('APPROVED'),/Đã duyệt chưa có nghĩa đã hoàn tiền/);
+  for(const status of ['REQUESTED','APPROVED','PROCESSING','UNKNOWN','FAILED','DECLINED','FUTURE'])assert.doesNotMatch(row(status),/Đã hoàn —/,status);
+  assert.match(row('PROCESSING'),/Cần kiểm tra kết quả\. Không gửi lại/);
+  assert.match(row('SUCCEEDED'),/Đã hoàn — kết quả đã xác minh với tham chiếu REF-OK/);
+  assert.match(row('FAILED'),/Hoàn thất bại — chưa hoàn tiền.*không tự gửi lại/);
+  assert.match(row('DECLINED'),/Quyết định không hoàn khoản này/);
+  assert.match(row('FUTURE'),/Cần kiểm tra.*Nguyên nhân: Khác \(ODD\).*Trạng thái hoàn chưa được hỗ trợ — chưa xác nhận đã hoàn/);
+  assert.equal([...container.querySelectorAll('[aria-label="Yêu cầu hoàn r-FUTURE"] button')].length,0,'no action for unsupported state');
+  assert.match(container.querySelector('[aria-label="Tóm tắt vòng đời hoàn"]').textContent.replaceAll(' ',' '),/Trong 8 yêu cầu hoàn đã tải: đã hoàn \(đã xác minh\) 5\.000 ₫ · chưa hoàn — chờ\/duyệt\/xử lý\/cần đối soát 10\.000 ₫ \(4 yêu cầu\) · không hoàn\/thất bại 2 · cần kiểm tra 1\./);
+  assert.equal(posts().length,0);
+});
+test('G4.4 initial list failure shows an error without stale data or actions, and reload recovers with GET only',async()=>{
+  let fail=true;
+  await mount(()=>{if(fail)throw failure(500);return copy(serverData);});
+  assert.match(container.textContent,/Máy chủ gặp lỗi|HTTP 500/);
+  assert.ok(!container.querySelector('[aria-label="Bộ lọc cọc và hoàn"]'),'no data sections while list failed');
+  assert.equal(button('Duyệt khoản hoàn'),undefined);
+  fail=false;await click('Tải lại');
+  assert.ok(container.querySelector('[aria-label="Khoản nhận pay-1"]'));
+  assert.match(container.querySelector('[role="status"]').textContent,/Đã tải lại dữ liệu từ máy chủ/);
+  assert.equal(posts().length,0);assert.equal(requests.length,2);
+});
+test('G4.4 list loading state shows no actions before data arrives',async()=>{
+  const gate=deferred();await mount(async()=>{await gate.promise;return copy(serverData);});
+  assert.match(container.textContent,/Đang tải…/);assert.equal(button('Duyệt khoản hoàn'),undefined);
+  await act(async()=>gate.resolve());assert.ok(button('Duyệt khoản hoàn'));
+});

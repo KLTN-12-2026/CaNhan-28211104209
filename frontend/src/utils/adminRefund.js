@@ -37,6 +37,28 @@ export function refundResult(operation, data) {
   return null;
 }
 
+const pendingRefundStatuses = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN']);
+const closedRefundStatuses = new Set(['FAILED', 'DECLINED']);
+
+/**
+ * Tóm tắt các yêu cầu hoàn trong danh sách đã tải (không phải tổng toàn hệ thống).
+ * Chỉ SUCCEEDED tính là đã hoàn; trạng thái lạ đếm riêng để cần kiểm tra.
+ */
+export function refundSummary(refunds) {
+  const summary = { count: 0, refunded: 0, pending: 0, pendingCount: 0, closedCount: 0, unknownCount: 0 };
+  if (!Array.isArray(refunds)) return summary;
+  for (const refund of refunds) {
+    if (!refund) continue;
+    summary.count += 1;
+    const amount = Number.isSafeInteger(refund.amount) && refund.amount >= 0 ? refund.amount : 0;
+    if (refund.status === 'SUCCEEDED') summary.refunded += amount;
+    else if (pendingRefundStatuses.has(refund.status)) { summary.pending += amount; summary.pendingCount += 1; }
+    else if (closedRefundStatuses.has(refund.status)) summary.closedCount += 1;
+    else summary.unknownCount += 1;
+  }
+  return summary;
+}
+
 export function matchesPaymentSearch(row, query) {
   const needle = query.trim().toLowerCase();
   return !needle || [row.id, row.bookingId, row.paymentId, row.providerTransaction].some(value => value?.toLowerCase().includes(needle));

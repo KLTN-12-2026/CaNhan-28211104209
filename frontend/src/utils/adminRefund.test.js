@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesPaymentSearch, providerDate, refundDate, refundResult, validateRefundAmount, validateRefundCompletion } from './adminRefund.js';
+import { matchesPaymentSearch, providerDate, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from './adminRefund.js';
 
 test('refund amounts and completion require whole VND, reason and exact source', () => {
   assert.equal(validateRefundAmount('0', 'Không hoàn', 100, true), '');
@@ -33,4 +33,13 @@ test('creation recovery excludes existing or mismatched requests and search supp
   assert.equal(refundResult(operation,{refunds:[{...row,paymentId:'p2'}]}),undefined);
   assert.equal(matchesPaymentSearch({bookingId:'Booking-ABC',providerTransaction:'Ref-123'},' REF-123 '),true);
   assert.equal(matchesPaymentSearch({bookingId:'Booking-ABC'},'other'),false);
+});
+
+test('refund summary counts only SUCCEEDED as refunded and separates pending, closed and unknown statuses', () => {
+  assert.deepEqual(refundSummary([
+    { status: 'SUCCEEDED', amount: 100 }, { status: 'REQUESTED', amount: 1 }, { status: 'APPROVED', amount: 2 },
+    { status: 'PROCESSING', amount: 3 }, { status: 'UNKNOWN', amount: 4 }, { status: 'FAILED', amount: 50 },
+    { status: 'DECLINED', amount: 0 }, { status: 'FUTURE', amount: 70 }, { status: 'SUCCEEDED', amount: '9' }, null,
+  ]), { count: 9, refunded: 100, pending: 10, pendingCount: 4, closedCount: 2, unknownCount: 1 });
+  assert.deepEqual(refundSummary(undefined), { count: 0, refunded: 0, pending: 0, pendingCount: 0, closedCount: 0, unknownCount: 0 });
 });
