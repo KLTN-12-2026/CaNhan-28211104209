@@ -169,6 +169,30 @@ class QrDemoHttpTest {
         for(Actor other:List.of(user,staff)) assertEquals(403,adminSearch(other,"old-ref").getStatus(),other.role());
         assertEquals(206,count("payment_transactions",b.id()),"search is read-only");
     }
+    /** Confirmed booking cancelled by Admin as a late customer cancellation (within 24h of the pickup day). */
+    BookingService.View lateCustomerCancelled(String ref)throws Exception {
+        var b=approve();verify(b.id(),ref,390000);assertEquals("CONFIRMED",current(b.id()).status());
+        clock.value=Instant.parse("2026-10-25T05:00:00Z"); // 12h before the start of the pickup day (Vietnam)
+        var c=current(b.id());rental.apply(admin,b.id(),new BookingService.Action("CANCELLED",c.version(),"Synthetic late cancellation",null,false,false,"LATE_CUSTOMER"));
+        assertEquals("CANCELLED",current(b.id()).status());
+        var pending=repo.refunds(b.id());assertEquals(1,pending.size());assertEquals("REQUESTED",pending.getFirst().status());assertEquals("LATE_CUSTOMER",pending.getFirst().kind());
+        return current(b.id());
+    }
+    @Test void lateReceiptOnCancelledBookingNeverOverridesThePendingAdminDecisionOnEarlierMoney()throws Exception {
+        // D3-pre: a receipt recorded after a late cancellation must not auto-approve a full refund of the earlier receipt.
+        var b=lateCustomerCancelled("EARLY-A");var earlier=repo.forBooking(b.id()).getFirst();
+        clock.value=clock.value.plusSeconds(600);
+        var late=input(b.id(),"AFTER-B",100000,clock.instant().minusSeconds(60));
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",late).getStatus());
+        var forEarlier=repo.refunds(b.id()).stream().filter(r->r.paymentId().equals(earlier.id())).toList();
+        assertEquals(1,forEarlier.size(),"earlier receipt keeps only its pending Admin decision");
+        assertEquals("REQUESTED",forEarlier.getFirst().status());assertEquals("LATE_CUSTOMER",forEarlier.getFirst().kind());
+        assertEquals(0,repo.reserved(earlier.id(),null),"no automatic reservation on the earlier receipt");
+        var newer=repo.forBooking(b.id()).stream().filter(p->"AFTER-B".equals(p.providerTransaction())).findFirst().orElseThrow();
+        var forNewer=repo.refunds(b.id()).stream().filter(r->r.paymentId().equals(newer.id())).toList();
+        assertEquals(1,forNewer.size());assertEquals("APPROVED",forNewer.getFirst().status());assertEquals(100000,forNewer.getFirst().amount());
+        assertEquals("CANCELLED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+    }
     @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
         // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
         var b=approve();verify(b.id(),"A",200000);

@@ -173,6 +173,12 @@ public class DepositWorkflow {
             tx.executeWithoutResult(s -> {
                 var b=bookings.depositLock(bookingId);
                 if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) return;
+                if (Set.of("CANCELLED","REJECTED").contains(b.status())) {
+                    // D3-pre: receipts held at closure were settled by the cancellation policy (incl. pending Admin decisions);
+                    // only the newly recorded receipt is handled here, never earlier money.
+                    if (paymentId != null) payments.qrRefundReceipt(paymentId, "UNAPPLIED", "Khoản ghi nhận sau khi đơn đã hủy/từ chối; hoàn toàn bộ.");
+                    return;
+                }
                 if (!"PENDING".equals(b.status())) {
                     payments.qrRefund(bookingId,"CONFIRMED".equals(b.status()) ? "EXCESS" : "UNAPPLIED",!"CONFIRMED".equals(b.status()));
                     return;

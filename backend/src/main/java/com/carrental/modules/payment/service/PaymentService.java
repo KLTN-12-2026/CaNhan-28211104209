@@ -148,6 +148,14 @@ public class PaymentService {
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, null, clock.instant(), "refund:" + p.id() + ":" + kind);
     }
 
+    /** Queue a refund for exactly one receipt (caller holds the booking deposit lock). */
+    @Transactional
+    public void qrRefundReceipt(String paymentId, String kind, String reason) {
+        var p = repo.lockPayment(paymentId);
+        if (!"SUCCEEDED".equals(p.status())) return;
+        queue(p, true, p.amount() - p.appliedAmount(), kind, "APPROVED", reason);
+    }
+
     @Transactional
     public void qrRefund(String bookingId, String kind, boolean all) {
         bookings.depositLock(bookingId);
