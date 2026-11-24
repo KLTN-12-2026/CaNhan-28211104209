@@ -138,6 +138,156 @@ class QrDemoHttpTest {
         var b=approve();verify(b.id(),"A",200000);assertEquals("PENDING",current(b.id()).status());assertEquals(190000,current(b.id()).deposit().missingAmount());
         verify(b.id(),"B",190000);assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));
     }
+    org.springframework.mock.web.MockHttpServletResponse adminSearch(Actor actor,String q)throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/payments").param("q",q).header("Authorization","Bearer "+tokens.issue(accounts.require(actor.id())))).andReturn().getResponse();
+    }
+    java.util.Set<String> refs(JsonNode rows){var out=new java.util.TreeSet<String>();rows.forEach(r->out.add(r.path("providerTransaction").asText()));return out;}
+    @Test void adminServerSearchReachesBeyondRecentHistoryWithLiteralWildcards()throws Exception {
+        // D2: an old receipt pushed out of the 200 most recent rows stays findable by server-side prefix search.
+        var b=approve();verify(b.id(),"OLD-REF_1",500000);var old=repo.forBooking(b.id()).getFirst();
+        Instant base=clock.instant().plusSeconds(60);
+        for(int i=0;i<205;i++) jdbc.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,provider_transaction,applied,version) values(?,?,?,?,?,?,?,false,0)",
+            String.format("bulk%028d",i),b.id(),1000,"FAILED",java.sql.Timestamp.from(base.plusSeconds(i)),java.sql.Timestamp.from(base.plusSeconds(i)),"BULK-"+i);
+        var recent=json.readTree(get(admin,"/admin/payments").getContentAsString());
+        assertEquals(200,recent.get("payments").size());assertFalse(refs(recent.get("payments")).contains("OLD-REF_1"));assertFalse(recent.has("search"),"no query keeps the old response");
+        for(String q:List.of("old-ref_","OLD-REF","  Old-Ref_1  ")) {
+            var r=adminSearch(admin,q);assertEquals(200,r.getStatus(),q);var found=json.readTree(r.getContentAsString());
+            assertEquals(java.util.Set.of("OLD-REF_1"),refs(found.get("payments")),q);
+            assertTrue(java.util.stream.StreamSupport.stream(found.get("refunds").spliterator(),false).anyMatch(x->x.get("paymentId").asText().equals(old.id())&&x.get("kind").asText().equals("EXCESS")),"refunds of the matched receipt are included: "+q);
+            assertEquals(q.strip(),found.get("search").get("query").asText());assertFalse(found.get("search").get("truncated").asBoolean());
+            assertEquals(0,found.get("refundableAmounts").get(old.id()).asLong());
+            assertTrue(found.get("refundPayments").size()>=1);
+        }
+        for(String literal:List.of("old-re_","old-ref%","%%%","!!!","___")) {
+            var r=adminSearch(admin,literal);assertEquals(200,r.getStatus(),literal);
+            assertEquals(0,json.readTree(r.getContentAsString()).get("payments").size(),"wildcard must be literal: "+literal);
+        }
+        var byBooking=json.readTree(adminSearch(admin,b.id().substring(0,8)).getContentAsString());
+        assertEquals(200,byBooking.get("payments").size());assertTrue(byBooking.get("search").get("truncated").asBoolean(),"capped results are flagged");
+        assertEquals(400,adminSearch(admin,"ab").getStatus());assertEquals(400,adminSearch(admin,"x".repeat(65)).getStatus());
+        var blank=json.readTree(adminSearch(admin,"   ").getContentAsString());assertFalse(blank.has("search"));assertEquals(200,blank.get("payments").size());
+        for(Actor other:List.of(user,staff)) assertEquals(403,adminSearch(other,"old-ref").getStatus(),other.role());
+        assertEquals(206,count("payment_transactions",b.id()),"search is read-only");
+    }
+    /** Confirmed booking cancelled by Admin as a late customer cancellation (within 24h of the pickup day). */
+    BookingService.View lateCustomerCancelled(String ref)throws Exception {
+        var b=approve();verify(b.id(),ref,390000);assertEquals("CONFIRMED",current(b.id()).status());
+        clock.value=Instant.parse("2026-10-25T05:00:00Z"); // 12h before the start of the pickup day (Vietnam)
+        var c=current(b.id());rental.apply(admin,b.id(),new BookingService.Action("CANCELLED",c.version(),"Synthetic late cancellation",null,false,false,"LATE_CUSTOMER"));
+        assertEquals("CANCELLED",current(b.id()).status());
+        var pending=repo.refunds(b.id());assertEquals(1,pending.size());assertEquals("REQUESTED",pending.getFirst().status());assertEquals("LATE_CUSTOMER",pending.getFirst().kind());
+        return current(b.id());
+    }
+    @Test void lateReceiptOnCancelledBookingNeverOverridesThePendingAdminDecisionOnEarlierMoney()throws Exception {
+        // D3-pre: a receipt recorded after a late cancellation must not auto-approve a full refund of the earlier receipt.
+        var b=lateCustomerCancelled("EARLY-A");var earlier=repo.forBooking(b.id()).getFirst();
+        clock.value=clock.value.plusSeconds(600);
+        var late=input(b.id(),"AFTER-B",100000,clock.instant().minusSeconds(60));
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",late).getStatus());
+        var forEarlier=repo.refunds(b.id()).stream().filter(r->r.paymentId().equals(earlier.id())).toList();
+        assertEquals(1,forEarlier.size(),"earlier receipt keeps only its pending Admin decision");
+        assertEquals("REQUESTED",forEarlier.getFirst().status());assertEquals("LATE_CUSTOMER",forEarlier.getFirst().kind());
+        assertEquals(0,repo.reserved(earlier.id(),null),"no automatic reservation on the earlier receipt");
+        var newer=repo.forBooking(b.id()).stream().filter(p->"AFTER-B".equals(p.providerTransaction())).findFirst().orElseThrow();
+        var forNewer=repo.refunds(b.id()).stream().filter(r->r.paymentId().equals(newer.id())).toList();
+        assertEquals(1,forNewer.size());assertEquals("APPROVED",forNewer.getFirst().status());assertEquals(100000,forNewer.getFirst().amount());
+        assertEquals("CANCELLED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+    }
+    Instant closedAt(String id){return jdbc.queryForObject("select max(occurred_at) from booking_status_history where booking_id=? and next_status in ('CANCELLED','REJECTED')",java.sql.Timestamp.class,id).toInstant();}
+    PaymentRepository.Refund refundOf(String bookingId,String ref){
+        var p=repo.forBooking(bookingId).stream().filter(x->ref.equals(x.providerTransaction())).findFirst().orElseThrow();
+        var rs=repo.refunds(bookingId).stream().filter(r->r.paymentId().equals(p.id())).toList();assertEquals(1,rs.size(),ref);return rs.getFirst();
+    }
+    void lateReceipt(String id,String ref,long amount,Instant transfer)throws Exception {
+        assertEquals(200,post(staff,"/bookings/"+id+"/deposit/verify",input(id,ref,amount,transfer)).getStatus(),ref);
+    }
+    @Test void receiptAfterLateCancellationFollowsTransferTimeAgainstTheClosure()throws Exception {
+        // D3 phương án 2: before closure -> cancellation policy (LATE_CUSTOMER: Admin decides); at/after closure -> full refund.
+        var b=lateCustomerCancelled("EARLY-A");Instant closed=closedAt(b.id());var approved=b.deposit().approvedAt();
+        clock.value=closed.plusSeconds(3600);
+        lateReceipt(b.id(),"BEFORE-1",120000,closed.minusSeconds(1));
+        lateReceipt(b.id(),"AT-2",80000,closed);
+        lateReceipt(b.id(),"AFTER-3",50000,closed.plusSeconds(1));
+        assertTrue(closed.minusSeconds(1).isAfter(approved),"fixture transfer time is after approval");
+        var before=refundOf(b.id(),"BEFORE-1");assertEquals("REQUESTED",before.status());assertEquals("LATE_CUSTOMER",before.kind());assertEquals(120000,before.amount());
+        var at=refundOf(b.id(),"AT-2");assertEquals("APPROVED",at.status());assertEquals("UNAPPLIED",at.kind());assertEquals(80000,at.amount());
+        var after=refundOf(b.id(),"AFTER-3");assertEquals("APPROVED",after.status());assertEquals("UNAPPLIED",after.kind());assertEquals(50000,after.amount());
+        var earlier=refundOf(b.id(),"EARLY-A");assertEquals("REQUESTED",earlier.status());assertEquals("LATE_CUSTOMER",earlier.kind());
+        // Admin keeps the 0-100% decision on money transferred before the closure.
+        payments.decide(admin,before.id(),before.version(),60000,"Synthetic 50% decision");
+        assertEquals("APPROVED",repo.refund(before.id()).status());assertEquals(60000,repo.refund(before.id()).amount());
+        assertEquals("CANCELLED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+        for(var p:repo.forBooking(b.id())) if(!"EARLY-A".equals(p.providerTransaction())) assertEquals(0,p.appliedAmount(),"late money is never applied");
+    }
+    @Test void receiptAfterEarlyCancellationOrRejectionIsRefundedInFullUnderTheBookingPolicy()throws Exception {
+        // EARLY_USER: before closure -> full refund under the early-cancellation policy; after -> full UNAPPLIED.
+        var b=approve();var approved=b.deposit().approvedAt();clock.value=approved.plusSeconds(300);
+        var c=current(b.id());rental.apply(user,b.id(),new BookingService.Action("CANCELLED",c.version(),"Synthetic early cancellation",null,false,false,null));
+        assertEquals("CANCELLED",current(b.id()).status());Instant closed=closedAt(b.id());clock.value=closed.plusSeconds(600);
+        lateReceipt(b.id(),"E-BEFORE",100000,closed.minusSeconds(60));lateReceipt(b.id(),"E-AFTER",70000,closed.plusSeconds(60));
+        var eb=refundOf(b.id(),"E-BEFORE");assertEquals("APPROVED",eb.status());assertEquals("EARLY_USER",eb.kind());assertEquals(100000,eb.amount());
+        var ea=refundOf(b.id(),"E-AFTER");assertEquals("APPROVED",ea.status());assertEquals("UNAPPLIED",ea.kind());assertEquals(70000,ea.amount());
+        // REJECTED by the pickup branch (BUSINESS): before -> BUSINESS full; after -> UNAPPLIED full.
+        clock.value=Instant.parse("2026-10-23T03:00:00Z");
+        var r=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,10,29),LocalDate.of(2026,10,31)));
+        r=(BookingService.View)workflow.approve(staff,r.id(),r.version());clock.value=r.deposit().approvedAt().plusSeconds(300);
+        rental.apply(staff,r.id(),new BookingService.Action("REJECTED",current(r.id()).version(),"Synthetic rejection",null,false,false,null));
+        assertEquals("REJECTED",current(r.id()).status());Instant rejected=closedAt(r.id());clock.value=rejected.plusSeconds(600);
+        lateReceipt(r.id(),"R-BEFORE",90000,rejected.minusSeconds(60));lateReceipt(r.id(),"R-AFTER",40000,rejected);
+        var rb=refundOf(r.id(),"R-BEFORE");assertEquals("APPROVED",rb.status());assertEquals("BUSINESS",rb.kind());assertEquals(90000,rb.amount());
+        var ra=refundOf(r.id(),"R-AFTER");assertEquals("APPROVED",ra.status());assertEquals("UNAPPLIED",ra.kind());assertEquals(40000,ra.amount());
+        assertEquals(0,count("contracts",r.id()));assertEquals("REJECTED",current(r.id()).status());
+    }
+    @Test void customerSeesOnlyTheAdminCustomerNoteNeverTheInternalReason()throws Exception {
+        // QR-D4 (phương án C): reason stays internal; customerNote is the only decision text the owner receives.
+        var b=lateCustomerCancelled("D4-A");var pending=repo.refunds(b.id()).getFirst();assertNull(pending.customerNote(),"automatic refunds carry no customer note");
+        var bad=new LinkedHashMap<String,Object>(Map.of("expectedVersion",pending.version(),"amount",100000,"reason","Internal: customer called late","customerNote","x".repeat(501)));
+        assertEquals(400,post(admin,"/admin/refunds/"+pending.id()+"/decide",bad).getStatus());assertEquals("REQUESTED",repo.refund(pending.id()).status());
+        var ok=new LinkedHashMap<String,Object>(Map.of("expectedVersion",pending.version(),"amount",195000,"reason","Internal: customer called late, policy 50%","customerNote","  Hoàn 50% theo chính sách hủy sát giờ.  "));
+        assertEquals(200,post(admin,"/admin/refunds/"+pending.id()+"/decide",ok).getStatus());
+        var decided=repo.refund(pending.id());assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",decided.customerNote());assertEquals("Internal: customer called late, policy 50%",decided.reason());
+        var customer=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString()).get("refunds").get(0);
+        assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",customer.get("customerNote").asText());assertFalse(customer.has("reason"));
+        assertFalse(customer.toString().contains("Internal"),"internal reason never reaches the customer");
+        for(Actor operator:List.of(staff,admin)) {
+            var row=json.readTree(get(operator,"/bookings/"+b.id()+"/deposit").getContentAsString()).get("refunds").get(0);
+            assertEquals("Internal: customer called late, policy 50%",row.get("reason").asText());assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",row.get("customerNote").asText());
+        }
+        // Manual request: blank note is stored as no note; decision may add one.
+        var c=approve();verify(c.id(),"D4-M",200000);var pay=repo.forBooking(c.id()).getFirst();
+        var created=json.readTree(post(admin,"/admin/refunds/create-manual",new LinkedHashMap<String,Object>(Map.of("paymentId",pay.id(),"amount",50000,"reason","Internal manual","customerNote","   "))).getContentAsString());
+        assertTrue(created.get("customerNote").isNull());
+        var withNote=post(admin,"/admin/refunds/create-manual",new LinkedHashMap<String,Object>(Map.of("paymentId",pay.id(),"amount",50000,"reason","Internal manual","customerNote","Ghi chú cho khách"))).getStatus();
+        assertEquals(409,withNote,"one manual request per receipt is unchanged");
+        assertEquals(403,post(staff,"/admin/refunds/"+created.get("id").asText()+"/decide",new LinkedHashMap<String,Object>(Map.of("expectedVersion",0,"amount",0,"reason","x","customerNote","y"))).getStatus());
+    }
+    @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
+        // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
+        var b=approve();verify(b.id(),"A",200000);
+        var created=(PaymentRepository.Refund)payments.createManualRefund(admin,repo.forBooking(b.id()).getFirst().id(),50000,"Synthetic manual request");
+        payments.decide(admin,created.id(),created.version(),50000,"Synthetic decision");
+        var customer=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString());
+        assertFalse(customer.has("events"),"USER must not receive the internal event log");
+        var pay=customer.get("payments").get(0);
+        for(String hidden:List.of("verifierId","idempotencyKey","version","applied","expiresAt","providerPayDate")) assertFalse(pay.has(hidden),"USER payment exposes "+hidden);
+        for(String kept:List.of("id","amount","status","appliedAmount","providerTransaction","transferTime","transferNote","sourceAccount","verifiedAt")) assertTrue(pay.has(kept),"USER payment misses "+kept);
+        assertEquals(200000,pay.get("amount").asLong());assertEquals(0,pay.get("appliedAmount").asLong());assertEquals("A",pay.get("providerTransaction").asText());
+        var refund=customer.get("refunds").get(0);
+        for(String hidden:List.of("approvedBy","requestDate","version","reason")) assertFalse(refund.has(hidden),"USER refund exposes "+hidden);
+        for(String kept:List.of("id","amount","status","kind","customerNote","approvedAt")) assertTrue(refund.has(kept),"USER refund misses "+kept);
+        assertEquals(50000,refund.get("amount").asLong());assertEquals("MANUAL_EXCESS",refund.get("kind").asText());assertEquals("APPROVED",refund.get("status").asText());
+        assertFalse(customer.toString().contains(staff.id()),"USER ledger leaks the verifier id");
+        assertFalse(customer.toString().contains(admin.id()),"USER ledger leaks the approver id");
+        assertFalse(customer.toString().contains("key-A"),"USER ledger leaks the idempotency key");
+        assertTrue(customer.has("qrReconciliation"));assertTrue(customer.has("deposit"));
+        for(Actor operator:List.of(staff,admin)) {
+            var full=json.readTree(get(operator,"/bookings/"+b.id()+"/deposit").getContentAsString());
+            assertTrue(full.get("events").size()>0,operator.role()+" keeps events");
+            assertEquals(staff.id(),full.get("payments").get(0).get("verifierId").asText());
+            assertEquals("key-A",full.get("payments").get(0).get("idempotencyKey").asText());
+            assertEquals(admin.id(),full.get("refunds").get(0).get("approvedBy").asText());
+        }
+    }
     @Test void excessRefundThenEarlyCancellationNeverExceedsReceived()throws Exception {
         var b=approve();verify(b.id(),"A",500000);var p=repo.forBooking(b.id()).getFirst();assertEquals(390000,p.appliedAmount());assertEquals(110000,current(b.id()).deposit().excessAmount());
         var r=repo.refundForPayment(p.id()).orElseThrow();assertEquals(110000,r.amount());payments.processManualRefund(admin,r.id());

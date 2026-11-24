@@ -164,3 +164,14 @@ test('G5-F01 late receipt form shows the refund warning in form and review, and 
   await ready();
   assert.doesNotMatch(container.querySelector('[role="dialog"]').textContent,/hết hạn giữ chỗ/);
 });
+test('D3 closed-booking receipt form shows the transfer-time policy in form and review, and posts the unchanged payload shape',async()=>{
+  await mount();
+  await act(async()=>root.render(createElement(Form,{key:'closed-'+booking.id,booking,closed:true,onRefresh:()=>{refreshes++;}})));
+  assert.match(container.querySelector('[aria-label="Cảnh báo đơn đã hủy"]').textContent,/không khôi phục đơn.*Khoản chuyển từ thời điểm đó trở đi được hoàn toàn bộ/);
+  assert.ok(!container.querySelector('[aria-label="Cảnh báo đơn hết hạn"]'));
+  await ready();
+  assert.match(container.querySelector('[role="dialog"]').textContent,/Khoản chuyển trước thời điểm hủy\/từ chối được xử lý theo chính sách hủy/);
+  await click('Xác nhận ghi nhận DEMO');
+  const posts=requests.filter(r=>r.method==='post');assert.equal(posts.length,1);
+  assert.deepEqual(Object.keys(posts[0].body).sort(),['amountVnd','expectedVersion','idempotencyKey','sourceAccount','transactionRef','transferNote','transferTime','verified']);
+});

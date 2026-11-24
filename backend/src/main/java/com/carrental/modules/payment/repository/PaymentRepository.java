@@ -20,7 +20,7 @@ public class PaymentRepository {
 
     public record Refund(String id, String paymentId, String bookingId, long amount, String status, String kind,
                          String reason, String approvedBy, Instant approvedAt, Instant createdAt,
-                         String providerTransaction, String requestDate, long version, String depositMethod) {}
+                         String providerTransaction, String requestDate, long version, String depositMethod, String customerNote) {}
 
     private static Instant instant(java.sql.ResultSet r, String name) throws java.sql.SQLException {
         var t = r.getTimestamp(name); return t == null ? null : t.toInstant();
@@ -41,7 +41,7 @@ public class PaymentRepository {
         r.getString("status"), r.getString("kind"), r.getString("reason"), r.getString("approved_by"),
         instant(r, "approved_at"), instant(r, "created_at"), r.getString("provider_transaction"),
         r.getString("request_date"), r.getLong("version"),
-        r.getString("deposit_method")
+        r.getString("deposit_method"), r.getString("customer_note")
     );
 
     public Optional<Payment> payment(String id) {
@@ -125,13 +125,17 @@ public class PaymentRepository {
     }
 
     public void createRefund(String id, Payment p, long amount, String status, String kind, String reason, Instant now) {
-        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,created_at,business_key) values(?,?,?,?,?,?,?,?,?)",
-            id, p.id(), p.bookingId(), amount, status, kind, reason, Timestamp.from(now), p.id()+":"+kind);
+        createRefund(id, p, amount, status, kind, reason, null, now);
     }
 
-    public void decide(String id, long version, long amount, String reason, String actor, Instant now) {
-        int rows = jdbc.update("update payment_refunds set amount=?,status=?,reason=?,approved_by=?,approved_at=?,version=version+1 where id=? and version=? and status='REQUESTED'",
-            amount, amount == 0 ? "DECLINED" : "APPROVED", reason, actor, Timestamp.from(now), id, version);
+    public void createRefund(String id, Payment p, long amount, String status, String kind, String reason, String customerNote, Instant now) {
+        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,customer_note,created_at,business_key) values(?,?,?,?,?,?,?,?,?,?)",
+            id, p.id(), p.bookingId(), amount, status, kind, reason, customerNote, Timestamp.from(now), p.id()+":"+kind);
+    }
+
+    public void decide(String id, long version, long amount, String reason, String customerNote, String actor, Instant now) {
+        int rows = jdbc.update("update payment_refunds set amount=?,status=?,reason=?,customer_note=?,approved_by=?,approved_at=?,version=version+1 where id=? and version=? and status='REQUESTED'",
+            amount, amount == 0 ? "DECLINED" : "APPROVED", reason, customerNote, actor, Timestamp.from(now), id, version);
         if (rows != 1) throw DomainException.conflict("Yêu cầu hoàn đã thay đổi hoặc đã được quyết định.");
     }
 
@@ -181,6 +185,37 @@ public class PaymentRepository {
             """, (r, n) -> Map.entry(r.getString(1), r.getLong(2)))
             .forEach(entry -> amounts.put(entry.getKey(), entry.getValue()));
         return amounts;
+    }
+
+    public static final int ADMIN_LIMIT = 200, UNRESOLVED_LIMIT = 50;
+
+    /** Case-insensitive prefix pattern; %, _ and the escape character are literal (ESCAPE '!'). */
+    static String prefixPattern(String q) {
+        return q.toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    private static final String PAYMENT_MATCH = "(lower(pt.id) like ? escape '!' or lower(pt.booking_id) like ? escape '!' or lower(coalesce(pt.provider_transaction,'')) like ? escape '!')";
+
+    public List<Payment> searchPayments(String q) {
+        var p = prefixPattern(q);
+        return jdbc.query("select pt.*, b.deposit_method from payment_transactions pt left join bookings b on pt.booking_id = b.id where " + PAYMENT_MATCH +
+            " order by pt.created_at desc, pt.id limit " + ADMIN_LIMIT, payment, p, p, p);
+    }
+
+    public List<Refund> searchRefunds(String q) {
+        var p = prefixPattern(q);
+        return jdbc.query("select pr.*, b.deposit_method from payment_refunds pr left join bookings b on pr.booking_id = b.id where " +
+            "lower(pr.id) like ? escape '!' or lower(pr.booking_id) like ? escape '!' or lower(pr.payment_id) like ? escape '!' " +
+            "or lower(coalesce(pr.provider_transaction,'')) like ? escape '!' " +
+            "or pr.payment_id in (select pt.id from payment_transactions pt where " + PAYMENT_MATCH + ")" +
+            " order by pr.created_at desc, pr.id limit " + ADMIN_LIMIT, refund, p, p, p, p, p, p, p);
+    }
+
+    public List<Payment> searchUnresolvedPayments(String q) {
+        var p = prefixPattern(q);
+        return jdbc.query("select pt.*, b.deposit_method from payment_transactions pt left join bookings b on pt.booking_id = b.id where " +
+            "(pt.status in ('PENDING','UNKNOWN') or (pt.status='SUCCEEDED' and pt.applied_amount < pt.amount and not exists(select 1 from payment_refunds r where r.payment_id=pt.id))) and " +
+            PAYMENT_MATCH + " order by pt.created_at, pt.id limit " + UNRESOLVED_LIMIT, payment, p, p, p);
     }
 
     public List<Payment> paymentsForRefunds(List<Refund> refunds) {

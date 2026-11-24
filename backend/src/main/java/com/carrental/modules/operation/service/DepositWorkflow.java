@@ -173,6 +173,13 @@ public class DepositWorkflow {
             tx.executeWithoutResult(s -> {
                 var b=bookings.depositLock(bookingId);
                 if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) return;
+                if (Set.of("CANCELLED","REJECTED").contains(b.status())) {
+                    // D3-pre: receipts held at closure were settled by the cancellation policy (incl. pending Admin decisions);
+                    // only the newly recorded receipt is handled here, never earlier money.
+                    // D3 (phương án 2): transferred before closure -> the booking's cancellation policy; at/after closure -> full refund.
+                    if (paymentId != null) payments.receiptAfterClosure(paymentId, b.deposit().cancellationKind(), bookings.closedAt(bookingId));
+                    return;
+                }
                 if (!"PENDING".equals(b.status())) {
                     payments.qrRefund(bookingId,"CONFIRMED".equals(b.status()) ? "EXCESS" : "UNAPPLIED",!"CONFIRMED".equals(b.status()));
                     return;

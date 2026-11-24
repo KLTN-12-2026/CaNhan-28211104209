@@ -13,6 +13,16 @@ export function validateRefundAmount(value, reason, maximum, allowZero = false) 
   return '';
 }
 
+/** D4: optional customer-facing note (trimmed, empty -> null, at most 500 characters). */
+export function customerNoteValue(value) {
+  const note = typeof value === 'string' ? value.trim() : '';
+  return note ? note : null;
+}
+export function validateCustomerNote(value) {
+  const note = customerNoteValue(value);
+  return note && note.length > 500 ? 'Thông báo cho khách tối đa 500 ký tự.' : '';
+}
+
 export function validateRefundCompletion(form, sourceAccount, verified) {
   const error = validateReceipt({ transactionRef: form.reference, amountVnd: '1', transferTime: form.transferTime, sourceAccount: form.recipientAccount }, verified);
   if (error) return error;
@@ -25,12 +35,12 @@ export function refundResult(operation, data) {
   const { type, item, body, responseId } = operation;
   if (type === 'create') return data.refunds.find(r =>
     (responseId ? r.id === responseId : !operation.previousIds.includes(r.id)) &&
-    r.paymentId === item.id && r.kind === 'MANUAL_EXCESS' && r.amount === body.amount && r.reason === body.reason);
+    r.paymentId === item.id && r.kind === 'MANUAL_EXCESS' && r.amount === body.amount && r.reason === body.reason && (r.customerNote ?? null) === (body.customerNote ?? null));
   if (type === 'reconcile') return data.payments.find(p => p.id === item.id && ['SUCCEEDED', 'FAILED'].includes(p.status));
   const row = data.refunds.find(r => r.id === item.id && r.paymentId === item.paymentId && r.amount === (type === 'decide' ? body.amount : item.amount));
   if (!row || row.version <= item.version) return null;
   if (type === 'reconcile-refund') return ['SUCCEEDED', 'FAILED'].includes(row.status) ? row : null;
-  if (type === 'decide') return row.reason === body.reason && (body.amount === 0 ? row.status === 'DECLINED' : ['APPROVED', 'PROCESSING', 'SUCCEEDED'].includes(row.status)) ? row : null;
+  if (type === 'decide') return row.reason === body.reason && (row.customerNote ?? null) === (body.customerNote ?? null) && (body.amount === 0 ? row.status === 'DECLINED' : ['APPROVED', 'PROCESSING', 'SUCCEEDED'].includes(row.status)) ? row : null;
   if (type === 'process') return ['PROCESSING', 'SUCCEEDED'].includes(row.status) ? row : null;
   if (type === 'complete') return row.status === 'SUCCEEDED' && row.providerTransaction === body.reference && row.requestDate === providerDate(body.transferTime) &&
     [...data.payments, ...(data.refundPayments || [])].some(p => p.id === row.paymentId && p.sourceAccount === body.recipientAccount) ? row : null;

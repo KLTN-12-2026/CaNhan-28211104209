@@ -8,21 +8,21 @@ import { getErrorMessage } from '../../utils/roles';
 import { toVietnamInstant } from '../../utils/calendarDate';
 import { vietnamNowInput } from '../../utils/qrReceipt';
 import { userRefundKind } from '../../utils/userRefund';
-import { matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
+import { customerNoteValue, validateCustomerNote, matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
 
 const activeRefunds = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'FAILED']);
 const knownRefundStatuses = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'SUCCEEDED', 'FAILED', 'DECLINED']);
 const actionLabels = { create: 'Tạo yêu cầu hoàn', decide: 'Duyệt khoản hoàn', process: 'Bắt đầu xử lý hoàn', complete: 'Xác nhận đã hoàn DEMO', reconcile: 'Truy vấn kết quả' };
 
 export function RefundRow({ item, run, busy, depositMethod = item.depositMethod, payment }) {
-  const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState('');
+  const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState(''), [note, setNote] = useState('');
   const [form, setForm] = useState({ recipientAccount: '', reference: '', transferTime: '' });
   const [verified, setVerified] = useState(false), [error, setError] = useState('');
   const isQr = depositMethod === 'DEMO_QR_MANUAL';
   function decide(e) {
-    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, item.amount, true);
+    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, item.amount, true) || validateCustomerNote(note);
     if (invalid) { setError(invalid); return; } setError('');
-    run(`/admin/refunds/${item.id}/decide`, { expectedVersion: item.version, amount: Number(amount), reason: reason.trim() }, { type: 'decide', item });
+    run(`/admin/refunds/${item.id}/decide`, { expectedVersion: item.version, amount: Number(amount), reason: reason.trim(), customerNote: customerNoteValue(note) }, { type: 'decide', item });
   }
   function complete(e) {
     e.preventDefault(); const invalid = validateRefundCompletion(form, payment?.sourceAccount, verified);
@@ -32,6 +32,7 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
   return <section className="panel space-y-3" aria-label={`Yêu cầu hoàn ${item.id}`}>
     <Link to={`/admin/bookings/${item.bookingId}`}>Đơn {item.bookingId.slice(0, 8)}</Link>
     <p><strong>{refundLabels[item.status] || 'Cần kiểm tra'}</strong> · {money(item.amount)} · {item.reason}</p>
+    <p className="text-sm">{item.customerNote ? <>Thông báo cho khách: {item.customerNote}</> : 'Chưa có thông báo cho khách — khách chỉ thấy giải thích theo loại và trạng thái hoàn.'}</p>
     <p>Nguyên nhân: {userRefundKind(item.kind)} ({item.kind || '—'})</p>
     <p>{isQr ? 'QR DEMO · Không chuyển tiền thật' : 'VNPAY Sandbox'} · Tạo lúc {refundDate(item.createdAt)}</p>
     {item.status === 'SUCCEEDED' && <p>Đã hoàn — kết quả đã xác minh với tham chiếu {item.providerTransaction || '—'}.</p>}
@@ -51,6 +52,9 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
         <label className="field">Số tiền hoàn (VND)<input type="number" min="0" max={item.amount} step="1" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
         <p>Tối đa {money(item.amount)}. Quyết định 0đ là không hoàn, bắt buộc có lý do.</p>
         <label className="field">Lý do quyết định<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label>
+        <p className="text-sm">Lý do quyết định là ghi chú nội bộ; khách không thấy.</p>
+        <label className="field">Thông báo cho khách (không bắt buộc)<textarea maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
+        <p className="text-sm">Khách sẽ thấy nội dung này trong tình trạng hoàn của đơn. Không ghi thông tin nội bộ.</p>
         <button className="btn" type="submit">Duyệt khoản hoàn</button>
       </form>}
       {item.status === 'APPROVED' && <>
@@ -73,11 +77,11 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
 }
 
 export function ManualRefundForm({ payment, available, run, busy }) {
-  const [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [error, setError] = useState('');
+  const [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [note, setNote] = useState(''), [error, setError] = useState('');
   function submit(e) {
-    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, available);
+    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, available) || validateCustomerNote(note);
     if (invalid) { setError(invalid); return; } setError('');
-    run('/admin/refunds/create-manual', { paymentId: payment.id, amount: Number(amount), reason: reason.trim() }, { type: 'create', item: payment });
+    run('/admin/refunds/create-manual', { paymentId: payment.id, amount: Number(amount), reason: reason.trim(), customerNote: customerNoteValue(note) }, { type: 'create', item: payment });
   }
   return <section className="panel space-y-3" aria-label="Tạo yêu cầu hoàn thủ công">
     <p>QR DEMO · Khoản nhận {payment.providerTransaction || payment.id.slice(0, 8)}</p>
@@ -86,13 +90,18 @@ export function ManualRefundForm({ payment, available, run, busy }) {
     <fieldset disabled={busy}><form className="space-y-2" onSubmit={submit}>
       <label className="field">Số tiền yêu cầu hoàn (VND)<input type="number" min="1" max={available} step="1" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
       <label className="field">Lý do yêu cầu hoàn<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label>
+      <p className="text-sm">Lý do là ghi chú nội bộ; khách không thấy.</p>
+      <label className="field">Thông báo cho khách (không bắt buộc)<textarea maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
       <button className="btn" type="submit">Tạo yêu cầu hoàn</button>
     </form></fieldset>
   </section>;
 }
 
 export default function ApiPaymentsPage() {
-  const request = useApiData('/admin/payments');
+  // D2: tra cứu phía server (tiền tố mã đơn/giao dịch/tham chiếu, kể cả ngoài giới hạn gần nhất); không từ khóa = danh sách gần nhất.
+  const [serverQuery, setServerQuery] = useState(''), [activeSearch, setActiveSearch] = useState(''), [searchError, setSearchError] = useState('');
+  const listPath = activeSearch ? `/admin/payments?q=${encodeURIComponent(activeSearch)}` : '/admin/payments';
+  const request = useApiData(listPath);
   const [snapshot, setSnapshot] = useState(null), [phase, setPhase] = useState('idle');
   const [review, setReview] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [query, setQuery] = useState(''), [paymentStatus, setPaymentStatus] = useState(''), [refundStatus, setRefundStatus] = useState('active');
@@ -109,7 +118,7 @@ export default function ApiPaymentsPage() {
   }
   async function readBack(operation) {
     try {
-      const response = await apiClient.get('/admin/payments');
+      const response = await apiClient.get(listPath);
       if (!alive.current) return;
       const updated = response.data;
       if (!Array.isArray(updated?.payments) || !Array.isArray(updated?.refunds) || !Array.isArray(updated?.unresolved)) throw Error('Invalid readback');
@@ -148,6 +157,19 @@ export default function ApiPaymentsPage() {
     locked.current = true; setPhase('checking');
     try { await readBack(pending.current); } finally { locked.current = false; }
   }
+  function runSearch(event) {
+    event.preventDefault();
+    if (busy || locked.current || pending.current) return;
+    const q = serverQuery.trim();
+    if (q.length < 3 || q.length > 64) { setSearchError('Nhập từ khóa tra cứu từ 3 đến 64 ký tự.'); return; }
+    setSearchError(''); setError(''); setNotice(''); setManualPayment(null); setSnapshot(null);
+    if (q === activeSearch) request.reload(); else setActiveSearch(q);
+  }
+  function clearSearch() {
+    if (busy || locked.current || pending.current) return;
+    setSearchError(''); setError(''); setNotice(''); setManualPayment(null); setSnapshot(null); setServerQuery(''); setActiveSearch('');
+  }
+  const search = activeSearch && data?.search?.query === activeSearch ? data.search : null;
   const payments = data?.payments || [], refunds = data?.refunds || [];
   const refundPayments = [...payments, ...(data?.refundPayments || [])];
   const filteredPayments = payments.filter(p => matchesPaymentSearch(p, query) && (!paymentStatus || p.status === paymentStatus));
@@ -162,18 +184,29 @@ export default function ApiPaymentsPage() {
       <h2>{actionLabels[review.type] || 'Truy vấn kết quả hoàn'}</h2>
       <p>Đơn {review.item.bookingId.slice(0, 8)} · Khoản {review.item.id.slice(0, 8)} · Hiện tại: {(['create', 'reconcile'].includes(review.type) ? paymentLabels : refundLabels)[review.item.status]}</p>
       <p>Số tiền: {money(review.body.amount ?? review.item.amount)} · {review.item.depositMethod === 'DEMO_QR_MANUAL' ? 'QR DEMO — Không chuyển tiền thật' : 'VNPAY Sandbox'}</p>
-      {review.body.reason && <p>Lý do: {review.body.reason}</p>}
+      {review.body.reason && <p>Lý do nội bộ (khách không thấy): {review.body.reason}</p>}
+      {['decide', 'create'].includes(review.type) && <p>Thông báo cho khách: {review.body.customerNote || 'Không có — khách chỉ thấy giải thích theo loại và trạng thái hoàn.'}</p>}
       {review.type === 'complete' && <><p>Tài khoản nhận giả lập: {review.body.recipientAccount} · Tham chiếu: {review.body.reference}</p><p>Thời điểm hoàn (giờ Việt Nam): {refundDate(review.body.transferTime)}</p></>}
       <p>{review.type === 'complete' ? 'Chỉ xác nhận sau khi đã đối chiếu kết quả hoàn DEMO.' : 'Thao tác này chưa xác nhận tiền đã hoàn.'}</p>
       <button className="btn" onClick={submit}>Xác nhận thao tác</button>
       <button className="btn-secondary" onClick={() => { setReview(null); setPhase('idle'); }}>Quay lại chỉnh sửa</button>
     </section>}
+    <form className="panel mb-4 space-y-2" aria-label="Tra cứu trên máy chủ" onSubmit={runSearch}>
+      <label className="field">Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)<input value={serverQuery} maxLength={64} disabled={busy} onChange={e => { setServerQuery(e.target.value); setSearchError(''); }} /></label>
+      <p className="text-sm">Tìm theo phần đầu của mã, không phân biệt hoa thường, gồm cả bản ghi cũ ngoài danh sách gần nhất. Ký tự % và _ được tìm đúng như nhập.</p>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-secondary" type="submit" disabled={busy}>Tra cứu máy chủ</button>
+        {activeSearch ? <button className="btn-secondary" type="button" disabled={busy} onClick={clearSearch}>Bỏ tra cứu</button> : null}
+      </div>
+      {searchError ? <Notice error>{searchError}</Notice> : null}
+      {search ? <p className="text-sm font-medium" aria-label="Phạm vi tra cứu máy chủ">Đang xem kết quả tra cứu máy chủ cho “{search.query}”: tối đa {search.limit} khoản nhận, {search.limit} yêu cầu hoàn và {search.unresolvedLimit} giao dịch cần đối soát.{search.truncated ? ' Kết quả đã chạm giới hạn — nhập mã dài hơn để thu hẹp.' : ''}</p> : null}
+    </form>
     {!data && request.loading && <p>Đang tải…</p>}
     {data && <>
       <section className="panel mb-4 space-y-2" aria-label="Bộ lọc cọc và hoàn">
         <label className="field">Tìm mã đơn, giao dịch hoặc tham chiếu<input value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <p>Lọc trong {data.historyLimit || 200} giao dịch và yêu cầu hoàn gần nhất. Mở chi tiết đơn để xem toàn bộ lịch sử của đơn.</p>
-        <p className="text-sm" role="status" aria-label="Phạm vi danh sách đã tải">Hiển thị {filteredPayments.length} / {payments.length} khoản nhận và {filteredRefunds.length} / {refunds.length} yêu cầu hoàn đã tải. Đây không phải tổng toàn hệ thống.</p>
+        <p>{search ? 'Ô này chỉ lọc trong kết quả tra cứu máy chủ đang hiển thị.' : `Ô này chỉ lọc trong ${data.historyLimit || 200} giao dịch và yêu cầu hoàn gần nhất; dùng tra cứu máy chủ để tìm bản ghi cũ hơn.`} Mở chi tiết đơn để xem toàn bộ lịch sử của đơn.</p>
+        <p className="text-sm" role="status" aria-label="Phạm vi danh sách đã tải">Hiển thị {filteredPayments.length} / {payments.length} khoản nhận và {filteredRefunds.length} / {refunds.length} yêu cầu hoàn {search ? 'trong kết quả tra cứu máy chủ' : 'đã tải'}. Đây không phải tổng toàn hệ thống.</p>
       </section>
       <h2 className="mb-3 text-lg font-semibold">Giao dịch cần đối soát</h2>
       {!data.unresolved.length && <p>Không có giao dịch cần đối soát trong danh sách hiện tại.</p>}

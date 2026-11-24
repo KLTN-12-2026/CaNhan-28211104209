@@ -169,7 +169,8 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const userTimingIssues = userQrStatus && Array.isArray(reconciliation?.timingIssues) ? reconciliation.timingIssues : [];
   const userTimingNotes = [
     userTimingIssues.includes('TRANSFER_LATE') && 'Có khoản chuyển từ hạn đóng cọc trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.',
-    userTimingIssues.includes('VERIFICATION_LATE') && 'Có khoản được xác minh sau hạn đối soát của nhân viên. Đây không phải lỗi của bạn; khoản này không được áp dụng vào đơn, xem tình trạng hoàn bên dưới.',
+    // Backend gắn VERIFICATION_LATE khi verifiedAt >= reviewDueAt (gồm đúng hạn chót); chỉ mô tả thời điểm, không quy trách nhiệm.
+    userTimingIssues.includes('VERIFICATION_LATE') && 'Có khoản được xác minh từ thời điểm hết hạn đối soát trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.',
   ].filter(Boolean);
   const userUnapplied = Boolean(userQrStatus) && ['EXPIRED', 'CLOSED'].includes(reconciliation?.stage) && hasReceivedAmount && hasAppliedAmount && reconciliation.receivedAmount > reconciliation.appliedAmount;
   const refundList = Array.isArray(data?.refunds) ? data.refunds : null;
@@ -282,9 +283,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       </div>
     )}
 
-    {isQr && depositApproved && role === 'STAFF' && assignedPickup && ['PENDING', 'EXPIRED'].includes(booking.status) && (
-      // EXPIRED (PENDING quá hạn): vẫn ghi nhận tiền đến muộn để backend đưa vào hoàn; không xác nhận đơn.
-      <QrReceiptForm key={booking.id} booking={booking} late={booking.status === 'EXPIRED'} onRefresh={() => { request.reload(); reload(); }} />
+    {isQr && depositApproved && role === 'STAFF' && assignedPickup && ['PENDING', 'EXPIRED', 'CANCELLED', 'REJECTED'].includes(booking.status) && (
+      // EXPIRED: ghi nhận tiền đến muộn để backend đưa vào hoàn. CANCELLED/REJECTED (D3): backend phân xử theo thời điểm chuyển
+      // so với thời điểm hủy/từ chối; không khôi phục đơn.
+      <QrReceiptForm key={booking.id} booking={booking} late={booking.status === 'EXPIRED'} closed={['CANCELLED', 'REJECTED'].includes(booking.status)} onRefresh={() => { request.reload(); reload(); }} />
     )}
 
     {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && deposit?.required && !depositApproved && (
@@ -320,11 +322,13 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       {refundList.map(r => { const s = userRefundStatus(r.status); return <div key={r.id} className="mt-2 panel">
         <p className="font-medium">Hoàn {money(r.amount)} · {s.label}</p>
         <p className="text-sm">{s.detail}</p>
-        <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}{r.reason ? ` · ${r.reason}` : ''}</p>
+        <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}</p>
+        {r.customerNote ? <p className="text-sm">Thông báo từ quản trị viên: {r.customerNote}</p> : null}
       </div>; })}
     </section>}
     {role !== 'USER' && data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">
       <p className="font-medium">Hoàn {money(r.amount)} · {refundLabels[r.status] || 'Cần kiểm tra'} · {r.reason}</p>
+      {r.customerNote ? <p className="text-sm">Thông báo cho khách: {r.customerNote}</p> : null}
       <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)} ({r.kind || '—'}) · Duyệt bởi: {r.approvedBy || '—'} · {r.approvedAt ? date(r.approvedAt) : '—'}</p>
     </div>)}
 

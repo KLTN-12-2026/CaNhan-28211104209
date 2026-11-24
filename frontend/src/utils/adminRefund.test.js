@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchesPaymentSearch, providerDate, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from './adminRefund.js';
+import { customerNoteValue, validateCustomerNote, matchesPaymentSearch, providerDate, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from './adminRefund.js';
 
 test('refund amounts and completion require whole VND, reason and exact source', () => {
   assert.equal(validateRefundAmount('0', 'Không hoàn', 100, true), '');
@@ -42,4 +42,18 @@ test('refund summary counts only SUCCEEDED as refunded and separates pending, cl
     { status: 'DECLINED', amount: 0 }, { status: 'FUTURE', amount: 70 }, { status: 'SUCCEEDED', amount: '9' }, null,
   ]), { count: 9, refunded: 100, pending: 10, pendingCount: 4, closedCount: 2, unknownCount: 1 });
   assert.deepEqual(refundSummary(undefined), { count: 0, refunded: 0, pending: 0, pendingCount: 0, closedCount: 0, unknownCount: 0 });
+});
+
+test('D4 customer note is optional, trimmed, limited, and part of the decision/creation match', () => {
+  assert.equal(customerNoteValue('  x  '), 'x');assert.equal(customerNoteValue('   '), null);assert.equal(customerNoteValue(undefined), null);
+  assert.equal(validateCustomerNote('a'.repeat(500)), '');assert.match(validateCustomerNote('a'.repeat(501)), /tối đa 500/);
+  const item = { id: 'r', paymentId: 'p', amount: 1000, version: 1 };
+  const data = note => ({ refunds: [{ id: 'r', paymentId: 'p', amount: 500, version: 2, status: 'APPROVED', reason: 'R', customerNote: note }], payments: [] });
+  const op = note => ({ type: 'decide', item, body: { amount: 500, reason: 'R', customerNote: note } });
+  assert.ok(refundResult(op('Note'), data('Note')));
+  assert.equal(refundResult(op('Note'), data(null)), null, 'a missing stored note is not the intended decision');
+  assert.ok(refundResult(op(null), data(undefined)), 'no note on either side matches');
+  const create = { type: 'create', item: { id: 'p' }, previousIds: [], body: { amount: 300, reason: 'R', customerNote: 'N' } };
+  assert.ok(refundResult(create, { refunds: [{ id: 'n', paymentId: 'p', kind: 'MANUAL_EXCESS', amount: 300, reason: 'R', customerNote: 'N' }] }));
+  assert.equal(refundResult(create, { refunds: [{ id: 'n', paymentId: 'p', kind: 'MANUAL_EXCESS', amount: 300, reason: 'R', customerNote: null }] }), undefined);
 });

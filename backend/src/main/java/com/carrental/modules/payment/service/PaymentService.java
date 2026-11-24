@@ -67,11 +67,35 @@ public class PaymentService {
         result.put("sandbox", true);
         result.put("acceptingNew", settings.acceptingNew());
         result.put("deposit", b.deposit());
-        result.put("payments", repo.forBooking(bookingId));
-        result.put("refunds", repo.refunds(bookingId));
-        result.put("events", repo.events(bookingId));
+        // D1: chủ đơn chỉ nhận dữ liệu cần cho giao diện; mã người xác minh/duyệt, khóa yêu cầu và nhật ký nội bộ chỉ cho Staff/Admin.
+        if (actor.is("USER")) {
+            result.put("payments", repo.forBooking(bookingId).stream().map(PaymentService::customerPayment).toList());
+            result.put("refunds", repo.refunds(bookingId).stream().map(PaymentService::customerRefund).toList());
+        } else {
+            result.put("payments", repo.forBooking(bookingId));
+            result.put("refunds", repo.refunds(bookingId));
+            result.put("events", repo.events(bookingId));
+        }
         if (b.qrReconciliation() != null) result.put("qrReconciliation", b.qrReconciliation());
         return result;
+    }
+
+    static Map<String, Object> customerPayment(Payment p) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("id", p.id()); m.put("bookingId", p.bookingId()); m.put("amount", p.amount()); m.put("status", p.status());
+        m.put("createdAt", p.createdAt()); m.put("providerTransaction", p.providerTransaction()); m.put("transferTime", p.transferTime());
+        m.put("transferNote", p.transferNote()); m.put("sourceAccount", p.sourceAccount()); m.put("verifiedAt", p.verifiedAt());
+        m.put("appliedAmount", p.appliedAmount()); m.put("depositMethod", p.depositMethod());
+        return m;
+    }
+
+    static Map<String, Object> customerRefund(Refund r) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("id", r.id()); m.put("paymentId", r.paymentId()); m.put("bookingId", r.bookingId()); m.put("amount", r.amount());
+        // D4: never the internal reason; only the note the Admin wrote for the customer.
+        m.put("status", r.status()); m.put("kind", r.kind()); m.put("customerNote", r.customerNote()); m.put("approvedAt", r.approvedAt());
+        m.put("createdAt", r.createdAt()); m.put("providerTransaction", r.providerTransaction()); m.put("depositMethod", r.depositMethod());
+        return m;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -125,6 +149,28 @@ public class PaymentService {
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, null, clock.instant(), "refund:" + p.id() + ":" + kind);
     }
 
+    /**
+     * D3 (phương án 2): a receipt recorded after the booking was cancelled/rejected. Money transferred before the closure
+     * follows the booking's cancellation policy (late customer / no-show stay an Admin decision); money transferred at or
+     * after the closure, or when the closure time is unknown, is refunded in full. Never touches earlier receipts.
+     */
+    @Transactional
+    public void receiptAfterClosure(String paymentId, String cancellationKind, Instant closedAt) {
+        var p = repo.lockPayment(paymentId);
+        if (!"SUCCEEDED".equals(p.status())) return;
+        if (closedAt != null && p.transferTime() != null && p.transferTime().isBefore(closedAt)) {
+            String kind = Objects.toString(cancellationKind, "CANCELLED");
+            boolean discretionary = Set.of("NO_SHOW", "LATE_CUSTOMER").contains(kind);
+            queue(p, true, p.amount() - p.appliedAmount(), kind, discretionary ? "REQUESTED" : "APPROVED",
+                discretionary ? "Khoản chuyển trước thời điểm hủy, ghi nhận sau; Admin quyết định 0–100%; cần lý do"
+                              : "Khoản chuyển trước thời điểm hủy/từ chối, ghi nhận sau; hoàn theo chính sách hủy");
+        } else {
+            queue(p, true, p.amount() - p.appliedAmount(), "UNAPPLIED", "APPROVED",
+                closedAt == null ? "Khoản ghi nhận sau khi đơn đã hủy/từ chối (không xác định thời điểm đóng); hoàn toàn bộ."
+                                 : "Khoản chuyển từ thời điểm đơn hủy/từ chối trở đi; hoàn toàn bộ.");
+        }
+    }
+
     @Transactional
     public void qrRefund(String bookingId, String kind, boolean all) {
         bookings.depositLock(bookingId);
@@ -171,9 +217,23 @@ public class PaymentService {
 
     @Transactional
     public Object decide(Actor admin, String refundId, long version, long amount, String reason) {
+        return decide(admin, refundId, version, amount, reason, null);
+    }
+
+    /** D4: the reason stays internal; the optional customer note is the only decision text the customer sees. */
+    static String customerNote(String note) {
+        if (note == null || note.isBlank()) return null;
+        String trimmed = note.strip();
+        if (trimmed.length() > 500) throw DomainException.bad("Thông báo cho khách tối đa 500 ký tự.");
+        return trimmed;
+    }
+
+    @Transactional
+    public Object decide(Actor admin, String refundId, long version, long amount, String reason, String note) {
         admin.require("ADMIN");
         if (reason == null || reason.isBlank() || reason.length() > 1000)
             throw DomainException.bad("Cần lý do hoàn tiền, tối đa 1000 ký tự.");
+        String customerNote = customerNote(note);
         var first = repo.refund(refundId);
         bookings.depositLock(first.bookingId());
         var firstRefund = repo.refund(refundId);
@@ -182,31 +242,53 @@ public class PaymentService {
         var p = repo.lockPayment(r.paymentId());
         if (!"SUCCEEDED".equals(p.status()) || amount < 0 || amount > p.amount() - repo.reserved(p.id(), r.id()))
             throw DomainException.bad("Số tiền hoàn vượt tiền đã nhận.");
-        repo.decide(r.id(), version, amount, reason, admin.id(), clock.instant());
+        repo.decide(r.id(), version, amount, reason, customerNote, admin.id(), clock.instant());
         repo.event(p.bookingId(), p.id(), "REFUND_DECIDED", reason, admin.id(), clock.instant(), null);
         return repo.refund(r.id());
     }
 
     @Transactional(readOnly = true)
     public Object admin(Actor actor) {
+        return admin(actor, null);
+    }
+
+    /** D2: optional server-side lookup (prefix, case-insensitive) beyond the recent-history limit; no query keeps the old response. */
+    @Transactional(readOnly = true)
+    public Object admin(Actor actor, String query) {
         actor.require("ADMIN");
-        var history = repo.adminPayments();
+        String q = query == null || query.isBlank() ? null : query.strip();
+        if (q != null && (q.length() < 3 || q.length() > 64))
+            throw DomainException.bad("Từ khóa tra cứu cần từ 3 đến 64 ký tự.");
+        var history = q == null ? repo.adminPayments() : repo.searchPayments(q);
         var reserved = repo.reservedAmounts();
-        var refunds = repo.adminRefunds();
+        var refunds = q == null ? repo.adminRefunds() : repo.searchRefunds(q);
+        var unresolved = q == null ? repo.unresolvedPayments() : repo.searchUnresolvedPayments(q);
         Map<String, Long> refundable = new HashMap<>();
         for (var p : history) refundable.put(p.id(), "SUCCEEDED".equals(p.status())
             ? Math.max(0, p.amount() - p.appliedAmount() - reserved.getOrDefault(p.id(), 0L)) : 0L);
-        return Map.of("refunds", refunds, "refundPayments", repo.paymentsForRefunds(refunds),
-            "unresolved", repo.unresolvedPayments(), "payments", history,
-            "refundableAmounts", refundable, "manualRefundPaymentIds", repo.manualRefundPaymentIds(),
-            "historyLimit", 200, "sandbox", true);
+        var result = new LinkedHashMap<String, Object>();
+        result.put("refunds", refunds); result.put("refundPayments", repo.paymentsForRefunds(refunds));
+        result.put("unresolved", unresolved); result.put("payments", history);
+        result.put("refundableAmounts", refundable); result.put("manualRefundPaymentIds", repo.manualRefundPaymentIds());
+        result.put("historyLimit", PaymentRepository.ADMIN_LIMIT); result.put("sandbox", true);
+        if (q != null) result.put("search", Map.of("query", q, "limit", PaymentRepository.ADMIN_LIMIT,
+            "unresolvedLimit", PaymentRepository.UNRESOLVED_LIMIT,
+            "truncated", history.size() >= PaymentRepository.ADMIN_LIMIT || refunds.size() >= PaymentRepository.ADMIN_LIMIT
+                || unresolved.size() >= PaymentRepository.UNRESOLVED_LIMIT));
+        return result;
     }
 
     @Transactional
     public Object createManualRefund(Actor admin, String paymentId, long amount, String reason) {
+        return createManualRefund(admin, paymentId, amount, reason, null);
+    }
+
+    @Transactional
+    public Object createManualRefund(Actor admin, String paymentId, long amount, String reason, String note) {
         admin.require("ADMIN");
         if (reason == null || reason.isBlank() || reason.length() > 1000)
             throw DomainException.bad("Cần lý do hoàn tiền, tối đa 1000 ký tự.");
+        String customerNote = customerNote(note);
         var first = repo.payment(paymentId).orElseThrow(DomainException::missing);
         bookings.depositLock(first.bookingId());
         var p = repo.lockPayment(paymentId);
@@ -217,13 +299,13 @@ public class PaymentService {
         if (amount <= 0 || amount > available)
             throw DomainException.bad("Số tiền hoàn vượt tiền có sẵn.");
         String refundId = id();
-        repo.createRefund(refundId, p, amount, "REQUESTED", "MANUAL_EXCESS", reason, clock.instant());
+        repo.createRefund(refundId, p, amount, "REQUESTED", "MANUAL_EXCESS", reason, customerNote, clock.instant());
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, admin.id(), clock.instant(), "refund:" + refundId);
         return repo.refund(refundId);
     }
 
-    public Object decideManualRefund(Actor admin, String refundId, long version, long amount, String reason) {
-        return decide(admin, refundId, version, amount, reason);
+    public Object decideManualRefund(Actor admin, String refundId, long version, long amount, String reason, String note) {
+        return decide(admin, refundId, version, amount, reason, note);
     }
 
     @Transactional
