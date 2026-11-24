@@ -176,7 +176,8 @@ public class DepositWorkflow {
                 if (Set.of("CANCELLED","REJECTED").contains(b.status())) {
                     // D3-pre: receipts held at closure were settled by the cancellation policy (incl. pending Admin decisions);
                     // only the newly recorded receipt is handled here, never earlier money.
-                    if (paymentId != null) payments.qrRefundReceipt(paymentId, "UNAPPLIED", "Khoản ghi nhận sau khi đơn đã hủy/từ chối; hoàn toàn bộ.");
+                    // D3 (phương án 2): transferred before closure -> the booking's cancellation policy; at/after closure -> full refund.
+                    if (paymentId != null) payments.receiptAfterClosure(paymentId, b.deposit().cancellationKind(), bookings.closedAt(bookingId));
                     return;
                 }
                 if (!"PENDING".equals(b.status())) {

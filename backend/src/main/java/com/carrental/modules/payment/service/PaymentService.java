@@ -148,12 +148,26 @@ public class PaymentService {
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, null, clock.instant(), "refund:" + p.id() + ":" + kind);
     }
 
-    /** Queue a refund for exactly one receipt (caller holds the booking deposit lock). */
+    /**
+     * D3 (phương án 2): a receipt recorded after the booking was cancelled/rejected. Money transferred before the closure
+     * follows the booking's cancellation policy (late customer / no-show stay an Admin decision); money transferred at or
+     * after the closure, or when the closure time is unknown, is refunded in full. Never touches earlier receipts.
+     */
     @Transactional
-    public void qrRefundReceipt(String paymentId, String kind, String reason) {
+    public void receiptAfterClosure(String paymentId, String cancellationKind, Instant closedAt) {
         var p = repo.lockPayment(paymentId);
         if (!"SUCCEEDED".equals(p.status())) return;
-        queue(p, true, p.amount() - p.appliedAmount(), kind, "APPROVED", reason);
+        if (closedAt != null && p.transferTime() != null && p.transferTime().isBefore(closedAt)) {
+            String kind = Objects.toString(cancellationKind, "CANCELLED");
+            boolean discretionary = Set.of("NO_SHOW", "LATE_CUSTOMER").contains(kind);
+            queue(p, true, p.amount() - p.appliedAmount(), kind, discretionary ? "REQUESTED" : "APPROVED",
+                discretionary ? "Khoản chuyển trước thời điểm hủy, ghi nhận sau; Admin quyết định 0–100%; cần lý do"
+                              : "Khoản chuyển trước thời điểm hủy/từ chối, ghi nhận sau; hoàn theo chính sách hủy");
+        } else {
+            queue(p, true, p.amount() - p.appliedAmount(), "UNAPPLIED", "APPROVED",
+                closedAt == null ? "Khoản ghi nhận sau khi đơn đã hủy/từ chối (không xác định thời điểm đóng); hoàn toàn bộ."
+                                 : "Khoản chuyển từ thời điểm đơn hủy/từ chối trở đi; hoàn toàn bộ.");
+        }
     }
 
     @Transactional

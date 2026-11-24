@@ -303,7 +303,16 @@ test('G5-F01 pickup Staff can record late money on an expired QR booking, with a
   const pending = render('PENDING');
   assert.match(pending, /aria-label="Ghi nhận cọc QR DEMO"/);
   assert.doesNotMatch(pending, /Cảnh báo đơn hết hạn/);
-  for (const status of ['CONFIRMED', 'CANCELLED', 'REJECTED', 'IN_PROGRESS', 'COMPLETED']) assert.doesNotMatch(render(status), /Ghi nhận cọc QR DEMO/, status);
+  for (const status of ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'RETURNED']) assert.doesNotMatch(render(status), /Ghi nhận cọc QR DEMO/, status);
+  // D3: đơn đã hủy/từ chối có form với cảnh báo phân xử theo thời điểm chuyển; không dùng cảnh báo hết hạn.
+  for (const status of ['CANCELLED', 'REJECTED']) {
+    const closedHtml = render(status);
+    assert.match(closedHtml, /aria-label="Ghi nhận cọc QR DEMO"/, status);
+    assert.match(closedHtml, /Khoản chuyển trước thời điểm hủy\/từ chối được xử lý theo chính sách hủy của đơn.*Khoản chuyển từ thời điểm đó trở đi được hoàn toàn bộ/, status);
+    assert.doesNotMatch(closedHtml, /Cảnh báo đơn hết hạn/, status);
+    for (const [role, assigned] of [['STAFF', false], ['ADMIN', true], ['USER', true]]) assert.doesNotMatch(render(status, role, assigned), /Ghi nhận cọc QR DEMO/, `${status} ${role}/${assigned}`);
+  }
+  assert.doesNotMatch(expired, /Cảnh báo đơn đã hủy/);
   for (const [role, assigned] of [['STAFF', false], ['ADMIN', true], ['USER', true]]) assert.doesNotMatch(render('EXPIRED', role, assigned), /Ghi nhận cọc QR DEMO/, `${role}/${assigned}`);
   const notApproved = { ...approved, deposit: { ...approved.deposit, approvedAt: null } };
   assert.doesNotMatch(render('EXPIRED', 'STAFF', true, notApproved), /Ghi nhận cọc QR DEMO/);

@@ -123,6 +123,12 @@ public class BookingService {
                (a.is("STAFF") && (branches.assigned(a, b.pickupBranchId) || branches.assigned(a, b.returnBranchId)));
     }
 
+    /** D3: time the booking was closed by cancellation/rejection (latest transition), or null if never closed. */
+    public Instant closedAt(String id) {
+        return jdbc.query("select max(occurred_at) from booking_status_history where booking_id=? and next_status in ('CANCELLED','REJECTED')",
+            rs -> { if (!rs.next()) return null; var t = rs.getTimestamp(1); return t == null ? null : t.toInstant(); }, id);
+    }
+
     public Booking require(Actor a, String id) {
         Booking b = repo.findById(id).orElseThrow(DomainException::missing);
         if (!canRead(a, b)) throw DomainException.missing();

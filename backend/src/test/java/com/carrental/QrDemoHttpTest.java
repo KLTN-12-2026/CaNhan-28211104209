@@ -193,6 +193,51 @@ class QrDemoHttpTest {
         assertEquals(1,forNewer.size());assertEquals("APPROVED",forNewer.getFirst().status());assertEquals(100000,forNewer.getFirst().amount());
         assertEquals("CANCELLED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
     }
+    Instant closedAt(String id){return jdbc.queryForObject("select max(occurred_at) from booking_status_history where booking_id=? and next_status in ('CANCELLED','REJECTED')",java.sql.Timestamp.class,id).toInstant();}
+    PaymentRepository.Refund refundOf(String bookingId,String ref){
+        var p=repo.forBooking(bookingId).stream().filter(x->ref.equals(x.providerTransaction())).findFirst().orElseThrow();
+        var rs=repo.refunds(bookingId).stream().filter(r->r.paymentId().equals(p.id())).toList();assertEquals(1,rs.size(),ref);return rs.getFirst();
+    }
+    void lateReceipt(String id,String ref,long amount,Instant transfer)throws Exception {
+        assertEquals(200,post(staff,"/bookings/"+id+"/deposit/verify",input(id,ref,amount,transfer)).getStatus(),ref);
+    }
+    @Test void receiptAfterLateCancellationFollowsTransferTimeAgainstTheClosure()throws Exception {
+        // D3 phương án 2: before closure -> cancellation policy (LATE_CUSTOMER: Admin decides); at/after closure -> full refund.
+        var b=lateCustomerCancelled("EARLY-A");Instant closed=closedAt(b.id());var approved=b.deposit().approvedAt();
+        clock.value=closed.plusSeconds(3600);
+        lateReceipt(b.id(),"BEFORE-1",120000,closed.minusSeconds(1));
+        lateReceipt(b.id(),"AT-2",80000,closed);
+        lateReceipt(b.id(),"AFTER-3",50000,closed.plusSeconds(1));
+        assertTrue(closed.minusSeconds(1).isAfter(approved),"fixture transfer time is after approval");
+        var before=refundOf(b.id(),"BEFORE-1");assertEquals("REQUESTED",before.status());assertEquals("LATE_CUSTOMER",before.kind());assertEquals(120000,before.amount());
+        var at=refundOf(b.id(),"AT-2");assertEquals("APPROVED",at.status());assertEquals("UNAPPLIED",at.kind());assertEquals(80000,at.amount());
+        var after=refundOf(b.id(),"AFTER-3");assertEquals("APPROVED",after.status());assertEquals("UNAPPLIED",after.kind());assertEquals(50000,after.amount());
+        var earlier=refundOf(b.id(),"EARLY-A");assertEquals("REQUESTED",earlier.status());assertEquals("LATE_CUSTOMER",earlier.kind());
+        // Admin keeps the 0-100% decision on money transferred before the closure.
+        payments.decide(admin,before.id(),before.version(),60000,"Synthetic 50% decision");
+        assertEquals("APPROVED",repo.refund(before.id()).status());assertEquals(60000,repo.refund(before.id()).amount());
+        assertEquals("CANCELLED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+        for(var p:repo.forBooking(b.id())) if(!"EARLY-A".equals(p.providerTransaction())) assertEquals(0,p.appliedAmount(),"late money is never applied");
+    }
+    @Test void receiptAfterEarlyCancellationOrRejectionIsRefundedInFullUnderTheBookingPolicy()throws Exception {
+        // EARLY_USER: before closure -> full refund under the early-cancellation policy; after -> full UNAPPLIED.
+        var b=approve();var approved=b.deposit().approvedAt();clock.value=approved.plusSeconds(300);
+        var c=current(b.id());rental.apply(user,b.id(),new BookingService.Action("CANCELLED",c.version(),"Synthetic early cancellation",null,false,false,null));
+        assertEquals("CANCELLED",current(b.id()).status());Instant closed=closedAt(b.id());clock.value=closed.plusSeconds(600);
+        lateReceipt(b.id(),"E-BEFORE",100000,closed.minusSeconds(60));lateReceipt(b.id(),"E-AFTER",70000,closed.plusSeconds(60));
+        var eb=refundOf(b.id(),"E-BEFORE");assertEquals("APPROVED",eb.status());assertEquals("EARLY_USER",eb.kind());assertEquals(100000,eb.amount());
+        var ea=refundOf(b.id(),"E-AFTER");assertEquals("APPROVED",ea.status());assertEquals("UNAPPLIED",ea.kind());assertEquals(70000,ea.amount());
+        // REJECTED by the pickup branch (BUSINESS): before -> BUSINESS full; after -> UNAPPLIED full.
+        clock.value=Instant.parse("2026-10-23T03:00:00Z");
+        var r=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,10,29),LocalDate.of(2026,10,31)));
+        r=(BookingService.View)workflow.approve(staff,r.id(),r.version());clock.value=r.deposit().approvedAt().plusSeconds(300);
+        rental.apply(staff,r.id(),new BookingService.Action("REJECTED",current(r.id()).version(),"Synthetic rejection",null,false,false,null));
+        assertEquals("REJECTED",current(r.id()).status());Instant rejected=closedAt(r.id());clock.value=rejected.plusSeconds(600);
+        lateReceipt(r.id(),"R-BEFORE",90000,rejected.minusSeconds(60));lateReceipt(r.id(),"R-AFTER",40000,rejected);
+        var rb=refundOf(r.id(),"R-BEFORE");assertEquals("APPROVED",rb.status());assertEquals("BUSINESS",rb.kind());assertEquals(90000,rb.amount());
+        var ra=refundOf(r.id(),"R-AFTER");assertEquals("APPROVED",ra.status());assertEquals("UNAPPLIED",ra.kind());assertEquals(40000,ra.amount());
+        assertEquals(0,count("contracts",r.id()));assertEquals("REJECTED",current(r.id()).status());
+    }
     @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
         // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
         var b=approve();verify(b.id(),"A",200000);

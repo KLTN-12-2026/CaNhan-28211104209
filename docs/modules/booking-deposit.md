@@ -16,6 +16,7 @@ Return URL chỉ hiển thị; IPN hoặc truy vấn có chữ ký mới ghi nh�
 - Doanh nghiệp từ chối/không cung cấp xe, khách hủy trước mốc nhận ít nhất 24 giờ: hoàn toàn bộ. Đơn theo ngày dùng đầu ngày nhận.
 - Hủy sát giờ hoặc không đến nhận: Admin quyết định 0–100%, bắt buộc lý do.
 - Tiền đến muộn, đơn không xác nhận được hoặc thu thừa: hoàn toàn bộ khoản không áp dụng.
+- Khoản ghi nhận sau khi đơn đã hủy/từ chối (QR DEMO): so thời điểm chuyển với thời điểm hủy/từ chối (lịch sử trạng thái). Chuyển trước thời điểm đó → theo chính sách hủy của đơn (khách hủy sát giờ/không đến nhận: tạo yêu cầu chờ Admin quyết định 0–100%; hủy sớm/doanh nghiệp từ chối: hoàn toàn bộ). Chuyển từ thời điểm đó trở đi (gồm đúng thời điểm) → hoàn toàn bộ. Không khôi phục đơn, không động tới khoản đã nhận trước đó. Staff chi nhánh nhận ghi nhận được qua giao diện kèm cảnh báo.
 - No-show: sau hết ngày nhận, Staff chi nhánh nhận xác nhận đã liên hệ và chưa giao xe, ghi lý do, kiểm tra chuỗi lịch trước hủy. Không áp dụng cho đơn đã giao/có biên bản giao.
 
 Hoàn có vòng đời REQUESTED → APPROVED → PROCESSING → SUCCEEDED/FAILED/UNKNOWN; quyết định 0 đồng là DECLINED. Gửi yêu cầu thành công chưa là đã hoàn. Timeout giữ UNKNOWN, không gửi lại mù quáng. Tổng hoàn thành công và đang xử lý không vượt tiền thu. Không tự trừ thiệt hại/phụ phí.
