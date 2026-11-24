@@ -24,7 +24,20 @@ export function previewHeading(status) {
   return STATUS_HEADINGS[status] || 'KHÔNG XÁC ĐỊNH ĐƯỢC KẾT QUẢ';
 }
 
-export function previewExplanation(status) {
+const EARLY_STOP_EXPLANATION =
+  'Hệ thống dừng trước khi xét các thứ tự trong tập ứng viên, nên đây không phải kết luận đã thử mọi thứ tự. Xem lý do bên dưới.';
+
+/**
+ * Explanation for a preview result. "Every order was examined" is claimed only when the backend says so:
+ * NO_FEASIBLE_PLAN from BACKEND_SEARCH with a candidate set. An early stop (e.g. the start location is
+ * closed that day) carries no plan context and is explained by its notices instead.
+ */
+export function previewExplanation(result) {
+  const status = result?.status;
+  if (status === 'NO_FEASIBLE_PLAN') {
+    const searched = result.planSource === 'BACKEND_SEARCH' && Boolean(result.candidateSet);
+    return searched ? STATUS_EXPLANATIONS.NO_FEASIBLE_PLAN : EARLY_STOP_EXPLANATION;
+  }
   return STATUS_EXPLANATIONS[status] || null;
 }
 

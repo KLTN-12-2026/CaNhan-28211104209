@@ -427,3 +427,32 @@ test("G6.4: preview shows plan source, candidate set and a distinct explanation 
     await unmountAll();
   }
 });
+
+test("G6-R1: early-closed start is explained by its notice, never as an exhaustive search", async () => {
+  resetRequests();
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  roots.add(root);
+  await act(async () => root.render(createElement(AuthContext.Provider, { value: { user: { id: "u1", role: "USER" } } },
+    createElement(MemoryRouter, null, createElement(ApiItineraryPlannerPage)))));
+  await act(async () => resolve(take("/ai/locations"), [
+    { id: "loc-1", name: "Test A", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+    { id: "loc-2", name: "Test B", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+  ]));
+  await act(async () => container.querySelector("form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  const closedNotice = "Địa điểm bắt đầu 'Test A' đóng cửa hoặc chưa có lịch mở cửa vào ngày 2026-10-25.";
+  await act(async () => resolve(take("/ai/itineraries/preview", "post"), {
+    status: "NO_FEASIBLE_PLAN", planSource: null, candidateSet: null, fingerprint: null,
+    orderedLocationIds: ["loc-1"], items: [], totals: null, notices: [closedNotice],
+    criteria: { tripDate: "2026-10-25", startTime: "09:00", endTime: "17:00", startLocationId: "loc-1" },
+  }));
+  const text = container.textContent;
+  assert.ok(text.includes("KHÔNG CÓ THỨ TỰ KHẢ THI"));
+  assert.ok(text.includes(closedNotice), "the backend's start-closed notice is shown");
+  assert.ok(text.includes("dừng trước khi xét"), "explains that no order was examined");
+  assert.ok(!text.includes("Đã xét mọi thứ tự"), "must not claim an exhaustive search");
+  assert.equal(container.querySelector('[data-testid="candidate-set"]'), null);
+  assert.equal(container.querySelector('[data-testid="plan-source"]'), null);
+  await unmountAll();
+});

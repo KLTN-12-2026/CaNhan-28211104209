@@ -5,11 +5,25 @@ import { candidateSetLines, planSourceLabel, previewExplanation, previewHeading 
 test('each preview status has its own heading and only failures carry an explanation', () => {
   const headings = ['VALIDATED', 'NO_FEASIBLE_PLAN', 'NEEDS_DATA', 'UNAVAILABLE'].map(previewHeading);
   assert.equal(new Set(headings).size, 4);
-  assert.equal(previewExplanation('VALIDATED'), null);
-  assert.match(previewExplanation('NO_FEASIBLE_PLAN'), /Đã xét mọi thứ tự/);
-  assert.match(previewExplanation('NEEDS_DATA'), /không phải kết luận/);
-  assert.match(previewExplanation('UNAVAILABLE'), /chưa thể kết luận/);
+  const set = { eligibleCount: 2, candidateIds: ['s', 'a'], excluded: [], truncatedLocationIds: [] };
+  assert.equal(previewExplanation({ status: 'VALIDATED', planSource: 'QWEN', candidateSet: set }), null);
+  assert.match(previewExplanation({ status: 'NO_FEASIBLE_PLAN', planSource: 'BACKEND_SEARCH', candidateSet: set }), /Đã xét mọi thứ tự/);
+  assert.match(previewExplanation({ status: 'NEEDS_DATA', planSource: null, candidateSet: set }), /không phải kết luận/);
+  assert.match(previewExplanation({ status: 'UNAVAILABLE', planSource: null, candidateSet: null }), /chưa thể kết luận/);
   assert.equal(previewHeading('SOMETHING_ELSE'), 'KHÔNG XÁC ĐỊNH ĐƯỢC KẾT QUẢ');
+  assert.equal(previewExplanation(null), null);
+});
+
+test('G6-R1: NO_FEASIBLE_PLAN claims an exhaustive search only when the backend searched the candidate set', () => {
+  const set = { eligibleCount: 2, candidateIds: ['s', 'a'], excluded: [], truncatedLocationIds: [] };
+  const earlyClosed = { status: 'NO_FEASIBLE_PLAN', planSource: null, candidateSet: null, notices: ['Điểm xuất phát đóng cửa'] };
+  for (const early of [earlyClosed, { ...earlyClosed, planSource: 'BACKEND_SEARCH' }, { ...earlyClosed, candidateSet: set }]) {
+    const text = previewExplanation(early);
+    assert.doesNotMatch(text, /Đã xét mọi thứ tự/, JSON.stringify(early));
+    assert.match(text, /dừng trước khi xét/);
+    assert.match(text, /không phải kết luận đã thử mọi thứ tự/);
+  }
+  assert.match(previewExplanation({ status: 'NO_FEASIBLE_PLAN', planSource: 'BACKEND_SEARCH', candidateSet: set }), /Đã xét mọi thứ tự 2–4 điểm/);
 });
 
 test('plan source distinguishes Qwen order from backend search and hides unknown values', () => {

@@ -505,8 +505,8 @@ export default function ApiItineraryPlannerPage() {
                   <span className="inline-block rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
                     {previewHeading(previewResult.status)}
                   </span>
-                  {previewExplanation(previewResult.status) && (
-                    <p className="text-sm text-slate-700" data-testid="preview-explanation">{previewExplanation(previewResult.status)}</p>
+                  {previewExplanation(previewResult) && (
+                    <p className="text-sm text-slate-700" data-testid="preview-explanation">{previewExplanation(previewResult)}</p>
                   )}
                   {candidateSetLines(previewResult.candidateSet, namesById).length > 0 && (
                     <ul className="list-disc pl-5 text-xs text-slate-500" data-testid="candidate-set">

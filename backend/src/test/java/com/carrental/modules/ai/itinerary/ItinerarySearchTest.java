@@ -284,6 +284,34 @@ class ItinerarySearchTest {
         assertEquals(0, facts.pairCalls("p1", "s"), "no leg back to the start is ever needed");
     }
 
+    /**
+     * G6-R1: a start location closed on the trip date stops before candidate selection. NO_FEASIBLE_PLAN without
+     * plan context and without calling the planner or OSRM: it is not an exhaustive search result.
+     */
+    @Test void closedStartStopsEarlyWithoutPlanContextOrProviderCalls() {
+        var weekly = new EnumMap<DayOfWeek, VisitMetadata.Hours>(DayOfWeek.class);
+        for (var day : DayOfWeek.values()) weekly.put(day, new VisitMetadata.Hours(VisitMetadata.State.CLOSED, List.of()));
+        var ev = new VisitMetadata.Evidence("https://example.invalid/closed", Instant.parse("2027-01-01T00:00:00Z"));
+        var closedMeta = new VisitMetadata("Asia/Ho_Chi_Minh", weekly, Map.of(), 30, ev, ev).validated(CLOCK);
+        var facts = new Facts();
+        facts.add(new PublicView("s", "x", "x", "Điểm đầu đóng cửa", new BigDecimal("16.1001"), new BigDecimal("108.2001"), closedMeta));
+        facts.add(open("a", "x", 2));
+        facts.add(open("b", "x", 3));
+        facts.leg("s", "a", 1000, 600);
+        facts.leg("s", "b", 1000, 600);
+        var planner = mock(QwenItinerarySequencePlanner.class);
+        var response = service(facts, mock(LocationService.class), planner)
+            .preview(USER, new ItineraryPreviewRequest(LocalDate.parse("2027-02-10"), "08:00", "17:00", "s", null));
+        assertEquals(Status.NO_FEASIBLE_PLAN, response.status());
+        assertNull(response.planSource(), "no plan was attempted");
+        assertNull(response.candidateSet(), "stopped before the candidate set was chosen");
+        assertTrue(response.items().isEmpty());
+        assertTrue(response.notices().stream().anyMatch(n -> n.contains("đóng cửa")), response.notices().toString());
+        assertTrue(response.notices().stream().noneMatch(n -> n.contains("Đã xét toàn bộ")), "no exhaustive-search notice");
+        verifyNoInteractions(planner);
+        assertTrue(facts.calls.isEmpty(), "no OSRM call");
+    }
+
     /** G6.4b-F1 regression: displayed legs equal the pair legs used to choose, never a multi-waypoint variant. */
     @Test void displayedLegsAreThePairLegsUsedForTheDecision() {
         var views = List.of(open("s", "x", 1), open("a", "x", 2), open("b", "x", 3), open("z", "x", 4));
