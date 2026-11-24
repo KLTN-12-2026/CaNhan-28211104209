@@ -67,11 +67,34 @@ public class PaymentService {
         result.put("sandbox", true);
         result.put("acceptingNew", settings.acceptingNew());
         result.put("deposit", b.deposit());
-        result.put("payments", repo.forBooking(bookingId));
-        result.put("refunds", repo.refunds(bookingId));
-        result.put("events", repo.events(bookingId));
+        // D1: chủ đơn chỉ nhận dữ liệu cần cho giao diện; mã người xác minh/duyệt, khóa yêu cầu và nhật ký nội bộ chỉ cho Staff/Admin.
+        if (actor.is("USER")) {
+            result.put("payments", repo.forBooking(bookingId).stream().map(PaymentService::customerPayment).toList());
+            result.put("refunds", repo.refunds(bookingId).stream().map(PaymentService::customerRefund).toList());
+        } else {
+            result.put("payments", repo.forBooking(bookingId));
+            result.put("refunds", repo.refunds(bookingId));
+            result.put("events", repo.events(bookingId));
+        }
         if (b.qrReconciliation() != null) result.put("qrReconciliation", b.qrReconciliation());
         return result;
+    }
+
+    static Map<String, Object> customerPayment(Payment p) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("id", p.id()); m.put("bookingId", p.bookingId()); m.put("amount", p.amount()); m.put("status", p.status());
+        m.put("createdAt", p.createdAt()); m.put("providerTransaction", p.providerTransaction()); m.put("transferTime", p.transferTime());
+        m.put("transferNote", p.transferNote()); m.put("sourceAccount", p.sourceAccount()); m.put("verifiedAt", p.verifiedAt());
+        m.put("appliedAmount", p.appliedAmount()); m.put("depositMethod", p.depositMethod());
+        return m;
+    }
+
+    static Map<String, Object> customerRefund(Refund r) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("id", r.id()); m.put("paymentId", r.paymentId()); m.put("bookingId", r.bookingId()); m.put("amount", r.amount());
+        m.put("status", r.status()); m.put("kind", r.kind()); m.put("reason", r.reason()); m.put("approvedAt", r.approvedAt());
+        m.put("createdAt", r.createdAt()); m.put("providerTransaction", r.providerTransaction()); m.put("depositMethod", r.depositMethod());
+        return m;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

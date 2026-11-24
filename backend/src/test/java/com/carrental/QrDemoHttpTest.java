@@ -138,6 +138,33 @@ class QrDemoHttpTest {
         var b=approve();verify(b.id(),"A",200000);assertEquals("PENDING",current(b.id()).status());assertEquals(190000,current(b.id()).deposit().missingAmount());
         verify(b.id(),"B",190000);assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));
     }
+    @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
+        // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
+        var b=approve();verify(b.id(),"A",200000);
+        var created=(PaymentRepository.Refund)payments.createManualRefund(admin,repo.forBooking(b.id()).getFirst().id(),50000,"Synthetic manual request");
+        payments.decide(admin,created.id(),created.version(),50000,"Synthetic decision");
+        var customer=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString());
+        assertFalse(customer.has("events"),"USER must not receive the internal event log");
+        var pay=customer.get("payments").get(0);
+        for(String hidden:List.of("verifierId","idempotencyKey","version","applied","expiresAt","providerPayDate")) assertFalse(pay.has(hidden),"USER payment exposes "+hidden);
+        for(String kept:List.of("id","amount","status","appliedAmount","providerTransaction","transferTime","transferNote","sourceAccount","verifiedAt")) assertTrue(pay.has(kept),"USER payment misses "+kept);
+        assertEquals(200000,pay.get("amount").asLong());assertEquals(0,pay.get("appliedAmount").asLong());assertEquals("A",pay.get("providerTransaction").asText());
+        var refund=customer.get("refunds").get(0);
+        for(String hidden:List.of("approvedBy","requestDate","version")) assertFalse(refund.has(hidden),"USER refund exposes "+hidden);
+        for(String kept:List.of("id","amount","status","kind","reason","approvedAt")) assertTrue(refund.has(kept),"USER refund misses "+kept);
+        assertEquals(50000,refund.get("amount").asLong());assertEquals("MANUAL_EXCESS",refund.get("kind").asText());assertEquals("APPROVED",refund.get("status").asText());
+        assertFalse(customer.toString().contains(staff.id()),"USER ledger leaks the verifier id");
+        assertFalse(customer.toString().contains(admin.id()),"USER ledger leaks the approver id");
+        assertFalse(customer.toString().contains("key-A"),"USER ledger leaks the idempotency key");
+        assertTrue(customer.has("qrReconciliation"));assertTrue(customer.has("deposit"));
+        for(Actor operator:List.of(staff,admin)) {
+            var full=json.readTree(get(operator,"/bookings/"+b.id()+"/deposit").getContentAsString());
+            assertTrue(full.get("events").size()>0,operator.role()+" keeps events");
+            assertEquals(staff.id(),full.get("payments").get(0).get("verifierId").asText());
+            assertEquals("key-A",full.get("payments").get(0).get("idempotencyKey").asText());
+            assertEquals(admin.id(),full.get("refunds").get(0).get("approvedBy").asText());
+        }
+    }
     @Test void excessRefundThenEarlyCancellationNeverExceedsReceived()throws Exception {
         var b=approve();verify(b.id(),"A",500000);var p=repo.forBooking(b.id()).getFirst();assertEquals(390000,p.appliedAmount());assertEquals(110000,current(b.id()).deposit().excessAmount());
         var r=repo.refundForPayment(p.id()).orElseThrow();assertEquals(110000,r.amount());payments.processManualRefund(admin,r.id());
