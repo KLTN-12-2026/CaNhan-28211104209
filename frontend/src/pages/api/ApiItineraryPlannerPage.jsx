@@ -4,6 +4,7 @@ import { listActiveLocations, previewItinerary, saveItinerary } from "../../api/
 import { Page, Field } from "../../components/common/PageKit";
 import EmptyState from "../../components/common/EmptyState";
 import { useAuth } from "../../context/AuthContext";
+import { candidateSetLines, planSourceLabel, previewExplanation, previewHeading } from "../../utils/itineraryPreview";
 
 function formatDateVn(isoDate) {
   if (!isoDate || typeof isoDate !== "string") return "";
@@ -33,6 +34,7 @@ export default function ApiItineraryPlannerPage() {
   const navigate = useNavigate();
 
   const [locations, setLocations] = useState([]);
+  const namesById = Object.fromEntries(locations.map((loc) => [loc.id, loc.name]));
   const [categories, setCategories] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
@@ -354,7 +356,7 @@ export default function ApiItineraryPlannerPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                       <div>
                         <span className="inline-block rounded bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
-                          HÀNH TRÌNH KHẢ THI
+                          {previewHeading("VALIDATED")}
                         </span>
                         <h2 className="mt-2 text-xl font-bold">
                           Kế hoạch chi tiết ngày {formatDateVn(previewResult.criteria.tripDate)}
@@ -362,6 +364,14 @@ export default function ApiItineraryPlannerPage() {
                         <p className="text-sm text-slate-500">
                           Khung giờ dự kiến: {previewResult.criteria.startTime} – {previewResult.criteria.endTime}
                         </p>
+                        {planSourceLabel(previewResult.planSource) && (
+                          <p className="text-sm text-slate-600" data-testid="plan-source">{planSourceLabel(previewResult.planSource)}</p>
+                        )}
+                        {candidateSetLines(previewResult.candidateSet, namesById).length > 0 && (
+                          <ul className="mt-1 list-disc pl-5 text-xs text-slate-500" data-testid="candidate-set">
+                            {candidateSetLines(previewResult.candidateSet, namesById).map((line) => <li key={line}>{line}</li>)}
+                          </ul>
+                        )}
                       </div>
                       <div className="flex gap-4 text-right text-sm">
                         <div>
@@ -493,14 +503,18 @@ export default function ApiItineraryPlannerPage() {
               ) : (
                 <div className="panel space-y-3">
                   <span className="inline-block rounded bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                    {previewResult.status === "NO_FEASIBLE_PLAN"
-                      ? "KHÔNG TÌM ĐƯỢC LỊCH TRÌNH PHÙ HỢP"
-                      : previewResult.status === "NEEDS_DATA"
-                      ? "THIẾU DỮ LIỆU KIỂM CHỨNG"
-                      : "DỊCH VỤ TẠM THỜI GIÁN ĐOẠN"}
+                    {previewHeading(previewResult.status)}
                   </span>
+                  {previewExplanation(previewResult.status) && (
+                    <p className="text-sm text-slate-700" data-testid="preview-explanation">{previewExplanation(previewResult.status)}</p>
+                  )}
+                  {candidateSetLines(previewResult.candidateSet, namesById).length > 0 && (
+                    <ul className="list-disc pl-5 text-xs text-slate-500" data-testid="candidate-set">
+                      {candidateSetLines(previewResult.candidateSet, namesById).map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                  )}
                   <p className="text-sm text-slate-700">
-                    Hệ thống không thể tạo kế hoạch theo yêu cầu của bạn vì các lý do sau:
+                    Chi tiết từ hệ thống:
                   </p>
                   <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
                     {previewResult.notices && previewResult.notices.length > 0 ? (

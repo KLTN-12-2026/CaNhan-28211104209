@@ -152,6 +152,19 @@ class ItinerarySearchTest {
             if (response.status() == Status.NO_FEASIBLE_PLAN) {
                 assertTrue(oracle.feasibleOrders().isEmpty(), id + " backend gave up although the oracle has a plan");
                 assertTrue(response.notices().stream().anyMatch(n -> n.contains("Đã xét toàn bộ")), id + " exhaustive notice");
+                assertEquals(ItineraryPreviewResponse.PLAN_SOURCE_BACKEND_SEARCH, response.planSource(), id + " infeasible only after the search");
+            }
+            if (response.status() == Status.VALIDATED) {
+                boolean qwenFits = oracle.schedule(proposed).feasible();
+                assertEquals(qwenFits ? ItineraryPreviewResponse.PLAN_SOURCE_QWEN : ItineraryPreviewResponse.PLAN_SOURCE_BACKEND_SEARCH,
+                    response.planSource(), id);
+            }
+            if (response.status() == Status.NEEDS_DATA) assertNull(response.planSource(), id);
+            if (response.candidateSet() != null) {
+                assertEquals(new TreeSet<>(strings(scenario.path("proof").path("candidateIds"))),
+                    new TreeSet<>(response.candidateSet().candidateIds()), id + " candidate set = proof pool");
+                assertEquals(input.path("startLocationId").asText(), response.candidateSet().candidateIds().get(0), id);
+                assertTrue(response.candidateSet().candidateIds().containsAll(response.orderedLocationIds()), id);
             }
             checked++;
         }
@@ -169,6 +182,48 @@ class ItinerarySearchTest {
         assertEquals("09:10", response.items().get(1).departure());
         assertNotNull(response.fingerprint());
         assertEquals(c.path("expected").path("status").asText(), response.status().name());
+        assertEquals(ItineraryPreviewResponse.PLAN_SOURCE_BACKEND_SEARCH, response.planSource());
+        assertEquals(List.of("a", "b", "c"), response.candidateSet().candidateIds());
+        assertEquals(3, response.candidateSet().eligibleCount());
+        assertTrue(response.candidateSet().excluded().isEmpty());
+        assertTrue(response.candidateSet().truncatedLocationIds().isEmpty());
+    }
+
+    @Test void planContextExplainsSourceExclusionsAndCap() {
+        var closed = new VisitMetadata("Asia/Ho_Chi_Minh", Map.of(DayOfWeek.WEDNESDAY, new VisitMetadata.Hours(VisitMetadata.State.CLOSED, List.of())),
+            Map.of(), 30, null, null);
+        var views = new ArrayList<PublicView>(List.of(open("s", "x", 1), open("a", "x", 2),
+            new PublicView("nometa", "x", "x", "Thiếu", new BigDecimal("16.1099"), new BigDecimal("108.2099"), null),
+            new PublicView("shut", "x", "x", "Đóng", new BigDecimal("16.1098"), new BigDecimal("108.2098"), closed)));
+        for (int i = 0; i < 8; i++) views.add(open("p" + i, "x", 10 + i));
+        var facts = complete(views, 600);
+        var qwen = run(facts, List.of("s", "a"), "12:00", null);
+        assertEquals(Status.VALIDATED, qwen.status());
+        assertEquals(ItineraryPreviewResponse.PLAN_SOURCE_QWEN, qwen.planSource());
+        var set = qwen.candidateSet();
+        assertEquals(10, set.eligibleCount());
+        assertEquals(List.of("s", "a", "p0", "p1", "p2", "p3", "p4", "p5"), set.candidateIds());
+        assertEquals(List.of("p6", "p7"), set.truncatedLocationIds());
+        assertEquals(List.of(new ItineraryPreviewResponse.ExcludedLocation("nometa", "MISSING_METADATA"),
+            new ItineraryPreviewResponse.ExcludedLocation("shut", "NOT_OPEN_ON_DATE")), set.excluded());
+
+        var lonely = new Facts();
+        lonely.add(open("s", "x", 1));
+        lonely.add(new PublicView("nometa", "x", "x", "Thiếu", new BigDecimal("16.1099"), new BigDecimal("108.2099"), null));
+        var needs = run(lonely, List.of("s", "nometa"), "12:00", null);
+        assertEquals(Status.NEEDS_DATA, needs.status());
+        assertNull(needs.planSource());
+        assertEquals(1, needs.candidateSet().eligibleCount());
+        assertEquals("MISSING_METADATA", needs.candidateSet().excluded().get(0).reason());
+
+        var qwenDown = mock(QwenItinerarySequencePlanner.class);
+        when(qwenDown.planSequence(anyString(), anyList(), anyInt(), any(AiRequestDeadline.class)))
+            .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(503, "Qwen tắt"));
+        var down = service(facts, mock(LocationService.class), qwenDown)
+            .preview(USER, new ItineraryPreviewRequest(LocalDate.parse("2027-02-10"), "08:00", "12:00", "s", null));
+        assertEquals(Status.UNAVAILABLE, down.status());
+        assertNull(down.planSource(), "no plan source when the planner did not answer");
+        assertNotNull(down.candidateSet());
     }
 
     static PublicView open(String id, String category, int n) {

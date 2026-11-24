@@ -109,8 +109,10 @@ public class ItineraryPreviewService {
             catalog, startLocation, request.preferredCategoryId(),
             view -> !effectiveIntervals(view.metadata(), request.tripDate()).isEmpty());
 
+        CandidateSet candidateSet = candidateSet(selection);
         if (selection.eligibleCount() < 2) {
-            return needsData(criteria, List.of("Không đủ địa điểm có thông tin mở cửa hợp lệ để lập hành trình tối thiểu 2 điểm."));
+            return needsData(criteria, List.of("Không đủ địa điểm có thông tin mở cửa hợp lệ để lập hành trình tối thiểu 2 điểm."))
+                .withPlanContext(null, candidateSet);
         }
 
         List<PublicView> filteredCandidates = selection.candidates();
@@ -134,7 +136,7 @@ public class ItineraryPreviewService {
             if (qpe.getStatusCode() == 429) {
                 throw new DomainException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, qpe.getMessage());
             }
-            return unavailable(criteria, List.of(), List.of(qpe.getMessage()));
+            return unavailable(criteria, List.of(), List.of(qpe.getMessage())).withPlanContext(null, candidateSet);
         }
 
         List<String> orderedIds = planResult.orderedLocationIds();
@@ -148,11 +150,13 @@ public class ItineraryPreviewService {
             criteria, orderedLocations, request.tripDate(), startTime, endTime, deadline);
         if (scheduleResult.errorResponse != null) {
             if (scheduleResult.errorResponse.status() != Status.NO_FEASIBLE_PLAN) {
-                return scheduleResult.errorResponse;
+                return scheduleResult.errorResponse.withPlanContext(null, candidateSet);
             }
             // G6.3: Qwen's order does not fit; examine every 2..4 order in the same finite set before concluding.
-            return searchFeasibleOrder(criteria, filteredCandidates, request.preferredCategoryId(),
+            var searched = searchFeasibleOrder(criteria, filteredCandidates, request.preferredCategoryId(),
                 request.tripDate(), startTime, endTime, deadline, scheduleResult.errorResponse);
+            boolean concluded = searched.status() == Status.VALIDATED || searched.status() == Status.NO_FEASIBLE_PLAN;
+            return searched.withPlanContext(concluded ? ItineraryPreviewResponse.PLAN_SOURCE_BACKEND_SEARCH : null, candidateSet);
         }
 
         return new ItineraryPreviewResponse(
@@ -163,7 +167,15 @@ public class ItineraryPreviewService {
             scheduleResult.totals,
             scheduleResult.fingerprint,
             List.of()
-        );
+        ).withPlanContext(ItineraryPreviewResponse.PLAN_SOURCE_QWEN, candidateSet);
+    }
+
+    private static CandidateSet candidateSet(ItineraryCandidateSelector.Selection selection) {
+        return new CandidateSet(
+            selection.eligibleCount(),
+            selection.candidates().stream().map(PublicView::id).toList(),
+            selection.excluded().stream().map(e -> new ExcludedLocation(e.locationId(), e.reason().name())).toList(),
+            selection.truncatedIds());
     }
 
     /** Longest order examined by the backend search: start plus three stops. */

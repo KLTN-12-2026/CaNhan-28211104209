@@ -386,3 +386,44 @@ test("ApiItineraryPlannerPage: network interruption or timeout on save displays 
 
   await unmountAll();
 });
+
+test("G6.4: preview shows plan source, candidate set and a distinct explanation per status", async () => {
+  const outcomes = [
+    { status: "VALIDATED", planSource: "BACKEND_SEARCH", expect: ["HÀNH TRÌNH KHẢ THI", "hệ thống đã tự xét", "Đã xét 2 địa điểm", "Không dùng Test C: thiếu thời lượng"] },
+    { status: "VALIDATED", planSource: "QWEN", expect: ["Thứ tự do trợ lý AI (Qwen) đề xuất"] },
+    { status: "NO_FEASIBLE_PLAN", planSource: "BACKEND_SEARCH", expect: ["KHÔNG CÓ THỨ TỰ KHẢ THI", "Đã xét mọi thứ tự 2–4 điểm", "Đã xét toàn bộ 1 thứ tự"] },
+    { status: "NEEDS_DATA", planSource: null, expect: ["THIẾU DỮ LIỆU KIỂM CHỨNG", "không phải kết luận"] },
+    { status: "UNAVAILABLE", planSource: null, expect: ["DỊCH VỤ TẠM THỜI GIÁN ĐOẠN", "chưa thể kết luận"] },
+  ];
+  for (const outcome of outcomes) {
+    resetRequests();
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    roots.add(root);
+    await act(async () => root.render(createElement(AuthContext.Provider, { value: { user: { id: "u1", role: "USER" } } },
+      createElement(MemoryRouter, null, createElement(ApiItineraryPlannerPage)))));
+    await act(async () => resolve(take("/ai/locations"), [
+      { id: "loc-1", name: "Test A", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+      { id: "loc-2", name: "Test B", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+      { id: "loc-3", name: "Test C", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+    ]));
+    await act(async () => container.querySelector("form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+    const validated = outcome.status === "VALIDATED";
+    await act(async () => resolve(take("/ai/itineraries/preview", "post"), {
+      status: outcome.status, planSource: outcome.planSource,
+      fingerprint: validated ? "fp" : null, orderedLocationIds: ["loc-1", "loc-2"],
+      criteria: { tripDate: "2026-10-25", startTime: "09:00", endTime: "17:00", startLocationId: "loc-1" },
+      items: [], totals: validated ? { totalDwellMinutes: 60, totalTravelMinutes: 5, totalDistanceMeters: 1000 } : null,
+      notices: outcome.status === "NO_FEASIBLE_PLAN" ? ["Đã xét toàn bộ 1 thứ tự 2–4 điểm trong 2 địa điểm ứng viên; không có thứ tự khả thi."] : [],
+      candidateSet: outcome.status === "UNAVAILABLE" ? null : {
+        eligibleCount: 2, candidateIds: ["loc-1", "loc-2"], truncatedLocationIds: [],
+        excluded: [{ locationId: "loc-3", reason: "MISSING_DURATION" }],
+      },
+    }));
+    for (const text of outcome.expect) assert.ok(container.textContent.includes(text), `${outcome.status}/${outcome.planSource}: ${text}`);
+    if (outcome.status === "UNAVAILABLE") assert.equal(container.querySelector('[data-testid="candidate-set"]'), null);
+    if (!validated) assert.equal(container.querySelector('[data-testid="plan-source"]'), null);
+    await unmountAll();
+  }
+});

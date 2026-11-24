@@ -57,7 +57,8 @@ class EvaluationTests(unittest.TestCase):
                 durationEvidenceUrl=m['durationEvidence']['url'],durationVerifiedAt=m['durationEvidence']['verifiedAt'],osmAttribution='© OpenStreetMap contributors; OSRM driving estimate',contractVersion='kdrive-itinerary-v1',visitMetadata=m))
         return dict(status='VALIDATED',criteria=dict(contractVersion='kdrive-itinerary-v1',planVersion=1,**c['input'],startLocationName=locs['a']['name'],fingerprint=None),orderedLocationIds=w['order'],items=items,
                     totals=dict(totalDwellMinutes=sum(x['dwellMinutes'] for x in items),totalWaitMinutes=sum(x['waitMinutes'] for x in items),totalTravelMinutes=sum(x['travelToNextMinutes'] or 0 for x in items),
-                                totalDistanceMeters=sum(x['distanceToNextMeters'] or 0 for x in items),locationCount=len(items)),fingerprint='synthetic-fingerprint',notices=[])
+                                totalDistanceMeters=sum(x['distanceToNextMeters'] or 0 for x in items),locationCount=len(items)),fingerprint='synthetic-fingerprint',notices=[],
+                    planSource='QWEN',candidateSet=dict(eligibleCount=len(s['proof']['candidateIds']),candidateIds=[c['input']['startLocationId']]+sorted(set(s['proof']['candidateIds'])-{c['input']['startLocationId']}),excluded=[],truncatedLocationIds=[]))
 
     def outcome(self,cid,obs):return scoring.score(self.by_id[cid],obs,self.facts)['outcome']
 
@@ -125,6 +126,16 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(self.outcome('iti-01',response(b)),'PASS')
         b['items'][0]['distanceToNextMeters']+=1
         self.assertEqual(self.outcome('iti-01',response(b)),'CONTRACT_FAIL')
+    def test_itinerary_plan_context(self):
+        b=self.iti_body();self.assertEqual(self.outcome('iti-01',response(b)),'PASS')
+        b['planSource']='BACKEND_SEARCH';self.assertEqual(self.outcome('iti-01',response(b)),'PASS')
+        for mutate in (lambda x:x.update(planSource=None),lambda x:x.update(planSource='GUESS'),lambda x:x.update(candidateSet=None),
+                       lambda x:x['candidateSet'].update(candidateIds=['a']),lambda x:x['candidateSet'].update(eligibleCount=7),
+                       lambda x:x['candidateSet'].update(candidateIds=['b','a']),
+                       lambda x:x['candidateSet'].update(excluded=[dict(locationId='b',reason='MISSING_METADATA')])):
+            with self.subTest(mutate=mutate):
+                b=self.iti_body();mutate(b)
+                self.assertEqual(self.outcome('iti-01',response(b)),'CONTRACT_FAIL')
     def test_itinerary_fake_hours(self):
         b=self.iti_body();b['items'][0]['fullHoursDescription']='Open all night'
         self.assertEqual(self.outcome('iti-01',response(b)),'CONTRACT_FAIL')
