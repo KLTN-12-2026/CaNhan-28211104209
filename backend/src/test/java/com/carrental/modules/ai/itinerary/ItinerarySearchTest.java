@@ -51,7 +51,10 @@ class ItinerarySearchTest {
         final Map<String, String> byPoint = new HashMap<>();
         final Map<String, double[]> legs = new HashMap<>(); // from->to : {distance, seconds}; absent/NO_ROUTE = missing
         final List<List<String>> calls = new ArrayList<>();
-        boolean pairsUnavailable;
+        /** After this many calls every further call is UNAVAILABLE (models OSRM or the 60s budget failing mid-request). */
+        int unavailableAfterCalls = Integer.MAX_VALUE;
+        /** Like real OSRM through intermediate waypoints: a multi-point request makes each leg longer than its pair route. */
+        double multiPointExtraMeters, multiPointExtraSeconds;
 
         void add(PublicView v) { views.put(v.id(), v); byPoint.put(v.latitude().doubleValue() + "," + v.longitude().doubleValue(), v.id()); }
         void leg(String from, String to, double meters, double seconds) { legs.put(from + "->" + to, new double[]{meters, seconds}); }
@@ -59,14 +62,16 @@ class ItinerarySearchTest {
         OsrmRoutingClient.Estimate route(List<OsrmRoutingClient.Point> points) {
             var ids = points.stream().map(p -> byPoint.get(p.latitude() + "," + p.longitude())).toList();
             calls.add(ids);
-            if (pairsUnavailable && ids.size() == 2) return new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.UNAVAILABLE, null, null, null, List.of());
+            if (calls.size() > unavailableAfterCalls) return new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.UNAVAILABLE, null, null, null, List.of());
+            boolean multi = ids.size() > 2;
             var out = new ArrayList<OsrmRoutingClient.Leg>();
             double meters = 0, seconds = 0;
             for (int i = 0; i + 1 < ids.size(); i++) {
                 double[] leg = legs.get(ids.get(i) + "->" + ids.get(i + 1));
                 if (leg == null) return new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.NO_ROUTE, null, null, null, List.of());
-                out.add(new OsrmRoutingClient.Leg(leg[0], leg[1]));
-                meters += leg[0]; seconds += leg[1];
+                double m = leg[0] + (multi ? multiPointExtraMeters : 0), s = leg[1] + (multi ? multiPointExtraSeconds : 0);
+                out.add(new OsrmRoutingClient.Leg(m, s));
+                meters += m; seconds += s;
             }
             return new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, meters, seconds, "OSM", out);
         }
@@ -266,16 +271,39 @@ class ItinerarySearchTest {
         for (int i = 0; i < 7; i++) views.add(open("p" + i, "x", i + 2));
         var facts = complete(views, 60);
         facts.legs.remove("p0->p6");
-        var proposed = List.of("s", "p0", "p6"); // whole-route call (3 points) fails: NO_ROUTE, search begins
+        var proposed = List.of("s", "p0", "p6"); // leg p0->p6 has no route: Qwen's order fails, search begins
         var response = run(facts, proposed, "23:00", null);
         assertEquals(Status.VALIDATED, response.status());
         assertEquals(List.of("s", "p0", "p1", "p2"), response.orderedLocationIds());
-        var pairs = facts.calls.stream().filter(c -> c.size() == 2).toList();
-        assertEquals(pairs.size(), new HashSet<>(pairs).size(), "each directed pair requested once");
+        assertTrue(facts.calls.stream().allMatch(c -> c.size() == 2), "every leg is a 2-point route (G6.4b-F1)");
+        var pairs = facts.calls;
+        assertEquals(pairs.size(), new HashSet<>(pairs).size(), "each directed pair requested once per preview, Qwen order included");
         assertTrue(pairs.size() <= 7 * 8, "at most 56 directed pairs for 8 candidates");
-        assertEquals(1, facts.pairCalls("p0", "p6"));
+        assertEquals(1, facts.pairCalls("p0", "p6"), "the failed Qwen leg is cached, not re-requested by the search");
+        assertEquals(1, facts.pairCalls("s", "p0"));
         assertEquals(0, facts.pairCalls("p1", "s"), "no leg back to the start is ever needed");
-        assertEquals(List.of("s", "p0", "p1", "p2"), facts.calls.get(facts.calls.size() - 1), "winner re-routed as one chain, like save");
+    }
+
+    /** G6.4b-F1 regression: displayed legs equal the pair legs used to choose, never a multi-waypoint variant. */
+    @Test void displayedLegsAreThePairLegsUsedForTheDecision() {
+        var views = List.of(open("s", "x", 1), open("a", "x", 2), open("b", "x", 3), open("z", "x", 4));
+        var facts = complete(views, 600);
+        facts.legs.remove("s->z");
+        facts.multiPointExtraMeters = 360;
+        facts.multiPointExtraSeconds = 180; // through-waypoint variant: +3 minutes per leg
+        for (var proposed : List.of(List.of("s", "a", "b"), List.of("s", "z"))) { // Qwen order kept / backend search
+            facts.calls.clear();
+            var response = run(facts, proposed, "10:00", null);
+            assertEquals(Status.VALIDATED, response.status(), proposed.toString());
+            var order = response.orderedLocationIds();
+            assertEquals(List.of("s", "a", "b"), order, "08:00-10:00 fits three stops with 10-minute pair legs only");
+            for (int i = 0; i + 1 < order.size(); i++) {
+                assertEquals(1000.0, response.items().get(i).distanceToNextMeters(), "pair distance, not the multi-waypoint one");
+                assertEquals(10, response.items().get(i).travelToNextMinutes());
+            }
+            assertEquals("09:50", response.items().get(2).departure());
+            assertTrue(facts.calls.stream().allMatch(c -> c.size() == 2), "no multi-waypoint request");
+        }
     }
 
     @Test void exhaustedSetReportsNoFeasiblePlanWithTheExaminedCount() {
@@ -306,8 +334,10 @@ class ItinerarySearchTest {
         assertEquals(429, ex.status.value());
 
         facts.legs.remove("s->a");
-        facts.pairsUnavailable = true; // OSRM (or the 60s budget) fails during the search
+        facts.calls.clear();
+        facts.unavailableAfterCalls = 1; // Qwen's s->a gets NO_ROUTE; the next leg the search needs is UNAVAILABLE
         var midSearch = run(facts, List.of("s", "a", "b"), "12:00", null);
         assertEquals(Status.UNAVAILABLE, midSearch.status(), "an unavailable leg is never read as infeasible");
+        assertTrue(facts.calls.size() >= 2, "the search started before OSRM failed");
     }
 }
