@@ -16,14 +16,14 @@ import java.util.*;
  * rounded up to whole minutes; overnight intervals carried from the previous day count; a missing day is
  * UNKNOWN (no intervals). No approach or return leg.
  */
-final class ItineraryOracle {
-    static final String OPENING_WINDOW = "OPENING_WINDOW", END_TIME = "END_TIME", DAY_BOUNDARY = "DAY_BOUNDARY", NO_ROUTE = "NO_ROUTE";
+public final class ItineraryOracle {
+    public static final String OPENING_WINDOW = "OPENING_WINDOW", END_TIME = "END_TIME", DAY_BOUNDARY = "DAY_BOUNDARY", NO_ROUTE = "NO_ROUTE";
 
-    record Interval(int start, int end) {}
-    record Item(String locationId, String arrival, String departure, int waitMinutes, Integer travelMinutes, Long distanceMeters) {}
+    public record Interval(int start, int end) {}
+    public record Item(String locationId, String arrival, String departure, int waitMinutes, Integer travelMinutes, Long distanceMeters) {}
     /** cause == null means the order is feasible. */
-    record Outcome(List<String> order, String cause, List<Item> items) {
-        boolean feasible() { return cause == null; }
+    public record Outcome(List<String> order, String cause, List<Item> items) {
+        public boolean feasible() { return cause == null; }
     }
 
     private final Map<String, JsonNode> locations = new LinkedHashMap<>();
@@ -32,7 +32,7 @@ final class ItineraryOracle {
     private final int startMinute, endMinute;
     private final String startId;
 
-    ItineraryOracle(JsonNode scenario, LocalDate tripDate, String startTime, String endTime, String startId) {
+    public ItineraryOracle(JsonNode scenario, LocalDate tripDate, String startTime, String endTime, String startId) {
         for (JsonNode l : scenario.path("locations")) locations.put(l.path("id").asText(), l);
         for (JsonNode leg : scenario.path("legs")) legs.put(leg.path("source").asText() + "->" + leg.path("target").asText(), leg);
         this.tripDate = tripDate;
@@ -41,7 +41,7 @@ final class ItineraryOracle {
         this.startId = startId;
     }
 
-    static ItineraryOracle forCase(JsonNode scenario, JsonNode input) {
+    public static ItineraryOracle forCase(JsonNode scenario, JsonNode input) {
         return new ItineraryOracle(scenario, LocalDate.parse(input.path("tripDate").asText()),
             input.path("startTime").asText(), input.path("endTime").asText(), input.path("startLocationId").asText());
     }
@@ -81,7 +81,7 @@ final class ItineraryOracle {
     }
 
     /** ACTIVE locations with metadata, a duration and at least one opening interval on the trip date. */
-    SortedSet<String> candidatePool() {
+    public SortedSet<String> candidatePool() {
         var pool = new TreeSet<String>();
         for (var e : locations.entrySet()) {
             JsonNode l = e.getValue();
@@ -93,7 +93,7 @@ final class ItineraryOracle {
     }
 
     /** Facts that block planning, in the proof's vocabulary. */
-    SortedSet<String> missingFacts() {
+    public SortedSet<String> missingFacts() {
         var missing = new TreeSet<String>();
         for (var e : locations.entrySet()) {
             JsonNode meta = e.getValue().path("metadata");
@@ -106,7 +106,7 @@ final class ItineraryOracle {
         return missing;
     }
 
-    Outcome schedule(List<String> order) {
+    public Outcome schedule(List<String> order) {
         int current = startMinute;
         var items = new ArrayList<Item>();
         for (int i = 0; i < order.size(); i++) {
@@ -137,7 +137,7 @@ final class ItineraryOracle {
     }
 
     /** Every order of 2..4 distinct candidates that begins at the fixed start, in lexicographic order. */
-    List<List<String>> orders() {
+    public List<List<String>> orders() {
         var others = new ArrayList<>(candidatePool());
         if (!others.remove(startId)) return List.of();
         var out = new ArrayList<List<String>>();
@@ -156,7 +156,7 @@ final class ItineraryOracle {
         }
     }
 
-    List<Outcome> enumerate() { return orders().stream().map(this::schedule).toList(); }
+    public List<Outcome> enumerate() { return orders().stream().map(this::schedule).toList(); }
 
-    List<List<String>> feasibleOrders() { return enumerate().stream().filter(Outcome::feasible).map(Outcome::order).toList(); }
+    public List<List<String>> feasibleOrders() { return enumerate().stream().filter(Outcome::feasible).map(Outcome::order).toList(); }
 }
