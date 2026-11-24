@@ -147,7 +147,12 @@ public class ItineraryPreviewService {
         ScheduleComputationResult scheduleResult = computeSchedule(
             criteria, orderedLocations, request.tripDate(), startTime, endTime, deadline);
         if (scheduleResult.errorResponse != null) {
-            return scheduleResult.errorResponse;
+            if (scheduleResult.errorResponse.status() != Status.NO_FEASIBLE_PLAN) {
+                return scheduleResult.errorResponse;
+            }
+            // G6.3: Qwen's order does not fit; examine every 2..4 order in the same finite set before concluding.
+            return searchFeasibleOrder(criteria, filteredCandidates, request.preferredCategoryId(),
+                request.tripDate(), startTime, endTime, deadline, scheduleResult.errorResponse);
         }
 
         return new ItineraryPreviewResponse(
@@ -159,6 +164,134 @@ public class ItineraryPreviewService {
             scheduleResult.fingerprint,
             List.of()
         );
+    }
+
+    /** Longest order examined by the backend search: start plus three stops. */
+    static final int MAX_STOPS = 4;
+
+    private static final class SearchState {
+        final Map<String, LegResult> legs = new HashMap<>();
+        List<PublicView> best;
+        int[] bestKey;
+        int examined;
+        ItineraryPreviewResponse unavailable;
+    }
+
+    private ItineraryPreviewResponse searchFeasibleOrder(
+            CriteriaInfo criteria,
+            List<PublicView> candidates,
+            String preferredCategoryId,
+            LocalDate tripDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            AiRequestDeadline deadline,
+            ItineraryPreviewResponse qwenFailure) {
+        var state = new SearchState();
+        var prefix = new ArrayList<PublicView>();
+        prefix.add(candidates.get(0));
+        extendSearch(state, criteria, candidates, prefix, preferredCategoryId, tripDate, startTime, endTime, deadline);
+        if (state.unavailable != null) {
+            return state.unavailable;
+        }
+        if (state.best == null) {
+            var notices = new ArrayList<>(qwenFailure.notices());
+            notices.add("Đã xét toàn bộ " + state.examined + " thứ tự 2–" + MAX_STOPS
+                + " điểm trong " + candidates.size() + " địa điểm ứng viên; không có thứ tự khả thi.");
+            return noFeasiblePlan(criteria, qwenFailure.orderedLocationIds(), notices);
+        }
+        // Re-schedule the winner exactly as save will (whole-route call), so preview and save fingerprints agree.
+        ScheduleComputationResult chosen = computeSchedule(criteria, state.best, tripDate, startTime, endTime, deadline);
+        if (chosen.errorResponse != null) {
+            return chosen.errorResponse;
+        }
+        return new ItineraryPreviewResponse(
+            Status.VALIDATED,
+            criteria,
+            state.best.stream().map(PublicView::id).toList(),
+            chosen.items,
+            chosen.totals,
+            chosen.fingerprint,
+            List.of()
+        );
+    }
+
+    private void extendSearch(
+            SearchState state,
+            CriteriaInfo criteria,
+            List<PublicView> candidates,
+            List<PublicView> prefix,
+            String preferredCategoryId,
+            LocalDate tripDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            AiRequestDeadline deadline) {
+        if (prefix.size() >= MAX_STOPS || state.unavailable != null) {
+            return;
+        }
+        for (PublicView next : candidates) {
+            if (prefix.contains(next)) {
+                continue;
+            }
+            prefix.add(next);
+            List<PublicView> chain = List.copyOf(prefix);
+            state.examined++;
+            ScheduleComputationResult result = scheduleWith(criteria, chain, tripDate, startTime, endTime,
+                i -> memoLeg(state, chain.get(i), chain.get(i + 1), deadline));
+            if (result.errorResponse == null) {
+                consider(state, chain, result.totals, preferredCategoryId);
+                extendSearch(state, criteria, candidates, prefix, preferredCategoryId, tripDate, startTime, endTime, deadline);
+            } else if (result.errorResponse.status() == Status.UNAVAILABLE) {
+                state.unavailable = result.errorResponse;
+            }
+            // A failing prefix fails every extension: earlier stops never depend on later ones.
+            prefix.remove(prefix.size() - 1);
+            if (state.unavailable != null) {
+                return;
+            }
+        }
+    }
+
+    private LegResult memoLeg(SearchState state, PublicView from, PublicView to, AiRequestDeadline deadline) {
+        return state.legs.computeIfAbsent(from.id() + "->" + to.id(), key -> {
+            var estimate = route(List.of(
+                new OsrmRoutingClient.Point(from.latitude().doubleValue(), from.longitude().doubleValue()),
+                new OsrmRoutingClient.Point(to.latitude().doubleValue(), to.longitude().doubleValue())), deadline);
+            if (estimate.status() != OsrmRoutingClient.Status.VERIFIED) {
+                return new LegResult(estimate.status(), null);
+            }
+            if (estimate.distanceMeters() != null && estimate.durationSeconds() != null) {
+                return new LegResult(OsrmRoutingClient.Status.VERIFIED,
+                    new OsrmRoutingClient.Leg(estimate.distanceMeters(), estimate.durationSeconds()));
+            }
+            if (estimate.legs() != null && estimate.legs().size() == 1) {
+                return new LegResult(OsrmRoutingClient.Status.VERIFIED, estimate.legs().get(0));
+            }
+            return new LegResult(OsrmRoutingClient.Status.NO_ROUTE, null);
+        });
+    }
+
+    /** Ranking: more preferred-category stops, then more stops, then less travel+wait, then smaller ID list. */
+    private static void consider(SearchState state, List<PublicView> chain, Totals totals, String preferredCategoryId) {
+        boolean preference = preferredCategoryId != null && !preferredCategoryId.isBlank();
+        int preferred = preference ? (int) chain.stream().filter(v -> preferredCategoryId.equals(v.categoryId())).count() : 0;
+        int[] key = {-preferred, -chain.size(), totals.totalTravelMinutes() + totals.totalWaitMinutes()};
+        if (state.best == null || compareCandidates(key, ids(chain), state.bestKey, ids(state.best)) < 0) {
+            state.best = chain;
+            state.bestKey = key;
+        }
+    }
+
+    private static List<String> ids(List<PublicView> chain) { return chain.stream().map(PublicView::id).toList(); }
+
+    static int compareCandidates(int[] key, List<String> ids, int[] otherKey, List<String> otherIds) {
+        for (int i = 0; i < key.length; i++) {
+            if (key[i] != otherKey[i]) return Integer.compare(key[i], otherKey[i]);
+        }
+        for (int i = 0; i < Math.min(ids.size(), otherIds.size()); i++) {
+            int c = ids.get(i).compareTo(otherIds.get(i));
+            if (c != 0) return c;
+        }
+        return Integer.compare(ids.size(), otherIds.size());
     }
 
     public VerifiedSchedule revalidateOrderedLocations(
@@ -348,6 +481,29 @@ public class ItineraryPreviewService {
             }
         }
 
+        final List<OsrmRoutingClient.Leg> resolvedLegs = legs;
+        return scheduleWith(criteria, orderedLocations, tripDate, startTime, endTime,
+            i -> new LegResult(OsrmRoutingClient.Status.VERIFIED, resolvedLegs.get(i)));
+    }
+
+    /** One leg between stop i and i+1, or why it is unusable. */
+    private record LegResult(OsrmRoutingClient.Status status, OsrmRoutingClient.Leg leg) {}
+
+    @FunctionalInterface
+    private interface LegSource { LegResult at(int index); }
+
+    /**
+     * Schedules stops in order; legs are requested only when the previous stop fits, so a failing prefix
+     * never triggers routing for later legs.
+     */
+    private ScheduleComputationResult scheduleWith(
+            CriteriaInfo criteria,
+            List<PublicView> orderedLocations,
+            LocalDate tripDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            LegSource legSource) {
+        List<String> orderedIds = orderedLocations.stream().map(PublicView::id).toList();
         LocalTime current = startTime;
         List<ScheduleItem> items = new ArrayList<>();
         List<Integer> dwellList = new ArrayList<>();
@@ -387,7 +543,16 @@ public class ItineraryPreviewService {
             Integer travelMinutes = null;
             Double travelDistanceMeters = null;
             if (i < orderedLocations.size() - 1) {
-                OsrmRoutingClient.Leg leg = legs.get(i);
+                LegResult legResult = legSource.at(i);
+                if (legResult.status() == OsrmRoutingClient.Status.UNAVAILABLE) {
+                    return new ScheduleComputationResult(unavailable(criteria, orderedIds,
+                        List.of("Dịch vụ định tuyến OSRM hiện không khả dụng.")));
+                }
+                if (legResult.status() != OsrmRoutingClient.Status.VERIFIED || legResult.leg() == null) {
+                    return new ScheduleComputationResult(noFeasiblePlan(criteria, orderedIds,
+                        List.of("Không tìm được tuyến đường lái xe khả thi giữa các điểm tham quan đã chọn.")));
+                }
+                OsrmRoutingClient.Leg leg = legResult.leg();
                 travelDistanceMeters = leg.distanceMeters();
                 travelMinutes = (int) Math.ceil(leg.durationSeconds() / 60.0);
                 int nextArrivalMins = departureMins + travelMinutes;
