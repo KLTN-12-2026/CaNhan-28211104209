@@ -169,7 +169,8 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const userTimingIssues = userQrStatus && Array.isArray(reconciliation?.timingIssues) ? reconciliation.timingIssues : [];
   const userTimingNotes = [
     userTimingIssues.includes('TRANSFER_LATE') && 'Có khoản chuyển từ hạn đóng cọc trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.',
-    userTimingIssues.includes('VERIFICATION_LATE') && 'Có khoản được xác minh sau hạn đối soát của nhân viên. Đây không phải lỗi của bạn; khoản này không được áp dụng vào đơn, xem tình trạng hoàn bên dưới.',
+    // Backend gắn VERIFICATION_LATE khi verifiedAt >= reviewDueAt (gồm đúng hạn chót); chỉ mô tả thời điểm, không quy trách nhiệm.
+    userTimingIssues.includes('VERIFICATION_LATE') && 'Có khoản được xác minh từ thời điểm hết hạn đối soát trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.',
   ].filter(Boolean);
   const userUnapplied = Boolean(userQrStatus) && ['EXPIRED', 'CLOSED'].includes(reconciliation?.stage) && hasReceivedAmount && hasAppliedAmount && reconciliation.receivedAmount > reconciliation.appliedAmount;
   const refundList = Array.isArray(data?.refunds) ? data.refunds : null;

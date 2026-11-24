@@ -339,11 +339,12 @@ test('G3.4 USER refund lifecycle never treats approval/processing as refunded an
   assert.ok(!container.querySelector('[aria-label="Tình trạng hoàn của bạn"]'));
 });
 
-test('G3.4 late transfer and late verification are explained without asking for more money or blaming the customer', async () => {
+test('G3.4 late transfer and late verification are explained without asking for more money or assigning blame', async () => {
   const late = ledgerWith('RECEIVED_INCOMPLETE', { receivedAmount: 600000, timingIssues: ['TRANSFER_LATE', 'VERIFICATION_LATE'] }, []);
   await mount(makeBooking('booking-a', 'RECEIVED_INCOMPLETE'), c => c.url.endsWith('/deposit') ? late : defaultHandler(c));
   assert.match(text(), /Có khoản chuyển từ hạn đóng cọc trở đi\. Khoản này không được áp dụng vào đơn/);
-  assert.match(text(), /xác minh sau hạn đối soát của nhân viên\. Đây không phải lỗi của bạn/);
+  assert.ok(text().includes('Có khoản được xác minh từ thời điểm hết hạn đối soát trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.'));
+  assert.doesNotMatch(text(), /lỗi của bạn|trách nhiệm|sau hạn đối soát của nhân viên/);
   const expired = ledgerWith('EXPIRED', { receivedAmount: 600000, timingIssues: ['TRANSFER_LATE'], urgency: 'EXPIRED' }, []);
   await mount(makeBooking('booking-a', 'EXPIRED'), c => c.url.endsWith('/deposit') ? expired : defaultHandler(c));
   assert.match(text(), /Đơn đã hết hạn giữ chỗ/);
@@ -362,4 +363,20 @@ test('G3.4 expired booking with refunds points to refund status; applied closed 
   assert.ok(!container.querySelector('[aria-label="Khoản đã nhận chưa áp dụng"]'));
   assert.ok(!container.querySelector('[aria-label="Tình trạng hoàn của bạn"]'));
   assert.doesNotMatch(text(), /Chưa có yêu cầu hoàn/);
+});
+
+test('G3-R01 VERIFICATION_LATE at the exact review deadline uses the from-deadline wording, assigns no blame and asks for no money', async () => {
+  const atDeadline = ledgerWith('RECEIVED_INCOMPLETE', { receivedAmount: 600000, timingIssues: ['VERIFICATION_LATE'] }, []);
+  // Ranh giới do backend quyết định: verifiedAt đúng bằng reviewDueAt vẫn là VERIFICATION_LATE.
+  atDeadline.payments = [{ id: 'payment-boundary', amount: 600000, status: 'SUCCEEDED', appliedAmount: 0, transferTime: '2026-10-24T03:20:00Z', verifiedAt: '2026-10-24T04:00:00Z' }];
+  await mount(makeBooking('booking-a', 'RECEIVED_INCOMPLETE'), c => c.url.endsWith('/deposit') ? atDeadline : defaultHandler(c));
+  const t = text();
+  assert.ok(t.includes('Có khoản được xác minh từ thời điểm hết hạn đối soát trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.'));
+  assert.doesNotMatch(t, /lỗi của bạn|không phải lỗi|trách nhiệm|sau hạn đối soát/);
+  assert.doesNotMatch(t, /Còn thiếu|đóng thêm|Có khoản chuyển từ hạn đóng cọc trở đi/);
+  // Frontend không tự tính lại theo giờ: không có cờ từ backend thì không có thông báo, dù verifiedAt muộn.
+  const unflagged = ledgerWith('RECEIVED_INCOMPLETE', { receivedAmount: 600000, timingIssues: [] }, []);
+  unflagged.payments = [{ ...atDeadline.payments[0], verifiedAt: '2026-10-24T05:00:00Z' }];
+  await mount(makeBooking('booking-a', 'RECEIVED_INCOMPLETE'), c => c.url.endsWith('/deposit') ? unflagged : defaultHandler(c));
+  assert.doesNotMatch(text(), /xác minh từ thời điểm hết hạn đối soát/);
 });
