@@ -138,6 +138,37 @@ class QrDemoHttpTest {
         var b=approve();verify(b.id(),"A",200000);assertEquals("PENDING",current(b.id()).status());assertEquals(190000,current(b.id()).deposit().missingAmount());
         verify(b.id(),"B",190000);assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));
     }
+    org.springframework.mock.web.MockHttpServletResponse adminSearch(Actor actor,String q)throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/payments").param("q",q).header("Authorization","Bearer "+tokens.issue(accounts.require(actor.id())))).andReturn().getResponse();
+    }
+    java.util.Set<String> refs(JsonNode rows){var out=new java.util.TreeSet<String>();rows.forEach(r->out.add(r.path("providerTransaction").asText()));return out;}
+    @Test void adminServerSearchReachesBeyondRecentHistoryWithLiteralWildcards()throws Exception {
+        // D2: an old receipt pushed out of the 200 most recent rows stays findable by server-side prefix search.
+        var b=approve();verify(b.id(),"OLD-REF_1",500000);var old=repo.forBooking(b.id()).getFirst();
+        Instant base=clock.instant().plusSeconds(60);
+        for(int i=0;i<205;i++) jdbc.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,provider_transaction,applied,version) values(?,?,?,?,?,?,?,false,0)",
+            String.format("bulk%028d",i),b.id(),1000,"FAILED",java.sql.Timestamp.from(base.plusSeconds(i)),java.sql.Timestamp.from(base.plusSeconds(i)),"BULK-"+i);
+        var recent=json.readTree(get(admin,"/admin/payments").getContentAsString());
+        assertEquals(200,recent.get("payments").size());assertFalse(refs(recent.get("payments")).contains("OLD-REF_1"));assertFalse(recent.has("search"),"no query keeps the old response");
+        for(String q:List.of("old-ref_","OLD-REF","  Old-Ref_1  ")) {
+            var r=adminSearch(admin,q);assertEquals(200,r.getStatus(),q);var found=json.readTree(r.getContentAsString());
+            assertEquals(java.util.Set.of("OLD-REF_1"),refs(found.get("payments")),q);
+            assertTrue(java.util.stream.StreamSupport.stream(found.get("refunds").spliterator(),false).anyMatch(x->x.get("paymentId").asText().equals(old.id())&&x.get("kind").asText().equals("EXCESS")),"refunds of the matched receipt are included: "+q);
+            assertEquals(q.strip(),found.get("search").get("query").asText());assertFalse(found.get("search").get("truncated").asBoolean());
+            assertEquals(0,found.get("refundableAmounts").get(old.id()).asLong());
+            assertTrue(found.get("refundPayments").size()>=1);
+        }
+        for(String literal:List.of("old-re_","old-ref%","%%%","!!!","___")) {
+            var r=adminSearch(admin,literal);assertEquals(200,r.getStatus(),literal);
+            assertEquals(0,json.readTree(r.getContentAsString()).get("payments").size(),"wildcard must be literal: "+literal);
+        }
+        var byBooking=json.readTree(adminSearch(admin,b.id().substring(0,8)).getContentAsString());
+        assertEquals(200,byBooking.get("payments").size());assertTrue(byBooking.get("search").get("truncated").asBoolean(),"capped results are flagged");
+        assertEquals(400,adminSearch(admin,"ab").getStatus());assertEquals(400,adminSearch(admin,"x".repeat(65)).getStatus());
+        var blank=json.readTree(adminSearch(admin,"   ").getContentAsString());assertFalse(blank.has("search"));assertEquals(200,blank.get("payments").size());
+        for(Actor other:List.of(user,staff)) assertEquals(403,adminSearch(other,"old-ref").getStatus(),other.role());
+        assertEquals(206,count("payment_transactions",b.id()),"search is read-only");
+    }
     @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
         // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
         var b=approve();verify(b.id(),"A",200000);

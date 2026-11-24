@@ -212,17 +212,33 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public Object admin(Actor actor) {
+        return admin(actor, null);
+    }
+
+    /** D2: optional server-side lookup (prefix, case-insensitive) beyond the recent-history limit; no query keeps the old response. */
+    @Transactional(readOnly = true)
+    public Object admin(Actor actor, String query) {
         actor.require("ADMIN");
-        var history = repo.adminPayments();
+        String q = query == null || query.isBlank() ? null : query.strip();
+        if (q != null && (q.length() < 3 || q.length() > 64))
+            throw DomainException.bad("Từ khóa tra cứu cần từ 3 đến 64 ký tự.");
+        var history = q == null ? repo.adminPayments() : repo.searchPayments(q);
         var reserved = repo.reservedAmounts();
-        var refunds = repo.adminRefunds();
+        var refunds = q == null ? repo.adminRefunds() : repo.searchRefunds(q);
+        var unresolved = q == null ? repo.unresolvedPayments() : repo.searchUnresolvedPayments(q);
         Map<String, Long> refundable = new HashMap<>();
         for (var p : history) refundable.put(p.id(), "SUCCEEDED".equals(p.status())
             ? Math.max(0, p.amount() - p.appliedAmount() - reserved.getOrDefault(p.id(), 0L)) : 0L);
-        return Map.of("refunds", refunds, "refundPayments", repo.paymentsForRefunds(refunds),
-            "unresolved", repo.unresolvedPayments(), "payments", history,
-            "refundableAmounts", refundable, "manualRefundPaymentIds", repo.manualRefundPaymentIds(),
-            "historyLimit", 200, "sandbox", true);
+        var result = new LinkedHashMap<String, Object>();
+        result.put("refunds", refunds); result.put("refundPayments", repo.paymentsForRefunds(refunds));
+        result.put("unresolved", unresolved); result.put("payments", history);
+        result.put("refundableAmounts", refundable); result.put("manualRefundPaymentIds", repo.manualRefundPaymentIds());
+        result.put("historyLimit", PaymentRepository.ADMIN_LIMIT); result.put("sandbox", true);
+        if (q != null) result.put("search", Map.of("query", q, "limit", PaymentRepository.ADMIN_LIMIT,
+            "unresolvedLimit", PaymentRepository.UNRESOLVED_LIMIT,
+            "truncated", history.size() >= PaymentRepository.ADMIN_LIMIT || refunds.size() >= PaymentRepository.ADMIN_LIMIT
+                || unresolved.size() >= PaymentRepository.UNRESOLVED_LIMIT));
+        return result;
     }
 
     @Transactional

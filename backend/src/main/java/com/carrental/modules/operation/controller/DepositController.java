@@ -133,8 +133,8 @@ public class DepositController {
     }
 
     @GetMapping("/admin/payments")
-    public Object admin(@AuthenticationPrincipal Actor actor) {
-        return payments.admin(actor);
+    public Object admin(@AuthenticationPrincipal Actor actor, @RequestParam(name = "q", required = false) String query) {
+        return payments.admin(actor, query);
     }
 
     @PostMapping("/admin/payments/{id}/reconcile")

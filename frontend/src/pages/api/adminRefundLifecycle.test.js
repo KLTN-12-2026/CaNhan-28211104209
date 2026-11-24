@@ -140,3 +140,30 @@ test('G4.4 list loading state shows no actions before data arrives',async()=>{
   assert.match(container.textContent,/Đang tải…/);assert.equal(button('Duyệt khoản hoàn'),undefined);
   await act(async()=>gate.resolve());assert.ok(button('Duyệt khoản hoàn'));
 });
+const searchSubmit=async()=>{await act(async()=>container.querySelector('[aria-label="Tra cứu trên máy chủ"]').requestSubmit());};
+test('D2 server search validates locally, sends q, shows scope/truncation and clears back to the recent list',async()=>{
+  await mount(c=>{const d=copy(serverData);if(c.url.includes('?q=')){d.search={query:decodeURIComponent(c.url.split('?q=')[1]),limit:200,unresolvedLimit:50,truncated:true};}return d;});
+  await change('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)','ab');await searchSubmit();
+  assert.match(container.textContent,/Nhập từ khóa tra cứu từ 3 đến 64 ký tự/);assert.equal(requests.length,1,'no request for invalid keyword');
+  await change('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)','  OLD-REF_1%  ');await searchSubmit();
+  assert.equal(requests.at(-1).url,'/admin/payments?q='+encodeURIComponent('OLD-REF_1%'));
+  assert.match(container.querySelector('[aria-label="Phạm vi tra cứu máy chủ"]').textContent,/kết quả tra cứu máy chủ cho “OLD-REF_1%”: tối đa 200 khoản nhận, 200 yêu cầu hoàn và 50 giao dịch cần đối soát\. Kết quả đã chạm giới hạn/);
+  assert.match(container.querySelector('[aria-label="Phạm vi danh sách đã tải"]').textContent,/trong kết quả tra cứu máy chủ\. Đây không phải tổng toàn hệ thống\./);
+  const before=requests.length;await searchSubmit();assert.equal(requests.length,before+1,'same keyword re-queries the server');
+  await click('Bỏ tra cứu');assert.equal(requests.at(-1).url,'/admin/payments');
+  assert.ok(!container.querySelector('[aria-label="Phạm vi tra cứu máy chủ"]'));assert.match(container.querySelector('[aria-label="Phạm vi danh sách đã tải"]').textContent,/đã tải\. Đây không phải tổng/);
+  assert.equal(posts().length,0);
+});
+test('D2 mutation readback stays on the active search and search is locked while the result is uncertain',async()=>{
+  await mount(c=>{if(c.method==='post')throw failure();const d=copy(serverData);if(c.url.includes('?q='))d.search={query:'booking-1',limit:200,unresolvedLimit:50,truncated:false};return d;});
+  await change('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)','booking-1');await searchSubmit();
+  await approve();await click('Xác nhận thao tác');assert.equal(posts().length,1);
+  assert.ok(requests.filter(r=>r.method==='get').slice(-1)[0].url.endsWith('?q=booking-1'),'readback uses the active search');
+  assert.equal(button('Tra cứu máy chủ').disabled,true);assert.equal(button('Bỏ tra cứu').disabled,true);
+  const gets=requests.length;await searchSubmit();assert.equal(requests.length,gets,'no search while the action result is uncertain');
+});
+test('D2 server rejection of a keyword is shown and no stale rows remain',async()=>{
+  await mount(c=>{if(c.url.includes('?q='))throw failure(400);return copy(serverData);});
+  await change('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)','abcdef');await searchSubmit();
+  assert.match(container.textContent,/HTTP 400/);assert.ok(!container.querySelector('[aria-label="Khoản nhận pay-1"]'),'no stale rows from the previous list');
+});

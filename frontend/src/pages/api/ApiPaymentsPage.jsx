@@ -92,7 +92,10 @@ export function ManualRefundForm({ payment, available, run, busy }) {
 }
 
 export default function ApiPaymentsPage() {
-  const request = useApiData('/admin/payments');
+  // D2: tra cứu phía server (tiền tố mã đơn/giao dịch/tham chiếu, kể cả ngoài giới hạn gần nhất); không từ khóa = danh sách gần nhất.
+  const [serverQuery, setServerQuery] = useState(''), [activeSearch, setActiveSearch] = useState(''), [searchError, setSearchError] = useState('');
+  const listPath = activeSearch ? `/admin/payments?q=${encodeURIComponent(activeSearch)}` : '/admin/payments';
+  const request = useApiData(listPath);
   const [snapshot, setSnapshot] = useState(null), [phase, setPhase] = useState('idle');
   const [review, setReview] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [query, setQuery] = useState(''), [paymentStatus, setPaymentStatus] = useState(''), [refundStatus, setRefundStatus] = useState('active');
@@ -109,7 +112,7 @@ export default function ApiPaymentsPage() {
   }
   async function readBack(operation) {
     try {
-      const response = await apiClient.get('/admin/payments');
+      const response = await apiClient.get(listPath);
       if (!alive.current) return;
       const updated = response.data;
       if (!Array.isArray(updated?.payments) || !Array.isArray(updated?.refunds) || !Array.isArray(updated?.unresolved)) throw Error('Invalid readback');
@@ -148,6 +151,19 @@ export default function ApiPaymentsPage() {
     locked.current = true; setPhase('checking');
     try { await readBack(pending.current); } finally { locked.current = false; }
   }
+  function runSearch(event) {
+    event.preventDefault();
+    if (busy || locked.current || pending.current) return;
+    const q = serverQuery.trim();
+    if (q.length < 3 || q.length > 64) { setSearchError('Nhập từ khóa tra cứu từ 3 đến 64 ký tự.'); return; }
+    setSearchError(''); setError(''); setNotice(''); setManualPayment(null); setSnapshot(null);
+    if (q === activeSearch) request.reload(); else setActiveSearch(q);
+  }
+  function clearSearch() {
+    if (busy || locked.current || pending.current) return;
+    setSearchError(''); setError(''); setNotice(''); setManualPayment(null); setSnapshot(null); setServerQuery(''); setActiveSearch('');
+  }
+  const search = activeSearch && data?.search?.query === activeSearch ? data.search : null;
   const payments = data?.payments || [], refunds = data?.refunds || [];
   const refundPayments = [...payments, ...(data?.refundPayments || [])];
   const filteredPayments = payments.filter(p => matchesPaymentSearch(p, query) && (!paymentStatus || p.status === paymentStatus));
@@ -168,12 +184,22 @@ export default function ApiPaymentsPage() {
       <button className="btn" onClick={submit}>Xác nhận thao tác</button>
       <button className="btn-secondary" onClick={() => { setReview(null); setPhase('idle'); }}>Quay lại chỉnh sửa</button>
     </section>}
+    <form className="panel mb-4 space-y-2" aria-label="Tra cứu trên máy chủ" onSubmit={runSearch}>
+      <label className="field">Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)<input value={serverQuery} maxLength={64} disabled={busy} onChange={e => { setServerQuery(e.target.value); setSearchError(''); }} /></label>
+      <p className="text-sm">Tìm theo phần đầu của mã, không phân biệt hoa thường, gồm cả bản ghi cũ ngoài danh sách gần nhất. Ký tự % và _ được tìm đúng như nhập.</p>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-secondary" type="submit" disabled={busy}>Tra cứu máy chủ</button>
+        {activeSearch ? <button className="btn-secondary" type="button" disabled={busy} onClick={clearSearch}>Bỏ tra cứu</button> : null}
+      </div>
+      {searchError ? <Notice error>{searchError}</Notice> : null}
+      {search ? <p className="text-sm font-medium" aria-label="Phạm vi tra cứu máy chủ">Đang xem kết quả tra cứu máy chủ cho “{search.query}”: tối đa {search.limit} khoản nhận, {search.limit} yêu cầu hoàn và {search.unresolvedLimit} giao dịch cần đối soát.{search.truncated ? ' Kết quả đã chạm giới hạn — nhập mã dài hơn để thu hẹp.' : ''}</p> : null}
+    </form>
     {!data && request.loading && <p>Đang tải…</p>}
     {data && <>
       <section className="panel mb-4 space-y-2" aria-label="Bộ lọc cọc và hoàn">
         <label className="field">Tìm mã đơn, giao dịch hoặc tham chiếu<input value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <p>Lọc trong {data.historyLimit || 200} giao dịch và yêu cầu hoàn gần nhất. Mở chi tiết đơn để xem toàn bộ lịch sử của đơn.</p>
-        <p className="text-sm" role="status" aria-label="Phạm vi danh sách đã tải">Hiển thị {filteredPayments.length} / {payments.length} khoản nhận và {filteredRefunds.length} / {refunds.length} yêu cầu hoàn đã tải. Đây không phải tổng toàn hệ thống.</p>
+        <p>{search ? 'Ô này chỉ lọc trong kết quả tra cứu máy chủ đang hiển thị.' : `Ô này chỉ lọc trong ${data.historyLimit || 200} giao dịch và yêu cầu hoàn gần nhất; dùng tra cứu máy chủ để tìm bản ghi cũ hơn.`} Mở chi tiết đơn để xem toàn bộ lịch sử của đơn.</p>
+        <p className="text-sm" role="status" aria-label="Phạm vi danh sách đã tải">Hiển thị {filteredPayments.length} / {payments.length} khoản nhận và {filteredRefunds.length} / {refunds.length} yêu cầu hoàn {search ? 'trong kết quả tra cứu máy chủ' : 'đã tải'}. Đây không phải tổng toàn hệ thống.</p>
       </section>
       <h2 className="mb-3 text-lg font-semibold">Giao dịch cần đối soát</h2>
       {!data.unresolved.length && <p>Không có giao dịch cần đối soát trong danh sách hiện tại.</p>}
