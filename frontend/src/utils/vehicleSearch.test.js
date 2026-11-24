@@ -106,12 +106,13 @@ test("presets toggle and manual changes clear explicit selected state; restored 
  await act(async()=>button(c,"Đi phố · xe gọn").click());assert.equal(input(c,"category").value,"compact");
  await change(input(c,"category"),"sedan");assert.equal(button(c,"Đi phố · xe gọn").getAttribute("aria-pressed"),"false");
 });
+const vietnamDay=offset=>new Date(Date.now()+7*3600000+offset*86400000).toISOString().slice(0,10);
 test("draft trip is submitted only on search; same-branch default, different return and field errors",async()=>{
  const requests=[];searchHandler=async config=>{requests.push(new URL(config.url,"http://localhost"));return{items:[{vehicle:car,total:650000,rentalDays:1}]};};
- const c=await mount("/vehicles");await change(input(c,"pickupBranchId"),"dn");await change(input(c,"start"),"2026-11-20");await change(input(c,"end"),"2026-11-21");assert.equal(requests.length,0);
+ const c=await mount("/vehicles");await change(input(c,"pickupBranchId"),"dn");await change(input(c,"start"),vietnamDay(10));await change(input(c,"end"),vietnamDay(11));assert.equal(requests.length,0);
  await change(input(c,"q"),"Search");assert.equal(requests.length,0);
  await act(async()=>button(c,"Tìm xe").click());assert.equal(requests.length,1);assert.equal(requests[0].searchParams.get("returnBranchId"),"dn");
  await act(async()=>input(c,"different").click());assert.ok(input(c,"returnBranchId"));await change(input(c,"returnBranchId"),"hn");await act(async()=>button(c,"Tìm xe").click());assert.equal(requests.at(-1).searchParams.get("returnBranchId"),"hn");
- await change(input(c,"end"),"2026-11-19");assert.equal(button(c,"Tìm xe").disabled,true);assert.match(c.textContent,/Thời gian trả phải sau/);assert.ok(input(c,"end").getAttribute("aria-describedby"));
+ await change(input(c,"end"),vietnamDay(9));assert.equal(button(c,"Tìm xe").disabled,true);assert.match(c.textContent,/Thời gian trả phải sau/);assert.ok(input(c,"end").getAttribute("aria-describedby"));
  await change(input(c,"start"),"2020-01-01");assert.match(c.textContent,/Ngày nhận không được trước hôm nay/);
 });

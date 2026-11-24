@@ -9,8 +9,30 @@ public record ItineraryPreviewResponse(
     List<ScheduleItem> items,
     Totals totals,
     String fingerprint,
-    List<String> notices
+    List<String> notices,
+    String planSource,
+    CandidateSet candidateSet
 ) {
+    /** Response without plan context: no plan attempted yet. */
+    public ItineraryPreviewResponse(Status status, CriteriaInfo criteria, List<String> orderedLocationIds,
+            List<ScheduleItem> items, Totals totals, String fingerprint, List<String> notices) {
+        this(status, criteria, orderedLocationIds, items, totals, fingerprint, notices, null, null);
+    }
+
+    public ItineraryPreviewResponse withPlanContext(String planSource, CandidateSet candidateSet) {
+        return new ItineraryPreviewResponse(status, criteria, orderedLocationIds, items, totals, fingerprint, notices,
+            planSource, candidateSet);
+    }
+
+    /** QWEN: the planner's order fits. BACKEND_SEARCH: the backend examined the candidate set after it did not. */
+    public static final String PLAN_SOURCE_QWEN = "QWEN";
+    public static final String PLAN_SOURCE_BACKEND_SEARCH = "BACKEND_SEARCH";
+
+    /** Finite set used for planning; excluded locations carry the missing or closed fact. */
+    public record CandidateSet(int eligibleCount, List<String> candidateIds, List<ExcludedLocation> excluded,
+                               List<String> truncatedLocationIds) {}
+    public record ExcludedLocation(String locationId, String reason) {}
+
     public enum Status {
         VALIDATED,
         NEEDS_DATA,

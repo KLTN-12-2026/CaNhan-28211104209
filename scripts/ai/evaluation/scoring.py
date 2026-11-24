@@ -95,8 +95,36 @@ def recommendation_score(case,body,facts):
     return body['status']==exp['status'] and (case['category']!='MATCH' or bool(set(v['vehicleId'] for v in rows[:3]) & set(exp['acceptableVehicleIds'])))
 
 
+EXCLUSION_REASONS = {'MISSING_METADATA','MISSING_DURATION','NOT_OPEN_ON_DATE'}
+
+
+def plan_context(body,inp,s,locs,chosen):
+    """planSource/candidateSet must agree with the status and with the scenario facts."""
+    source=body['planSource']; cs=body['candidateSet']; status=body['status']
+    require(source in (None,'QWEN','BACKEND_SEARCH'),'plan source')
+    if cs is not None:
+        keys(cs,{'eligibleCount','candidateIds','excluded','truncatedLocationIds'},'candidate set')
+        ids=cs['candidateIds']; truncated=cs['truncatedLocationIds']; strings(ids); strings(truncated)
+        require(len(set(ids))==len(ids) and 1<=len(ids)<=8 and ids[0]==inp['startLocationId'],'candidate ids')
+        require(not set(ids)&set(truncated) and (set(ids)|set(truncated))<=locs.keys(),'candidate/truncated ids')
+        integer(cs['eligibleCount'],1,10000); require(cs['eligibleCount']==len(ids)+len(truncated),'eligible count')
+        require(set(ids)|set(truncated)==set(s['proof']['candidateIds']),'candidate pool facts')
+        require(isinstance(cs['excluded'],list),'excluded list'); seen=set()
+        day=iso(inp['tripDate'])
+        for e in cs['excluded']:
+            keys(e,{'locationId','reason'},'excluded location'); lid=e['locationId']
+            require(lid in locs and lid not in seen and lid not in ids and e['reason'] in EXCLUSION_REASONS,'excluded identity'); seen.add(lid)
+            m=locs[lid]['metadata']
+            actual='MISSING_METADATA' if m is None else 'MISSING_DURATION' if not m['durationMinutes'] else 'NOT_OPEN_ON_DATE' if not intervals(locs[lid],day) else None
+            require(e['reason']==actual,'exclusion reason facts')
+        if status=='VALIDATED': require(chosen<=set(ids),'order outside candidate set')
+        if status=='NO_FEASIBLE_PLAN': require(source=='BACKEND_SEARCH','infeasible concluded before the whole set was examined')
+    if status=='VALIDATED': require(source in ('QWEN','BACKEND_SEARCH') and cs is not None,'validated plan context')
+    if status in ('NEEDS_DATA','UNAVAILABLE'): require(source is None,'no plan source without a plan')
+
+
 def itinerary_score(case,body,facts):
-    keys(body,{'status','criteria','orderedLocationIds','items','totals','fingerprint','notices'},'itinerary response')
+    keys(body,{'status','criteria','orderedLocationIds','items','totals','fingerprint','notices','planSource','candidateSet'},'itinerary response')
     require(body['status'] in ('VALIDATED','NEEDS_DATA','NO_FEASIBLE_PLAN','UNAVAILABLE'),'itinerary status')
     c=body['criteria']; inp=case['input']; s=facts['scenarios'][case['fixtureRef']]
     keys(c,{'contractVersion','planVersion','tripDate','startTime','endTime','startLocationId','startLocationName','preferredCategoryId','fingerprint'},'itinerary criteria')
@@ -105,6 +133,7 @@ def itinerary_score(case,body,facts):
     locs={l['id']:l for l in s['locations']}; require(c['startLocationName']==locs[inp['startLocationId']]['name'],'start name')
     strings(body['notices']); order=body['orderedLocationIds']; chosen=unique(order)
     require(chosen<=locs.keys(),'invented location')
+    plan_context(body,inp,s,locs,chosen)
     if body['status']!='VALIDATED':
         require(body['items']==[] and body['totals'] is None and body['fingerprint'] is None,'failed preview contains schedule')
         return body['status']==case['expected']['status']
