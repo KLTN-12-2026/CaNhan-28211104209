@@ -104,35 +104,16 @@ public class ItineraryPreviewService {
                 List.of("Địa điểm bắt đầu '" + startLocation.name() + "' đóng cửa hoặc chưa có lịch mở cửa vào ngày " + request.tripDate() + "."));
         }
 
-        // Lọc candidate pool: ACTIVE, có metadata, thời lượng hợp lệ, mở cửa ngày đó
-        List<PublicView> candidateViews = catalog.stream()
-            .filter(l -> l.metadata() != null && l.metadata().durationMinutes() != null && l.metadata().durationMinutes() > 0)
-            .filter(l -> !effectiveIntervals(l.metadata(), request.tripDate()).isEmpty())
-            .toList();
+        // Tập ứng viên hữu hạn, không phụ thuộc thứ tự/tên catalog: điểm đầu, rồi loại ưu tiên, rồi ID (G6.2)
+        ItineraryCandidateSelector.Selection selection = ItineraryCandidateSelector.select(
+            catalog, startLocation, request.preferredCategoryId(),
+            view -> !effectiveIntervals(view.metadata(), request.tripDate()).isEmpty());
 
-        if (candidateViews.size() < 2) {
+        if (selection.eligibleCount() < 2) {
             return needsData(criteria, List.of("Không đủ địa điểm có thông tin mở cửa hợp lệ để lập hành trình tối thiểu 2 điểm."));
         }
 
-        // Ưu tiên theo preferredCategoryId nếu có
-        List<PublicView> filteredCandidates = new ArrayList<>();
-        filteredCandidates.add(startLocation);
-        for (PublicView view : candidateViews) {
-            if (!view.id().equals(startLocation.id())) {
-                if (request.preferredCategoryId() != null && !request.preferredCategoryId().isBlank()
-                        && view.categoryId().equals(request.preferredCategoryId())) {
-                    filteredCandidates.add(view);
-                }
-            }
-        }
-        for (PublicView view : candidateViews) {
-            if (!filteredCandidates.contains(view)) {
-                filteredCandidates.add(view);
-            }
-        }
-        if (filteredCandidates.size() > 8) {
-            filteredCandidates = filteredCandidates.subList(0, 8);
-        }
+        List<PublicView> filteredCandidates = selection.candidates();
 
         int availableWindowMinutes = (endTime.getHour() * 60 + endTime.getMinute()) - (startTime.getHour() * 60 + startTime.getMinute());
         int targetCount = 2;

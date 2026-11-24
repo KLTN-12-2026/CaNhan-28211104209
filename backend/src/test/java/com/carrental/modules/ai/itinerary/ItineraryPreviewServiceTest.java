@@ -350,4 +350,33 @@ class ItineraryPreviewServiceTest {
         assertEquals(HttpStatus.CONFLICT, ex.status);
         assertTrue(ex.getMessage().contains("đã thay đổi"));
     }
+
+    /** G6.2 regression: the planner sees the same candidates in ID order whatever the catalog (name) order is. */
+    @Test
+    void plannerReceivesIdOrderedCandidatesIndependentOfCatalogOrder() {
+        LocalDate tripDate = LocalDate.parse("2026-10-20");
+        var estimate = new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM",
+            List.of(new OsrmRoutingClient.Leg(10000.0, 900.0)));
+        when(routing.route(anyList(), any(AiRequestDeadline.class))).thenReturn(estimate);
+        when(planner.planSequence(eq("loc-a"), anyList(), anyInt(), any(AiRequestDeadline.class)))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
+        var seen = new ArrayList<List<String>>();
+        for (var catalog : List.of(List.of(locA, locB, locC), List.of(locC, locB, locA), List.of(locB, locA, locC))) {
+            when(locations.activeCatalog(user)).thenReturn(catalog);
+            var res = service.preview(user, new ItineraryPreviewRequest(tripDate, "08:00", "14:00", "loc-a", null));
+            assertEquals(ItineraryPreviewResponse.Status.VALIDATED, res.status());
+        }
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<QwenItinerarySequencePlanner.Candidate>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(planner, times(3)).planSequence(eq("loc-a"), captor.capture(), anyInt(), any(AiRequestDeadline.class));
+        for (var candidates : captor.getAllValues()) seen.add(candidates.stream().map(QwenItinerarySequencePlanner.Candidate::id).toList());
+        assertEquals(List.of(List.of("loc-a", "loc-b", "loc-c"), List.of("loc-a", "loc-b", "loc-c"), List.of("loc-a", "loc-b", "loc-c")), seen);
+
+        clearInvocations(planner);
+        when(locations.activeCatalog(user)).thenReturn(List.of(locC, locB, locA));
+        service.preview(user, new ItineraryPreviewRequest(tripDate, "08:00", "14:00", "loc-a", "cat-1"));
+        verify(planner).planSequence(eq("loc-a"), captor.capture(), anyInt(), any(AiRequestDeadline.class));
+        assertEquals(List.of("loc-a", "loc-b", "loc-c"), captor.getValue().stream().map(QwenItinerarySequencePlanner.Candidate::id).toList(),
+            "preferred category only reorders non-start candidates; none of loc-b/loc-c is cat-1, so ID order stays");
+    }
 }
