@@ -380,3 +380,21 @@ test('G3-R01 VERIFICATION_LATE at the exact review deadline uses the from-deadli
   await mount(makeBooking('booking-a', 'RECEIVED_INCOMPLETE'), c => c.url.endsWith('/deposit') ? unflagged : defaultHandler(c));
   assert.doesNotMatch(text(), /xác minh từ thời điểm hết hạn đối soát/);
 });
+
+test('R02 QR opened before the ledger GET resolves stays open when the ledger arrives and re-renders the panel', async () => {
+  const ledgerGate = deferred();
+  await mount(undefined, async c => {
+    if (c.url.endsWith('/deposit')) { await ledgerGate.promise; return { deposit: deposit({ reportedAt: '2026-10-24T03:10:00Z' }), payments: [], refunds: [], events: [], qrReconciliation: summary('REPORTED_NO_RECEIPT') }; }
+    return defaultHandler(c);
+  });
+  const section = container.querySelector('[aria-label="Tình trạng cọc của bạn"]');
+  await click('Hiển thị mã QR cọc');
+  assert.ok(container.querySelector('[aria-label="Mã QR cọc DEMO"]'), 'QR shown while ledger still pending');
+  await act(async () => ledgerGate.resolve()); await settle();
+  // Ledger mới đổi stage -> panel render lại; QR đã mở không bị mất, khu cọc không bị dựng lại.
+  assert.match(text(), /Tình trạng cọc: Đã báo chuyển — chờ nhân viên đối chiếu/);
+  assert.ok(container.querySelector('[aria-label="Mã QR cọc DEMO"] img'), 'QR still shown after ledger re-render');
+  assert.ok(container.querySelector('[aria-label="Tình trạng cọc của bạn"]') === section, 'deposit section kept its identity');
+  assert.equal(requests.filter(r => r.url.endsWith('/deposit/qr-payload')).length, 1);
+  assert.equal(requests.filter(r => r.method === 'post').length, 0);
+});
