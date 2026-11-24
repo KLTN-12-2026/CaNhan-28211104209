@@ -61,11 +61,11 @@ class MySqlMigrationTest {
   String suffix=UUID.randomUUID().toString().replace("-","");String fresh="phase5_f_"+suffix,upgrade="phase5_u_"+suffix;
   var admin=jdbc("mysql");assertTrue(admin.queryForObject("select version()",String.class).startsWith("8.4."));
   for(String schema:List.of(fresh,upgrade))admin.execute("create database `"+schema+"` character set utf8mb4 collate utf8mb4_0900_ai_ci");
-  var f=flyway(fresh,null);assertEquals(12,f.migrate().migrationsExecuted);f.validate();
+  var f=flyway(fresh,null);assertEquals(13,f.migrate().migrationsExecuted);f.validate();
   var v1=flyway(upgrade,"1");assertEquals(1,v1.migrate().migrationsExecuted);
   var u=jdbc(upgrade);try(var connection=u.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
   var before=data(u);assertFalse(before.isEmpty());
-  var v2=flyway(upgrade,null);assertEquals(11,v2.migrate().migrationsExecuted);v2.validate();
+  var v2=flyway(upgrade,null);assertEquals(12,v2.migrate().migrationsExecuted);v2.validate();
   // All original columns/rows must remain exactly equal; only new nullable event fields differ.
   var after=data(u);stripReturnPolicyColumns(after);stripPhotoColumns(after);for(var row:after){if("incident_events".equals(row.get("_table")))for(String c:List.of("previous_status","next_status","assessed_damage","third_party_coverage","requested_amount","responsibility_basis")){assertNull(row.remove(c));}if("vehicles".equals(row.get("_table")))assertNull(row.remove("created_at"));}
   for(var row:after)if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));
@@ -76,7 +76,7 @@ class MySqlMigrationTest {
   assertEquals(0,u.queryForObject("select count(*) from information_schema.columns where table_schema=database() and table_name='reviews' and column_name='vehicle_id'",Integer.class));
   assertEquals("bigint",u.queryForObject("select data_type from information_schema.columns where table_schema=database() and table_name='incident_events' and column_name='requested_amount'",String.class));
   assertEquals(0,v2.migrate().migrationsExecuted);
-  for(String schema:List.of(fresh,upgrade))assertEquals(12,jdbc(schema).queryForObject("select count(*) from flyway_schema_history where success=1",Integer.class));
+  for(String schema:List.of(fresh,upgrade))assertEquals(13,jdbc(schema).queryForObject("select count(*) from flyway_schema_history where success=1",Integer.class));
   String output=System.getenv("KDRIVE_MIGRATION_ARTIFACT_DIR");if(output!=null){Path dir=Path.of(output);Files.createDirectories(dir);Files.writeString(dir.resolve("migration-schema.txt"),"fresh="+fresh+"\nupgrade="+upgrade+"\n"+structure(u));Files.writeString(dir.resolve("upgrade-preservation.txt"),"before="+before+"\nafter="+after+"\nequal="+before.equals(after));Files.writeString(dir.resolve("flyway-history.txt"),u.queryForList("select * from flyway_schema_history order by installed_rank").toString());}
  }
  @Test void v2UpgradePreservesVehicleRowsAndAddsUnknownCreationDate(){
@@ -85,7 +85,7 @@ class MySqlMigrationTest {
   flyway(schema,"2").migrate();var j=jdbc(schema);
   try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}catch(Exception e){throw new RuntimeException(e);}
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2') order by version");
-  var finalFlyway=flyway(schema,null);assertEquals(10,finalFlyway.migrate().migrationsExecuted);finalFlyway.validate();
+  var finalFlyway=flyway(schema,null);assertEquals(11,finalFlyway.migrate().migrationsExecuted);finalFlyway.validate();
   var after=data(j);stripReturnPolicyColumns(after);stripPhotoColumns(after);for(var row:after){if("vehicles".equals(row.get("_table")))assertNull(row.remove("created_at"));if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));}assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2') order by version"));
   assertEquals(1,j.queryForObject("select count(*) from flyway_schema_history where version='3' and success=1",Integer.class));
@@ -100,7 +100,7 @@ class MySqlMigrationTest {
   j.update("insert into location_categories(id,name) values('legacy-lc','Legacy category')");
   j.update("insert into locations(id,category_id,name,latitude,longitude,status) values('legacy-location','legacy-lc','Legacy location',16.0611,108.2232,'ACTIVE')");
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
-  var upgrade=flyway(schema,null);assertEquals(9,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(10,upgrade.migrate().migrationsExecuted);upgrade.validate();
   var after=data(j);stripReturnPolicyColumns(after);stripPhotoColumns(after);for(var row:after)if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));
   assertEquals(before,after);assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3') order by version"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
@@ -125,7 +125,7 @@ class MySqlMigrationTest {
   String userId=j.queryForObject("select id from users order by id limit 1",String.class);
   j.update("insert into driver_licenses(id,user_id,license_number,scheme,license_class,expires_on,automatic_only,status,version) values('upgrade-license',?,'SYNTHETIC-UPGRADE','VN_2025','B','2030-12-31',false,'VERIFIED',7)",userId);
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
-  var upgrade=flyway(schema,null);assertEquals(8,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(9,upgrade.migrate().migrationsExecuted);upgrade.validate();
   var after=data(j);stripReturnPolicyColumns(after);stripPhotoColumns(after);assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3','4') order by version"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
@@ -150,7 +150,7 @@ class MySqlMigrationTest {
   flyway(schema,"5").migrate();var j=jdbc(schema);
   try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
   var before=data(j);assertFalse(before.isEmpty());var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
-  var upgrade=flyway(schema,null);assertEquals(7,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(8,upgrade.migrate().migrationsExecuted);upgrade.validate();
   var after=data(j);stripReturnPolicyColumns(after);stripDepositColumns(after);assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3','4','5') order by version"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
@@ -167,7 +167,7 @@ class MySqlMigrationTest {
   j.update("update bookings set deposit_required=true,deposit_amount=300,deposit_policy='sandbox-deposit-30-v1' where id=?",booking);
   j.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,applied) values('legacy-pay',?,300,'SUCCEEDED',UTC_TIMESTAMP(),UTC_TIMESTAMP(),true)",booking);
   var oldHistory=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
-  var upgrade=flyway(schema,null);assertEquals(6,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(7,upgrade.migrate().migrationsExecuted);upgrade.validate();
   assertEquals(oldHistory,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=6 order by installed_rank"));
   assertEquals(300,j.queryForObject("select applied_amount from payment_transactions where id='legacy-pay'",Long.class));
   assertEquals("VNPAY_SANDBOX",j.queryForObject("select deposit_method from bookings where id=?",String.class,booking));
@@ -184,7 +184,7 @@ class MySqlMigrationTest {
   String booking=j.queryForObject("select id from bookings order by id limit 1",String.class);
   j.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,applied,applied_amount) values('v9-preserved',?,300,'SUCCEEDED',UTC_TIMESTAMP(),UTC_TIMESTAMP(),true,300)",booking);
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
-  var upgraded=flyway(schema,null);assertEquals(3,upgraded.migrate().migrationsExecuted);upgraded.validate();
+  var upgraded=flyway(schema,null);assertEquals(4,upgraded.migrate().migrationsExecuted);upgraded.validate();
   var after=data(j);stripReturnPolicyColumns(after);assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=9 order by installed_rank"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
@@ -201,7 +201,7 @@ class MySqlMigrationTest {
   j.update("update bookings set return_policy_version='same-branch-return-v1',return_policy_snapshot=?,return_policy_accepted_at='2026-10-23 03:00:00' where id=?",terms,booking);
   j.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,applied,applied_amount) values('v10-preserved',?,300,'SUCCEEDED',UTC_TIMESTAMP(),UTC_TIMESTAMP(),true,300)",booking);
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
-  var upgraded=flyway(schema,null);assertEquals(2,upgraded.migrate().migrationsExecuted);upgraded.validate();
+  var upgraded=flyway(schema,null);assertEquals(3,upgraded.migrate().migrationsExecuted);upgraded.validate();
   var after=data(j);stripReturnAssessmentColumns(after);assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=10 order by installed_rank"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));assertEquals(0,upgraded.migrate().migrationsExecuted);
@@ -212,9 +212,28 @@ class MySqlMigrationTest {
   try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
   j.update("update bookings set return_assessment='{\"amountVnd\":1950000,\"collectionStatus\":\"UNPAID\"}'");
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
-  var upgraded=flyway(schema,null);assertEquals(1,upgraded.migrate().migrationsExecuted);upgraded.validate();
+  var upgraded=flyway(schema,null);assertEquals(2,upgraded.migrate().migrationsExecuted);upgraded.validate();
   assertEquals(before,data(j));assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=11 order by installed_rank"));
   assertEquals(0,j.queryForObject("select count(*) from booking_return_settlements",Integer.class));
+  assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(0,upgraded.migrate().migrationsExecuted);
+ }
+ @Test void v12UpgradeAddsEmptyCustomerNoteAndPreservesRefundsAndHistory()throws Exception{
+  // QR-D4: V13 only adds a nullable customer_note; existing refund rows, internal reasons and history stay unchanged.
+  String schema="phase5_v12_"+UUID.randomUUID().toString().replace("-","");jdbc("mysql").execute("create database `"+schema+"` character set utf8mb4 collate utf8mb4_0900_ai_ci");
+  flyway(schema,"12").migrate();var j=jdbc(schema);
+  try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
+  String booking=j.queryForObject("select id from bookings order by id limit 1",String.class);
+  j.update("insert into payment_transactions(id,booking_id,amount,status,created_at,expires_at,applied,applied_amount) values('v12-pay',?,300,'SUCCEEDED',UTC_TIMESTAMP(),UTC_TIMESTAMP(),false,0)",booking);
+  j.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,created_at,business_key) values('v12-refund','v12-pay',?,100,'APPROVED','LATE_CUSTOMER','Internal reason before V13',UTC_TIMESTAMP(),'v12-pay:LATE_CUSTOMER')",booking);
+  var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
+  var upgraded=flyway(schema,null);assertEquals(1,upgraded.migrate().migrationsExecuted);upgraded.validate();
+  var after=data(j);for(var row:after)if("payment_refunds".equals(row.get("_table")))assertNull(row.remove("customer_note"),"existing refunds keep an empty customer note");
+  assertEquals(before,after);
+  assertEquals("Internal reason before V13",j.queryForObject("select reason from payment_refunds where id='v12-refund'",String.class));
+  assertEquals("YES",j.queryForObject("select is_nullable from information_schema.columns where table_schema=database() and table_name='payment_refunds' and column_name='customer_note'",String.class));
+  assertEquals(500L,j.queryForObject("select character_maximum_length from information_schema.columns where table_schema=database() and table_name='payment_refunds' and column_name='customer_note'",Long.class));
+  assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=12 order by installed_rank"));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
   assertEquals(0,upgraded.migrate().migrationsExecuted);
  }

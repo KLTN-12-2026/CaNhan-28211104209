@@ -8,21 +8,21 @@ import { getErrorMessage } from '../../utils/roles';
 import { toVietnamInstant } from '../../utils/calendarDate';
 import { vietnamNowInput } from '../../utils/qrReceipt';
 import { userRefundKind } from '../../utils/userRefund';
-import { matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
+import { customerNoteValue, validateCustomerNote, matchesPaymentSearch, refundDate, refundResult, refundSummary, validateRefundAmount, validateRefundCompletion } from '../../utils/adminRefund';
 
 const activeRefunds = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'FAILED']);
 const knownRefundStatuses = new Set(['REQUESTED', 'APPROVED', 'PROCESSING', 'UNKNOWN', 'SUCCEEDED', 'FAILED', 'DECLINED']);
 const actionLabels = { create: 'Tạo yêu cầu hoàn', decide: 'Duyệt khoản hoàn', process: 'Bắt đầu xử lý hoàn', complete: 'Xác nhận đã hoàn DEMO', reconcile: 'Truy vấn kết quả' };
 
 export function RefundRow({ item, run, busy, depositMethod = item.depositMethod, payment }) {
-  const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState('');
+  const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState(''), [note, setNote] = useState('');
   const [form, setForm] = useState({ recipientAccount: '', reference: '', transferTime: '' });
   const [verified, setVerified] = useState(false), [error, setError] = useState('');
   const isQr = depositMethod === 'DEMO_QR_MANUAL';
   function decide(e) {
-    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, item.amount, true);
+    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, item.amount, true) || validateCustomerNote(note);
     if (invalid) { setError(invalid); return; } setError('');
-    run(`/admin/refunds/${item.id}/decide`, { expectedVersion: item.version, amount: Number(amount), reason: reason.trim() }, { type: 'decide', item });
+    run(`/admin/refunds/${item.id}/decide`, { expectedVersion: item.version, amount: Number(amount), reason: reason.trim(), customerNote: customerNoteValue(note) }, { type: 'decide', item });
   }
   function complete(e) {
     e.preventDefault(); const invalid = validateRefundCompletion(form, payment?.sourceAccount, verified);
@@ -32,6 +32,7 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
   return <section className="panel space-y-3" aria-label={`Yêu cầu hoàn ${item.id}`}>
     <Link to={`/admin/bookings/${item.bookingId}`}>Đơn {item.bookingId.slice(0, 8)}</Link>
     <p><strong>{refundLabels[item.status] || 'Cần kiểm tra'}</strong> · {money(item.amount)} · {item.reason}</p>
+    <p className="text-sm">{item.customerNote ? <>Thông báo cho khách: {item.customerNote}</> : 'Chưa có thông báo cho khách — khách chỉ thấy giải thích theo loại và trạng thái hoàn.'}</p>
     <p>Nguyên nhân: {userRefundKind(item.kind)} ({item.kind || '—'})</p>
     <p>{isQr ? 'QR DEMO · Không chuyển tiền thật' : 'VNPAY Sandbox'} · Tạo lúc {refundDate(item.createdAt)}</p>
     {item.status === 'SUCCEEDED' && <p>Đã hoàn — kết quả đã xác minh với tham chiếu {item.providerTransaction || '—'}.</p>}
@@ -51,6 +52,9 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
         <label className="field">Số tiền hoàn (VND)<input type="number" min="0" max={item.amount} step="1" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
         <p>Tối đa {money(item.amount)}. Quyết định 0đ là không hoàn, bắt buộc có lý do.</p>
         <label className="field">Lý do quyết định<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label>
+        <p className="text-sm">Lý do quyết định là ghi chú nội bộ; khách không thấy.</p>
+        <label className="field">Thông báo cho khách (không bắt buộc)<textarea maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
+        <p className="text-sm">Khách sẽ thấy nội dung này trong tình trạng hoàn của đơn. Không ghi thông tin nội bộ.</p>
         <button className="btn" type="submit">Duyệt khoản hoàn</button>
       </form>}
       {item.status === 'APPROVED' && <>
@@ -73,11 +77,11 @@ export function RefundRow({ item, run, busy, depositMethod = item.depositMethod,
 }
 
 export function ManualRefundForm({ payment, available, run, busy }) {
-  const [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [error, setError] = useState('');
+  const [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [note, setNote] = useState(''), [error, setError] = useState('');
   function submit(e) {
-    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, available);
+    e.preventDefault(); const invalid = validateRefundAmount(amount, reason, available) || validateCustomerNote(note);
     if (invalid) { setError(invalid); return; } setError('');
-    run('/admin/refunds/create-manual', { paymentId: payment.id, amount: Number(amount), reason: reason.trim() }, { type: 'create', item: payment });
+    run('/admin/refunds/create-manual', { paymentId: payment.id, amount: Number(amount), reason: reason.trim(), customerNote: customerNoteValue(note) }, { type: 'create', item: payment });
   }
   return <section className="panel space-y-3" aria-label="Tạo yêu cầu hoàn thủ công">
     <p>QR DEMO · Khoản nhận {payment.providerTransaction || payment.id.slice(0, 8)}</p>
@@ -86,6 +90,8 @@ export function ManualRefundForm({ payment, available, run, busy }) {
     <fieldset disabled={busy}><form className="space-y-2" onSubmit={submit}>
       <label className="field">Số tiền yêu cầu hoàn (VND)<input type="number" min="1" max={available} step="1" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
       <label className="field">Lý do yêu cầu hoàn<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label>
+      <p className="text-sm">Lý do là ghi chú nội bộ; khách không thấy.</p>
+      <label className="field">Thông báo cho khách (không bắt buộc)<textarea maxLength={500} value={note} onChange={e => setNote(e.target.value)} /></label>
       <button className="btn" type="submit">Tạo yêu cầu hoàn</button>
     </form></fieldset>
   </section>;
@@ -178,7 +184,8 @@ export default function ApiPaymentsPage() {
       <h2>{actionLabels[review.type] || 'Truy vấn kết quả hoàn'}</h2>
       <p>Đơn {review.item.bookingId.slice(0, 8)} · Khoản {review.item.id.slice(0, 8)} · Hiện tại: {(['create', 'reconcile'].includes(review.type) ? paymentLabels : refundLabels)[review.item.status]}</p>
       <p>Số tiền: {money(review.body.amount ?? review.item.amount)} · {review.item.depositMethod === 'DEMO_QR_MANUAL' ? 'QR DEMO — Không chuyển tiền thật' : 'VNPAY Sandbox'}</p>
-      {review.body.reason && <p>Lý do: {review.body.reason}</p>}
+      {review.body.reason && <p>Lý do nội bộ (khách không thấy): {review.body.reason}</p>}
+      {['decide', 'create'].includes(review.type) && <p>Thông báo cho khách: {review.body.customerNote || 'Không có — khách chỉ thấy giải thích theo loại và trạng thái hoàn.'}</p>}
       {review.type === 'complete' && <><p>Tài khoản nhận giả lập: {review.body.recipientAccount} · Tham chiếu: {review.body.reference}</p><p>Thời điểm hoàn (giờ Việt Nam): {refundDate(review.body.transferTime)}</p></>}
       <p>{review.type === 'complete' ? 'Chỉ xác nhận sau khi đã đối chiếu kết quả hoàn DEMO.' : 'Thao tác này chưa xác nhận tiền đã hoàn.'}</p>
       <button className="btn" onClick={submit}>Xác nhận thao tác</button>

@@ -238,6 +238,29 @@ class QrDemoHttpTest {
         var ra=refundOf(r.id(),"R-AFTER");assertEquals("APPROVED",ra.status());assertEquals("UNAPPLIED",ra.kind());assertEquals(40000,ra.amount());
         assertEquals(0,count("contracts",r.id()));assertEquals("REJECTED",current(r.id()).status());
     }
+    @Test void customerSeesOnlyTheAdminCustomerNoteNeverTheInternalReason()throws Exception {
+        // QR-D4 (phương án C): reason stays internal; customerNote is the only decision text the owner receives.
+        var b=lateCustomerCancelled("D4-A");var pending=repo.refunds(b.id()).getFirst();assertNull(pending.customerNote(),"automatic refunds carry no customer note");
+        var bad=new LinkedHashMap<String,Object>(Map.of("expectedVersion",pending.version(),"amount",100000,"reason","Internal: customer called late","customerNote","x".repeat(501)));
+        assertEquals(400,post(admin,"/admin/refunds/"+pending.id()+"/decide",bad).getStatus());assertEquals("REQUESTED",repo.refund(pending.id()).status());
+        var ok=new LinkedHashMap<String,Object>(Map.of("expectedVersion",pending.version(),"amount",195000,"reason","Internal: customer called late, policy 50%","customerNote","  Hoàn 50% theo chính sách hủy sát giờ.  "));
+        assertEquals(200,post(admin,"/admin/refunds/"+pending.id()+"/decide",ok).getStatus());
+        var decided=repo.refund(pending.id());assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",decided.customerNote());assertEquals("Internal: customer called late, policy 50%",decided.reason());
+        var customer=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString()).get("refunds").get(0);
+        assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",customer.get("customerNote").asText());assertFalse(customer.has("reason"));
+        assertFalse(customer.toString().contains("Internal"),"internal reason never reaches the customer");
+        for(Actor operator:List.of(staff,admin)) {
+            var row=json.readTree(get(operator,"/bookings/"+b.id()+"/deposit").getContentAsString()).get("refunds").get(0);
+            assertEquals("Internal: customer called late, policy 50%",row.get("reason").asText());assertEquals("Hoàn 50% theo chính sách hủy sát giờ.",row.get("customerNote").asText());
+        }
+        // Manual request: blank note is stored as no note; decision may add one.
+        var c=approve();verify(c.id(),"D4-M",200000);var pay=repo.forBooking(c.id()).getFirst();
+        var created=json.readTree(post(admin,"/admin/refunds/create-manual",new LinkedHashMap<String,Object>(Map.of("paymentId",pay.id(),"amount",50000,"reason","Internal manual","customerNote","   "))).getContentAsString());
+        assertTrue(created.get("customerNote").isNull());
+        var withNote=post(admin,"/admin/refunds/create-manual",new LinkedHashMap<String,Object>(Map.of("paymentId",pay.id(),"amount",50000,"reason","Internal manual","customerNote","Ghi chú cho khách"))).getStatus();
+        assertEquals(409,withNote,"one manual request per receipt is unchanged");
+        assertEquals(403,post(staff,"/admin/refunds/"+created.get("id").asText()+"/decide",new LinkedHashMap<String,Object>(Map.of("expectedVersion",0,"amount",0,"reason","x","customerNote","y"))).getStatus());
+    }
     @Test void depositLedgerIsRoleScopedForTheCustomer()throws Exception {
         // D1: same booking, same data; the owner gets no internal identities, idempotency keys or internal event log.
         var b=approve();verify(b.id(),"A",200000);
@@ -250,8 +273,8 @@ class QrDemoHttpTest {
         for(String kept:List.of("id","amount","status","appliedAmount","providerTransaction","transferTime","transferNote","sourceAccount","verifiedAt")) assertTrue(pay.has(kept),"USER payment misses "+kept);
         assertEquals(200000,pay.get("amount").asLong());assertEquals(0,pay.get("appliedAmount").asLong());assertEquals("A",pay.get("providerTransaction").asText());
         var refund=customer.get("refunds").get(0);
-        for(String hidden:List.of("approvedBy","requestDate","version")) assertFalse(refund.has(hidden),"USER refund exposes "+hidden);
-        for(String kept:List.of("id","amount","status","kind","reason","approvedAt")) assertTrue(refund.has(kept),"USER refund misses "+kept);
+        for(String hidden:List.of("approvedBy","requestDate","version","reason")) assertFalse(refund.has(hidden),"USER refund exposes "+hidden);
+        for(String kept:List.of("id","amount","status","kind","customerNote","approvedAt")) assertTrue(refund.has(kept),"USER refund misses "+kept);
         assertEquals(50000,refund.get("amount").asLong());assertEquals("MANUAL_EXCESS",refund.get("kind").asText());assertEquals("APPROVED",refund.get("status").asText());
         assertFalse(customer.toString().contains(staff.id()),"USER ledger leaks the verifier id");
         assertFalse(customer.toString().contains(admin.id()),"USER ledger leaks the approver id");

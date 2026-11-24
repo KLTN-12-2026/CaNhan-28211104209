@@ -167,3 +167,23 @@ test('D2 server rejection of a keyword is shown and no stale rows remain',async(
   await change('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)','abcdef');await searchSubmit();
   assert.match(container.textContent,/HTTP 400/);assert.ok(!container.querySelector('[aria-label="Khoản nhận pay-1"]'),'no stale rows from the previous list');
 });
+test('D4 decision sends an optional customer note separately from the internal reason and matches it on readback',async()=>{
+  await mount(c=>{if(c.method==='post'){Object.assign(serverData.refunds[0],{amount:c.body.amount,reason:c.body.reason,customerNote:c.body.customerNote,status:'APPROVED',version:1});return serverData.refunds[0];}return copy(serverData);});
+  await change('Số tiền hoàn (VND)','40000');await change('Lý do quyết định','Nội bộ: khách gọi báo hủy');
+  await change('Thông báo cho khách (không bắt buộc)','x'.repeat(501));await click('Duyệt khoản hoàn');
+  assert.match(container.textContent,/Thông báo cho khách tối đa 500 ký tự/);assert.equal(posts().length,0);
+  await change('Thông báo cho khách (không bắt buộc)','  Hoàn 40.000 ₫ theo chính sách hủy.  ');await click('Duyệt khoản hoàn');
+  const dialog=container.querySelector('[role="dialog"]').textContent;
+  assert.match(dialog,/Lý do nội bộ \(khách không thấy\): Nội bộ: khách gọi báo hủy/);assert.match(dialog,/Thông báo cho khách: Hoàn 40\.000 ₫ theo chính sách hủy\./);
+  await click('Xác nhận thao tác');
+  assert.deepEqual(posts()[0].body,{expectedVersion:0,amount:40000,reason:'Nội bộ: khách gọi báo hủy',customerNote:'Hoàn 40.000 ₫ theo chính sách hủy.'});
+  assert.match(container.textContent,/Đã kiểm tra kết quả: Đã duyệt hoàn/);
+  await change('Trạng thái hoàn','');assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Thông báo cho khách: Hoàn 40\.000 ₫ theo chính sách hủy\./);
+});
+test('D4 blank customer note is sent as null and the row says the customer only sees the generic explanation',async()=>{
+  await mount(c=>{if(c.method==='post'){Object.assign(serverData.refunds[0],{amount:c.body.amount,reason:c.body.reason,customerNote:c.body.customerNote,status:'APPROVED',version:1});return serverData.refunds[0];}return copy(serverData);});
+  assert.match(container.querySelector('[aria-label="Yêu cầu hoàn refund-1"]').textContent,/Chưa có thông báo cho khách/);
+  await change('Số tiền hoàn (VND)','40000');await change('Lý do quyết định','Nội bộ');await change('Thông báo cho khách (không bắt buộc)','   ');await click('Duyệt khoản hoàn');
+  assert.match(container.querySelector('[role="dialog"]').textContent,/Thông báo cho khách: Không có/);
+  await click('Xác nhận thao tác');assert.equal(posts()[0].body.customerNote,null);
+});

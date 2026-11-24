@@ -316,7 +316,7 @@ const ledgerWith = (stage, summaryExtra, refunds, depositExtra = {}) => ({
   deposit: deposit(depositExtra), payments: [], refunds, events: [], qrReconciliation: summary(stage, summaryExtra),
 });
 const refundRows = [
-  { id: 'r1', paymentId: 'p1', amount: 200000, status: 'APPROVED', kind: 'LATE', reason: 'Khoản đến sau hạn', approvedBy: 'admin-secret', approvedAt: '2026-10-24T05:00:00Z' },
+  { id: 'r1', paymentId: 'p1', amount: 200000, status: 'APPROVED', kind: 'LATE', reason: 'Khoản đến sau hạn', customerNote: 'Hoàn toàn bộ khoản chuyển muộn.', approvedBy: 'admin-secret', approvedAt: '2026-10-24T05:00:00Z' },
   { id: 'r2', paymentId: 'p2', amount: 100000, status: 'SUCCEEDED', kind: 'EXCESS', reason: '', approvedBy: 'admin-secret', approvedAt: '2026-10-24T05:10:00Z' },
   { id: 'r3', paymentId: 'p3', amount: 50000, status: 'PROCESSING', kind: 'FUTURE_KIND', reason: null },
 ];
@@ -326,7 +326,9 @@ test('G3.4 USER refund lifecycle never treats approval/processing as refunded an
   await mount(booking, c => c.url.endsWith('/deposit') ? ledgerWith('CLOSED', { receivedAmount: 350000, appliedAmount: 0 }, refundRows) : defaultHandler(c));
   const section = container.querySelector('[aria-label="Tình trạng hoàn của bạn"]').textContent.replaceAll(' ', ' ');
   assert.match(section, /Đã hoàn \(đã xác minh\): 100\.000 ₫ · Đang chờ hoặc xử lý, chưa hoàn: 250\.000 ₫/);
-  assert.match(section, /Hoàn 200\.000 ₫ · Đã duyệt, chưa hoàn tiền.*Chưa hoàn tiền\..*Nguyên nhân: Khoản nhận không đủ điều kiện thời hạn · Khoản đến sau hạn/);
+  assert.match(section, /Hoàn 200\.000 ₫ · Đã duyệt, chưa hoàn tiền.*Chưa hoàn tiền\..*Nguyên nhân: Khoản nhận không đủ điều kiện thời hạnThông báo từ quản trị viên: Hoàn toàn bộ khoản chuyển muộn\./);
+  // D4: lý do nội bộ không bao giờ hiện cho khách, kể cả khi API cũ còn gửi kèm.
+  assert.doesNotMatch(section, /Khoản đến sau hạn/);
   assert.match(section, /Hoàn 100\.000 ₫ · Đã hoàn/);
   assert.match(section, /Hoàn 50\.000 ₫ · Đang xử lý hoàn.*Chưa xác nhận đã hoàn tiền.*Nguyên nhân: Khác/);
   assert.doesNotMatch(text(), /admin-secret|Duyệt bởi|Loại: LATE|FUTURE_KIND/);

@@ -92,7 +92,8 @@ public class PaymentService {
     static Map<String, Object> customerRefund(Refund r) {
         var m = new LinkedHashMap<String, Object>();
         m.put("id", r.id()); m.put("paymentId", r.paymentId()); m.put("bookingId", r.bookingId()); m.put("amount", r.amount());
-        m.put("status", r.status()); m.put("kind", r.kind()); m.put("reason", r.reason()); m.put("approvedAt", r.approvedAt());
+        // D4: never the internal reason; only the note the Admin wrote for the customer.
+        m.put("status", r.status()); m.put("kind", r.kind()); m.put("customerNote", r.customerNote()); m.put("approvedAt", r.approvedAt());
         m.put("createdAt", r.createdAt()); m.put("providerTransaction", r.providerTransaction()); m.put("depositMethod", r.depositMethod());
         return m;
     }
@@ -216,9 +217,23 @@ public class PaymentService {
 
     @Transactional
     public Object decide(Actor admin, String refundId, long version, long amount, String reason) {
+        return decide(admin, refundId, version, amount, reason, null);
+    }
+
+    /** D4: the reason stays internal; the optional customer note is the only decision text the customer sees. */
+    static String customerNote(String note) {
+        if (note == null || note.isBlank()) return null;
+        String trimmed = note.strip();
+        if (trimmed.length() > 500) throw DomainException.bad("Thông báo cho khách tối đa 500 ký tự.");
+        return trimmed;
+    }
+
+    @Transactional
+    public Object decide(Actor admin, String refundId, long version, long amount, String reason, String note) {
         admin.require("ADMIN");
         if (reason == null || reason.isBlank() || reason.length() > 1000)
             throw DomainException.bad("Cần lý do hoàn tiền, tối đa 1000 ký tự.");
+        String customerNote = customerNote(note);
         var first = repo.refund(refundId);
         bookings.depositLock(first.bookingId());
         var firstRefund = repo.refund(refundId);
@@ -227,7 +242,7 @@ public class PaymentService {
         var p = repo.lockPayment(r.paymentId());
         if (!"SUCCEEDED".equals(p.status()) || amount < 0 || amount > p.amount() - repo.reserved(p.id(), r.id()))
             throw DomainException.bad("Số tiền hoàn vượt tiền đã nhận.");
-        repo.decide(r.id(), version, amount, reason, admin.id(), clock.instant());
+        repo.decide(r.id(), version, amount, reason, customerNote, admin.id(), clock.instant());
         repo.event(p.bookingId(), p.id(), "REFUND_DECIDED", reason, admin.id(), clock.instant(), null);
         return repo.refund(r.id());
     }
@@ -265,9 +280,15 @@ public class PaymentService {
 
     @Transactional
     public Object createManualRefund(Actor admin, String paymentId, long amount, String reason) {
+        return createManualRefund(admin, paymentId, amount, reason, null);
+    }
+
+    @Transactional
+    public Object createManualRefund(Actor admin, String paymentId, long amount, String reason, String note) {
         admin.require("ADMIN");
         if (reason == null || reason.isBlank() || reason.length() > 1000)
             throw DomainException.bad("Cần lý do hoàn tiền, tối đa 1000 ký tự.");
+        String customerNote = customerNote(note);
         var first = repo.payment(paymentId).orElseThrow(DomainException::missing);
         bookings.depositLock(first.bookingId());
         var p = repo.lockPayment(paymentId);
@@ -278,13 +299,13 @@ public class PaymentService {
         if (amount <= 0 || amount > available)
             throw DomainException.bad("Số tiền hoàn vượt tiền có sẵn.");
         String refundId = id();
-        repo.createRefund(refundId, p, amount, "REQUESTED", "MANUAL_EXCESS", reason, clock.instant());
+        repo.createRefund(refundId, p, amount, "REQUESTED", "MANUAL_EXCESS", reason, customerNote, clock.instant());
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, admin.id(), clock.instant(), "refund:" + refundId);
         return repo.refund(refundId);
     }
 
-    public Object decideManualRefund(Actor admin, String refundId, long version, long amount, String reason) {
-        return decide(admin, refundId, version, amount, reason);
+    public Object decideManualRefund(Actor admin, String refundId, long version, long amount, String reason, String note) {
+        return decide(admin, refundId, version, amount, reason, note);
     }
 
     @Transactional

@@ -35,7 +35,7 @@ public class DepositController {
     public record Approval(long expectedVersion) {}
     public record NoShow(long expectedVersion, boolean contacted, boolean notDelivered, String reason) {}
     public record Decision(long expectedVersion,
-        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason, String customerNote) {}
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
     public record VerifyInput(String transactionRef,
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amountVnd,
@@ -59,9 +59,9 @@ public class DepositController {
         }
     }
     public record ManualRefundInput(String paymentId,
-        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason, String customerNote) {}
     public record ManualRefundDecideInput(long expectedVersion,
-        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason, String customerNote) {}
     public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime, long expectedVersion) {}
 
     @GetMapping("/bookings/{id}/deposit")
@@ -144,7 +144,7 @@ public class DepositController {
 
     @PostMapping("/admin/refunds/{id}/decide")
     public Object decide(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody Decision input) {
-        return payments.decide(actor, id, input.expectedVersion(), input.amount(), input.reason());
+        return payments.decide(actor, id, input.expectedVersion(), input.amount(), input.reason(), input.customerNote());
     }
 
     @PostMapping("/admin/refunds/{id}/process")
@@ -159,12 +159,12 @@ public class DepositController {
 
     @PostMapping("/admin/refunds/create-manual")
     public Object createManualRefund(@AuthenticationPrincipal Actor actor, @RequestBody ManualRefundInput input) {
-        return payments.createManualRefund(actor, input.paymentId(), input.amount(), input.reason());
+        return payments.createManualRefund(actor, input.paymentId(), input.amount(), input.reason(), input.customerNote());
     }
 
     @PostMapping("/admin/refunds/{id}/decide-manual")
     public Object decideManualRefund(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody ManualRefundDecideInput input) {
-        return payments.decideManualRefund(actor, id, input.expectedVersion(), input.amount(), input.reason());
+        return payments.decideManualRefund(actor, id, input.expectedVersion(), input.amount(), input.reason(), input.customerNote());
     }
 
     @PostMapping("/admin/refunds/{id}/process-manual")

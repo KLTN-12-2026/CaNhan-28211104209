@@ -322,11 +322,13 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       {refundList.map(r => { const s = userRefundStatus(r.status); return <div key={r.id} className="mt-2 panel">
         <p className="font-medium">Hoàn {money(r.amount)} · {s.label}</p>
         <p className="text-sm">{s.detail}</p>
-        <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}{r.reason ? ` · ${r.reason}` : ''}</p>
+        <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}</p>
+        {r.customerNote ? <p className="text-sm">Thông báo từ quản trị viên: {r.customerNote}</p> : null}
       </div>; })}
     </section>}
     {role !== 'USER' && data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">
       <p className="font-medium">Hoàn {money(r.amount)} · {refundLabels[r.status] || 'Cần kiểm tra'} · {r.reason}</p>
+      {r.customerNote ? <p className="text-sm">Thông báo cho khách: {r.customerNote}</p> : null}
       <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)} ({r.kind || '—'}) · Duyệt bởi: {r.approvedBy || '—'} · {r.approvedAt ? date(r.approvedAt) : '—'}</p>
     </div>)}
 

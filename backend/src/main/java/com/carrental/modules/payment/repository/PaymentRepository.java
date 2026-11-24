@@ -20,7 +20,7 @@ public class PaymentRepository {
 
     public record Refund(String id, String paymentId, String bookingId, long amount, String status, String kind,
                          String reason, String approvedBy, Instant approvedAt, Instant createdAt,
-                         String providerTransaction, String requestDate, long version, String depositMethod) {}
+                         String providerTransaction, String requestDate, long version, String depositMethod, String customerNote) {}
 
     private static Instant instant(java.sql.ResultSet r, String name) throws java.sql.SQLException {
         var t = r.getTimestamp(name); return t == null ? null : t.toInstant();
@@ -41,7 +41,7 @@ public class PaymentRepository {
         r.getString("status"), r.getString("kind"), r.getString("reason"), r.getString("approved_by"),
         instant(r, "approved_at"), instant(r, "created_at"), r.getString("provider_transaction"),
         r.getString("request_date"), r.getLong("version"),
-        r.getString("deposit_method")
+        r.getString("deposit_method"), r.getString("customer_note")
     );
 
     public Optional<Payment> payment(String id) {
@@ -125,13 +125,17 @@ public class PaymentRepository {
     }
 
     public void createRefund(String id, Payment p, long amount, String status, String kind, String reason, Instant now) {
-        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,created_at,business_key) values(?,?,?,?,?,?,?,?,?)",
-            id, p.id(), p.bookingId(), amount, status, kind, reason, Timestamp.from(now), p.id()+":"+kind);
+        createRefund(id, p, amount, status, kind, reason, null, now);
     }
 
-    public void decide(String id, long version, long amount, String reason, String actor, Instant now) {
-        int rows = jdbc.update("update payment_refunds set amount=?,status=?,reason=?,approved_by=?,approved_at=?,version=version+1 where id=? and version=? and status='REQUESTED'",
-            amount, amount == 0 ? "DECLINED" : "APPROVED", reason, actor, Timestamp.from(now), id, version);
+    public void createRefund(String id, Payment p, long amount, String status, String kind, String reason, String customerNote, Instant now) {
+        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,customer_note,created_at,business_key) values(?,?,?,?,?,?,?,?,?,?)",
+            id, p.id(), p.bookingId(), amount, status, kind, reason, customerNote, Timestamp.from(now), p.id()+":"+kind);
+    }
+
+    public void decide(String id, long version, long amount, String reason, String customerNote, String actor, Instant now) {
+        int rows = jdbc.update("update payment_refunds set amount=?,status=?,reason=?,customer_note=?,approved_by=?,approved_at=?,version=version+1 where id=? and version=? and status='REQUESTED'",
+            amount, amount == 0 ? "DECLINED" : "APPROVED", reason, customerNote, actor, Timestamp.from(now), id, version);
         if (rows != 1) throw DomainException.conflict("Yêu cầu hoàn đã thay đổi hoặc đã được quyết định.");
     }
 
